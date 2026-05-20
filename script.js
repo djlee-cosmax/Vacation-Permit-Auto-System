@@ -22,9 +22,9 @@ var leaves = JSON.parse(localStorage.getItem('p5_leaves') || '[]');
 // leave: { id, name, employeeId, team, type, start, end, reason, phone, createdAt }
 
 // 구분 옵션 (드롭다운에 표시되는 순서)
-var LEAVE_TYPES = ['연차', '반차(오전)', '반차(오후)', '반반차(오전)', '반반차(오후)', '생휴', '경조', '결근', '결근(오전)', '결근(오후)'];
+var LEAVE_TYPES = ['연차', '반차(오전)', '반차(오후)', '반반차(오전)', '반반차(오후)', '생휴', '결근', '결근(오전)', '결근(오후)'];
 
-// 구분별 1개당 일수 가중치
+// 구분별 1개당 일수 가중치 (경조는 호환을 위해 매핑은 유지)
 var TYPE_WEIGHT = {
   '연차': 1,
   '반차(오전)': 0.5,

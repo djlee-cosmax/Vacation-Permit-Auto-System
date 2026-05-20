@@ -129,6 +129,18 @@ input, select, textarea { font-family: inherit; }
 }
 .period-sep { color: #999; font-weight: 700; font-size: 15px; }
 
+/* 폼 안내 문구 (구분 select 아래) */
+.form-hint-text {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #2962ff;
+  background: #f0f5ff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 /* 개수 + 합계 일수 표시 */
 .count-row {
   display: flex;
