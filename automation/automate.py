@@ -313,7 +313,32 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
         })()
     """)
     print(f"    Apply.doSave() 결과: {save_result}")
-    page.wait_for_timeout(3500)
+
+    # 임시저장 처리 완료까지 대기 (confirm + alert 다이얼로그 2개 + 서버 응답)
+    page.wait_for_timeout(5000)
+
+    # "처리도중 입니다" 같은 처리 중 메시지가 사라질 때까지 추가 대기 (최대 15초)
+    set_stage("(10.5) 임시저장 처리 완료 대기")
+    try:
+        for _ in range(30):  # 0.5초 × 30 = 15초
+            still_processing = False
+            try:
+                # 메인 페이지나 iframe에서 처리 중 메시지 검사
+                for f in page.frames:
+                    try:
+                        cnt = f.locator("text=처리도중").count() + f.locator("text=처리 중").count()
+                        if cnt > 0:
+                            still_processing = True
+                            break
+                    except Exception:
+                        continue
+            except Exception:
+                break
+            if not still_processing:
+                break
+            page.wait_for_timeout(500)
+    except Exception as we:
+        print(f"    (처리 대기 중 예외: {we})")
 
     # 임시저장 후 화면 캡처 (성공 여부 시각 확인용)
     try:
@@ -323,6 +348,9 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
         print(f"    저장 후 캡처: {shot_path.name}")
     except Exception:
         pass
+
+    # 다음 신청서를 위한 안전 대기 (추가 1.5초)
+    page.wait_for_timeout(1500)
 
     print(f"  → '{category}' 신청서 임시저장 완료")
 
