@@ -82,6 +82,17 @@ def set_stage(stage: str):
     print(f"  >> {stage}")
 
 
+def try_click(parent, selectors: list, timeout_each: int = 3000) -> str | None:
+    """여러 셀렉터를 순서대로 시도. 성공 시 사용된 셀렉터 반환, 모두 실패 시 None."""
+    for sel in selectors:
+        try:
+            parent.locator(sel).first.click(timeout=timeout_each)
+            return sel
+        except Exception:
+            continue
+    return None
+
+
 def register_application(page, application: dict, app_idx: int, total_apps: int):
     """한 신청서(applications 배열의 한 항목) 등록"""
     gw_type = application["groupwareType"]
@@ -111,9 +122,25 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
     content.get_by_text("신청서추가").first.click()
     page.wait_for_timeout(1500)
 
-    # 4. 추가 버튼 (직원찾기 모달 열기) — iframe 안에서
+    # 4. 추가 버튼 (직원찾기 모달 열기) — 아이콘 버튼일 가능성 → 다양한 셀렉터 시도
     set_stage("(4) '추가' 버튼 클릭 (직원찾기 모달 열기)")
-    content.get_by_text("추가", exact=True).first.click()
+    used = try_click(content, [
+        'button[title="추가"]',
+        '[title="추가"]',
+        'a[title="추가"]',
+        'img[alt="추가"]',
+        'button[aria-label="추가"]',
+        '[aria-label="추가"]',
+        'button:has-text("추가")',
+        'a:has-text("추가")',
+        '[onclick*="popup"]',
+        '[onclick*="emp"]',
+        '[onclick*="add"]',
+        '[onclick*="Add"]',
+    ])
+    if not used:
+        raise Exception("'추가' 버튼(직원찾기 모달 열기)을 찾을 수 없습니다. iframe HTML을 확인해 주세요.")
+    print(f"    매칭된 셀렉터: {used}")
     page.wait_for_timeout(1500)
 
     # 5. 직원찾기 모달에서 "기존데이터유지" 체크박스 체크
@@ -269,10 +296,19 @@ def main():
                     shot_path = SCRIPT_DIR / f"error_screenshot_{ts}.png"
                     page.screenshot(path=str(shot_path), full_page=True)
                     print(f"          스크린샷 저장: {shot_path}")
-                    # HTML 일부 저장 (텍스트 검색용)
+                    # 메인 HTML
                     html_path = SCRIPT_DIR / f"error_page_{ts}.html"
                     html_path.write_text(page.content(), encoding="utf-8")
                     print(f"          HTML 저장: {html_path}")
+                    # iframe 안 HTML도 별도 저장 (실제 콘텐츠가 있는 곳)
+                    try:
+                        for i, frame in enumerate(page.frames):
+                            if frame.name and "iframe_biz" in frame.name:
+                                iframe_html = SCRIPT_DIR / f"error_iframe_{ts}_{i}.html"
+                                iframe_html.write_text(frame.content(), encoding="utf-8")
+                                print(f"          iframe HTML 저장: {iframe_html} (name={frame.name})")
+                    except Exception as ife:
+                        print(f"          (iframe HTML 추출 실패: {ife})")
                 except Exception as snap_err:
                     print(f"          (스크린샷 저장 실패: {snap_err})")
                 traceback.print_exc()
