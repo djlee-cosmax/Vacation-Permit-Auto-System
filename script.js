@@ -568,7 +568,31 @@ function splitLeaveToEntries(l) {
   });
 }
 
-// ----- 파일 내보내기 (작성된 휴가증) — JSON (그룹웨어 신청서 단위) -----
+// ----- 신청서 분배 — 한 신청서 안 동일 작업자 중복 금지 (라운드로빈) -----
+function distributeApplications(entries) {
+  if (!entries || entries.length === 0) return [];
+  // 작업자별 그룹화 (employeeId 우선, 없으면 name)
+  var byEmp = {};
+  entries.forEach(function(e) {
+    var key = e.employeeId || e.name;
+    if (!byEmp[key]) byEmp[key] = [];
+    byEmp[key].push(e);
+  });
+  // 슬롯 수 = max(작업자별 entries 수)
+  var maxN = 0;
+  Object.keys(byEmp).forEach(function(k) {
+    if (byEmp[k].length > maxN) maxN = byEmp[k].length;
+  });
+  // 빈 신청서 슬롯 N개 생성 후 라운드로빈 분배
+  var apps = [];
+  for (var i = 0; i < maxN; i++) apps.push([]);
+  Object.keys(byEmp).forEach(function(k) {
+    byEmp[k].forEach(function(e, idx) { apps[idx].push(e); });
+  });
+  return apps;
+}
+
+// ----- 파일 내보내기 (작성된 휴가증) — JSON (생휴/비생휴 분류) -----
 function exportLeaves() {
   if (leaves.length === 0) {
     showToast('내보낼 휴가증이 없습니다.', 'error');
@@ -581,19 +605,18 @@ function exportLeaves() {
     splitLeaveToEntries(l).forEach(function(e) { allEntries.push(e); });
   });
 
-  // type별 그룹화 → applications
-  var byType = {};
-  allEntries.forEach(function(e) {
-    if (!byType[e.type]) byType[e.type] = [];
-    byType[e.type].push(e);
-  });
-  var applications = Object.keys(byType).map(function(type) {
-    var entries = byType[type];
+  // 생휴/비생휴 분류
+  var sengyuEntries = allEntries.filter(function(e) { return e.type === '생휴'; });
+  var nonSengyuEntries = allEntries.filter(function(e) { return e.type !== '생휴'; });
+
+  // 각 분류 안에서 라운드로빈으로 신청서 분배
+  var nonApps = distributeApplications(nonSengyuEntries);
+  var sengyuApps = distributeApplications(sengyuEntries);
+
+  function buildApplication(category, entries) {
     var sumDays = entries.reduce(function(s, x) { return s + (x.days || 0); }, 0);
     return {
-      type: type,
-      groupwareType: GROUPWARE_TYPE_MAPPING[type] || type,
-      time: TYPE_TIMES[type] || '',
+      category: category,
       totalEntries: entries.length,
       totalDays: sumDays,
       entries: entries.map(function(e, i) {
@@ -602,6 +625,9 @@ function exportLeaves() {
           name: e.name,
           employeeId: e.employeeId,
           workplace: e.workplace,
+          type: e.type,
+          groupwareType: GROUPWARE_TYPE_MAPPING[e.type] || e.type,
+          time: TYPE_TIMES[e.type] || '',
           start: e.start,
           end: e.end,
           days: e.days,
@@ -610,7 +636,11 @@ function exportLeaves() {
         };
       })
     };
-  });
+  }
+
+  var applications = [];
+  nonApps.forEach(function(entries) { applications.push(buildApplication('비생휴', entries)); });
+  sengyuApps.forEach(function(entries) { applications.push(buildApplication('생휴', entries)); });
 
   var totalDays = applications.reduce(function(s, a) { return s + a.totalDays; }, 0);
 
@@ -635,7 +665,7 @@ function exportLeaves() {
   });
 
   var payload = {
-    schema: 'cosmax-vacation-v2',
+    schema: 'cosmax-vacation-v3',
     exportedAt: new Date().toISOString(),
     team: '생산3팀 파우더 성형실',
     totalLeaves: leaves.length,
