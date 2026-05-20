@@ -170,36 +170,60 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
     print(f"    매칭된 셀렉터: {used}")
     page.wait_for_timeout(1500)
 
-    # 5. 직원찾기 모달에서 "기존데이터유지" 체크박스 체크
-    keep_check = page.locator("label:has-text('기존데이터유지') input[type='checkbox']")
+    # 직원찾기 모달은 dialogframe_* iframe 안에 있음
+    dialog = page.frame_locator('iframe[name^="dialogframe"]').last
+
+    # 5. 기존데이터유지 체크
+    set_stage("(5) 기존데이터유지 체크")
+    keep_check = dialog.locator("#S_APPEND_YN")
     if not keep_check.is_checked():
         keep_check.check()
-        page.wait_for_timeout(200)
+    page.wait_for_timeout(400)
 
-    # 6. 각 entry의 이름을 순차적으로 검색 & 추가
-    search_input = page.locator("input").filter(has_text="").nth(0)  # 임시 — 실제론 사번/성명 input
-    # 더 안전한 셀렉터: 사번/성명 라벨 옆 input
-    search_input = page.locator("xpath=//*[contains(text(), '사번/성명') or contains(text(), '성명')]/following::input[1]").first
-
+    # 6. 각 entry의 이름을 순차 검색 (Enter 키로 조회 trigger)
+    name_input = dialog.locator("#S_EMP_NM")
     for entry in entries:
-        name = entry["name"]
-        print(f"  - {name} 검색 중...")
-        # 입력 후 Enter (기존 데이터 유지 체크되어 있으므로 누적됨)
-        search_input.fill("")
-        search_input.fill(name)
-        search_input.press("Enter")
-        page.wait_for_timeout(700)
+        nm = entry["name"]
+        set_stage(f"(6) 직원 검색: {nm}")
+        name_input.fill("")
+        name_input.fill(nm)
+        name_input.press("Enter")
+        page.wait_for_timeout(900)
 
-    # 7. 검색 결과 표의 헤더 체크박스로 전체 선택
-    # tbody가 아닌 thead의 첫 번째 체크박스
-    header_check = page.locator("xpath=//table//thead//input[@type='checkbox']").first
-    if not header_check.is_checked():
-        header_check.check()
-        page.wait_for_timeout(200)
+    # 7. sheet1 그리드의 전체 선택 — JS API 호출 시도
+    set_stage("(7) 검색 결과 전체 선택 (CCHK)")
+    # dialog_frame을 직접 가져와서 evaluate
+    dialog_frame_obj = None
+    for f in page.frames:
+        if f.name and f.name.startswith("dialogframe"):
+            dialog_frame_obj = f
+            break
+    if dialog_frame_obj is None:
+        raise Exception("dialogframe(직원찾기) 프레임을 찾을 수 없습니다.")
+    # sheet1의 모든 행을 체크 (CCHK = 선택 컬럼)
+    try:
+        dialog_frame_obj.evaluate("""
+            (() => {
+                const rowCount = sheet1.RowCount();
+                const headerRow = sheet1.HeaderRows();
+                for (let r = headerRow; r < headerRow + rowCount; r++) {
+                    sheet1.SetCellValue(r, "CCHK", 1, 1);
+                }
+            })()
+        """)
+    except Exception as ge:
+        print(f"    sheet1 전체 선택 JS 실패 → 헤더 체크박스 직접 클릭 시도: {ge}")
+        # 백업: 그리드 헤더의 체크박스 클릭
+        try:
+            dialog.locator('input[type="checkbox"]').first.check()
+        except Exception:
+            pass
+    page.wait_for_timeout(400)
 
-    # 8. 모달 우측 상단의 "선택" 버튼 클릭
-    page.get_by_role("button", name="선택").click()
-    page.wait_for_timeout(1200)
+    # 8. 선택 버튼 (#choose01)
+    set_stage("(8) 선택 버튼 클릭")
+    dialog.locator("#choose01").click()
+    page.wait_for_timeout(1500)
 
     # 9. 메인 표의 각 행에 근태구분/시작일/종료일/사유 입력
     for idx, entry in enumerate(entries):
