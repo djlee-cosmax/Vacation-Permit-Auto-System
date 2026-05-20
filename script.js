@@ -348,7 +348,7 @@ function renderLeaveList() {
 
     // 구분 배지들 (항목별)
     var typeBadges = items.map(function(it) {
-      var cls = 'leave-type-' + it.type.replace(/[()·]/g, '-').replace(/--/g, '-');
+      var cls = 'leave-type-' + it.type.replace(/[()·]/g, '-').replace(/-+/g, '-').replace(/-+$/, '');
       var label = it.type + (it.count > 1 ? ' x' + it.count : '');
       return '<span class="leave-item-type ' + cls + '">' + label + '</span>';
     }).join(' ');
