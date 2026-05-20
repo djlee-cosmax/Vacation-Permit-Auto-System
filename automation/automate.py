@@ -266,6 +266,7 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
         end_ymd = entry["end"].replace("-", "")
         reason = (entry.get("reason") or "").replace("`", "'").replace("\\", "\\\\")
         phone = entry.get("phone") or ""
+        # SetCellValue + 명시적으로 행 상태를 'U'(Update) 또는 'I'(Insert)로
         iframe01_obj.evaluate(f"""
             (() => {{
                 const g = (typeof Grids !== 'undefined' && Grids[0]) || sheet1;
@@ -274,14 +275,55 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
                 g.SetCellValue({row_idx}, "END_YMD", "{end_ymd}", 1);
                 g.SetCellValue({row_idx}, "ATTEND_RSN_TXT", `{reason}`, 1);
                 g.SetCellValue({row_idx}, "EGC_TEL_NO", "{phone}", 1);
+                // 행 상태가 Normal이면 Insert로 변경 (신규 행 가정)
+                try {{
+                    const status = g.GetRowStatus({row_idx});
+                    if (status === 'R' || status === 'N' || !status) {{
+                        g.SetRowStatus({row_idx}, 'I');
+                    }}
+                }} catch (e) {{}}
             }})()
         """)
-        print(f"    {nm} (행 {row_idx}): {gw_type} / {entry['start']}~{entry['end']}")
+        # 입력 직후 값 검증
+        verify = iframe01_obj.evaluate(f"""
+            (() => {{
+                const g = (typeof Grids !== 'undefined' && Grids[0]) || sheet1;
+                return {{
+                    attend: g.GetCellValue({row_idx}, "ATTEND_CD"),
+                    sta:    g.GetCellValue({row_idx}, "STA_YMD"),
+                    end:    g.GetCellValue({row_idx}, "END_YMD"),
+                    rsn:    g.GetCellValue({row_idx}, "ATTEND_RSN_TXT"),
+                    tel:    g.GetCellValue({row_idx}, "EGC_TEL_NO"),
+                    status: (function(){{ try {{ return g.GetRowStatus({row_idx}); }} catch(e) {{ return '?'; }} }})()
+                }};
+            }})()
+        """)
+        print(f"    {nm} (행 {row_idx}) 입력값: {verify}")
 
     # 10. 임시저장 — JS 함수 직접 호출
     set_stage("(10) 임시저장 클릭")
-    iframe01_obj.evaluate("Apply.doSave()")
-    page.wait_for_timeout(2500)
+    save_result = iframe01_obj.evaluate("""
+        (() => {
+            try {
+                Apply.doSave();
+                return { ok: true };
+            } catch (e) {
+                return { ok: false, err: String(e) };
+            }
+        })()
+    """)
+    print(f"    Apply.doSave() 결과: {save_result}")
+    page.wait_for_timeout(3500)
+
+    # 임시저장 후 화면 캡처 (성공 여부 시각 확인용)
+    try:
+        ts = datetime.now().strftime("%H%M%S")
+        shot_path = SCRIPT_DIR / f"after_save_{app_idx}_{ts}.png"
+        page.screenshot(path=str(shot_path), full_page=True)
+        print(f"    저장 후 캡처: {shot_path.name}")
+    except Exception:
+        pass
+
     print(f"  → '{gw_type}' 신청서 임시저장 완료")
 
 
@@ -326,6 +368,9 @@ def main():
             no_viewport=True,  # viewport 고정 해제 → 창 크기에 맞춰짐
             args=["--start-maximized"],
         )
+
+        # alert/confirm 자동 수락 (저장 성공/확인 메시지)
+        context.on("dialog", lambda d: (print(f"  [dialog] {d.type}: {d.message}"), d.accept()))
 
         page = context.pages[0] if context.pages else context.new_page()
         page.goto(GROUPWARE_URL, wait_until="domcontentloaded")
