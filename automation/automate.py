@@ -117,26 +117,53 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
     # 콘텐츠는 동적 iframe(iframe_biz_*) 안에서 로드됨 → 그 iframe 컨텍스트로 진입
     content = page.frame_locator('iframe[name*="iframe_biz"]').last
 
-    # 3. 신청서추가 버튼 — iframe 안에서 찾기
+    # 3. 신청서추가 버튼 — iframe 안에서 찾기 + popup/새 페이지 감지
     set_stage("(3) '신청서추가' 버튼 클릭 (iframe 안)")
-    content.get_by_text("신청서추가").first.click()
-    page.wait_for_timeout(1500)
+    pages_before = set(page.context.pages)
+    frames_before_count = len(page.frames)
+    try:
+        with page.context.expect_page(timeout=3000) as popup_info:
+            content.get_by_text("신청서추가").first.click()
+        new_page = popup_info.value
+        print(f"    → 새 페이지(popup) 열림: {new_page.url}")
+        new_page.wait_for_load_state("domcontentloaded")
+        # 새 페이지가 작업 대상이 됨 (단, 일부 그룹웨어는 iframe 안에서 작업)
+        work_page = new_page
+        work_context = new_page  # 새 페이지의 main_frame
+    except PlaywrightTimeoutError:
+        # popup 안 열림 → 같은 페이지에서 iframe이 추가됐을 가능성
+        print(f"    → popup 없음 (frames {frames_before_count} → {len(page.frames)})")
+        work_page = page
+        work_context = page
 
-    # 4. 추가 버튼 (직원찾기 모달 열기) — 아이콘 버튼일 가능성 → 다양한 셀렉터 시도
+    page.wait_for_timeout(2000)  # 모달/iframe 로딩 대기
+
+    # 모달이 iframe으로 떴는지 확인 (보통 iframe01 또는 다른 이름)
+    # 모든 iframe을 순회하면서 "추가" 버튼이 있는 곳 찾기
+    target_frame = None
+    for f in work_page.frames:
+        if f == work_page.main_frame:
+            continue
+        try:
+            if f.locator('[title="추가"], input[value="추가"], button:has-text("추가"), a:has-text("추가")').count() > 0:
+                target_frame = f
+                print(f"    → '추가' 버튼이 있는 iframe 발견: name={f.name}, url={f.url[:60]}")
+                break
+        except Exception:
+            continue
+
+    # 4. 추가 버튼 클릭
     set_stage("(4) '추가' 버튼 클릭 (직원찾기 모달 열기)")
-    used = try_click(content, [
+    parent = target_frame if target_frame else work_context
+    used = try_click(parent, [
+        'input[type="button"][value="추가"]',
+        'input[value="추가"]',
         'button[title="추가"]',
         '[title="추가"]',
-        'a[title="추가"]',
-        'img[alt="추가"]',
-        'button[aria-label="추가"]',
-        '[aria-label="추가"]',
         'button:has-text("추가")',
         'a:has-text("추가")',
-        '[onclick*="popup"]',
         '[onclick*="emp"]',
-        '[onclick*="add"]',
-        '[onclick*="Add"]',
+        '[onclick*="popup"]',
     ])
     if not used:
         raise Exception("'추가' 버튼(직원찾기 모달 열기)을 찾을 수 없습니다. iframe HTML을 확인해 주세요.")
@@ -300,15 +327,33 @@ def main():
                     html_path = SCRIPT_DIR / f"error_page_{ts}.html"
                     html_path.write_text(page.content(), encoding="utf-8")
                     print(f"          HTML 저장: {html_path}")
-                    # iframe 안 HTML도 별도 저장 (실제 콘텐츠가 있는 곳)
+                    # 모든 iframe HTML 저장 (어느 iframe에 어떤 콘텐츠가 있는지 추적)
                     try:
                         for i, frame in enumerate(page.frames):
-                            if frame.name and "iframe_biz" in frame.name:
-                                iframe_html = SCRIPT_DIR / f"error_iframe_{ts}_{i}.html"
+                            if frame == page.main_frame:
+                                continue
+                            try:
+                                safe_name = (frame.name or "noname").replace("/", "_")[:40]
+                                iframe_html = SCRIPT_DIR / f"error_iframe_{ts}_{i}_{safe_name}.html"
                                 iframe_html.write_text(frame.content(), encoding="utf-8")
-                                print(f"          iframe HTML 저장: {iframe_html} (name={frame.name})")
+                                print(f"          iframe[{i}] {frame.name or '(noname)'} : {iframe_html.name}")
+                            except Exception as fe:
+                                print(f"          iframe[{i}] 추출 실패: {fe}")
                     except Exception as ife:
-                        print(f"          (iframe HTML 추출 실패: {ife})")
+                        print(f"          (iframe 순회 실패: {ife})")
+                    # 추가로 열린 페이지(popup)도 저장
+                    try:
+                        all_pages = page.context.pages
+                        for j, p2 in enumerate(all_pages):
+                            if p2 == page:
+                                continue
+                            p2_path = SCRIPT_DIR / f"error_popup_{ts}_{j}.html"
+                            p2_path.write_text(p2.content(), encoding="utf-8")
+                            p2_shot = SCRIPT_DIR / f"error_popup_{ts}_{j}.png"
+                            p2.screenshot(path=str(p2_shot), full_page=True)
+                            print(f"          popup[{j}] {p2.url[:60]} → {p2_path.name}")
+                    except Exception as pe:
+                        print(f"          (popup 추출 실패: {pe})")
                 except Exception as snap_err:
                     print(f"          (스크린샷 저장 실패: {snap_err})")
                 traceback.print_exc()
