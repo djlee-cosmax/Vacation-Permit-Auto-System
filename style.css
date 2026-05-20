@@ -134,6 +134,26 @@ input, select, textarea { font-family: inherit; }
   color: #2962ff;
   font-weight: 700;
 }
+.period-day-info .time-hint {
+  display: inline-block;
+  background: #fff3e0;
+  color: #e65100;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.leave-time {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: #fff3e0;
+  color: #e65100;
+  font-size: 12px;
+  font-weight: 700;
+}
 
 /* 자동완성 */
 .autocomplete { position: relative; }

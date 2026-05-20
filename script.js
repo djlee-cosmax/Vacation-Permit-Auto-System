@@ -24,6 +24,14 @@ var leaves = JSON.parse(localStorage.getItem('p5_leaves') || '[]');
 // 기간이 단일 일자(반차/반반차)인 구분
 var SINGLE_DAY_TYPES = ['반차(오전)', '반차(오후)', '반반차(오전)', '반반차(오후)'];
 
+// 구분별 시간대
+var TYPE_TIMES = {
+  '반차(오전)':   '08:00 ~ 12:50',
+  '반차(오후)':   '12:00 ~ 16:40',
+  '반반차(오전)': '08:00 ~ 10:00',
+  '반반차(오후)': '15:00 ~ 16:50'
+};
+
 // ----- 유틸 -----
 function pad(n) { return n < 10 ? '0' + n : '' + n; }
 function dateToStr(d) {
@@ -160,10 +168,10 @@ function updatePeriodInfo() {
   var endStr = document.getElementById('leaveEnd').value;
   var info = document.getElementById('periodDayInfo');
 
-  // 단일 일자형은 종료일을 시작일과 동기화
+  // 단일 일자형은 종료일을 시작일과 동기화 + 시간 안내
   if (SINGLE_DAY_TYPES.indexOf(type) !== -1) {
     document.getElementById('leaveEnd').value = startStr;
-    info.textContent = '';
+    info.innerHTML = '<span class="time-hint">' + TYPE_TIMES[type] + '</span>';
     return;
   }
   if (!startStr || !endStr) { info.textContent = ''; return; }
@@ -194,7 +202,7 @@ function addLeave() {
   if (!reason) { showToast('사유를 입력해 주세요.', 'error'); return; }
   if (!phone) { showToast('연락처를 입력해 주세요.', 'error'); return; }
 
-  // 명단 매칭 (있으면 사번/조 자동 채움)
+  // 명단 매칭 (있으면 사번/근무지 자동 채움)
   var matched = workers.find(function(w) { return w.name === name; });
   var leave = {
     id: uuid(),
@@ -204,6 +212,7 @@ function addLeave() {
     type: type,
     start: start,
     end: SINGLE_DAY_TYPES.indexOf(type) !== -1 ? start : end,
+    time: TYPE_TIMES[type] || '',
     reason: reason,
     phone: phone,
     createdAt: new Date().toISOString()
@@ -253,6 +262,7 @@ function renderLeaveList() {
   list.innerHTML = leaves.map(function(l) {
     var typeCls = 'leave-type-' + l.type.replace(/[()·]/g, '-').replace(/--/g, '-');
     var periodText = l.start === l.end ? l.start : (l.start + ' ~ ' + l.end);
+    if (l.time) periodText += ' <span class="leave-time">' + l.time + '</span>';
     var sub = [l.employeeId, l.team].filter(Boolean).join(' / ');
     return '<div class="leave-item">' +
       '<div class="leave-item-head">' +
@@ -435,7 +445,7 @@ function exportLeaves() {
     return;
   }
   var aoa = [
-    ['번호', '이름', '사번', '근무지', '구분', '시작일', '종료일', '사유', '연락처', '작성일시']
+    ['번호', '이름', '사번', '근무지', '구분', '시작일', '종료일', '시간', '사유', '연락처', '작성일시']
   ];
   // 작성 순서대로 (오래된 것부터)
   leaves.slice().reverse().forEach(function(l, i) {
@@ -447,6 +457,7 @@ function exportLeaves() {
       l.type,
       l.start,
       l.end,
+      l.time || (TYPE_TIMES[l.type] || ''),
       l.reason,
       l.phone,
       new Date(l.createdAt).toLocaleString('ko-KR')
@@ -455,7 +466,7 @@ function exportLeaves() {
   var ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [
     { wch: 5 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
-    { wch: 12 }, { wch: 12 }, { wch: 30 }, { wch: 14 }, { wch: 20 }
+    { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 30 }, { wch: 14 }, { wch: 20 }
   ];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '휴가증');
