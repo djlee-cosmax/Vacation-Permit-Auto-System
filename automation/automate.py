@@ -101,16 +101,19 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
     # 2. 좌측 메뉴 — 근태/휴가신청 (#divMenu 영역으로 한정)
     set_stage("(2) 좌측 메뉴 '근태/휴가신청' 클릭")
     page.locator("#divMenu").get_by_text("근태/휴가신청").first.click()
-    page.wait_for_timeout(2500)  # 페이지 로딩 대기 (표 데이터 로드 등)
+    page.wait_for_timeout(3000)  # 메뉴 클릭 후 iframe 로드 대기
 
-    # 3. 신청서추가 버튼 — role 무관, 텍스트로 찾기
-    set_stage("(3) '신청서추가' 버튼 클릭")
-    page.get_by_text("신청서추가").first.click()
+    # 콘텐츠는 동적 iframe(iframe_biz_*) 안에서 로드됨 → 그 iframe 컨텍스트로 진입
+    content = page.frame_locator('iframe[name*="iframe_biz"]').last
+
+    # 3. 신청서추가 버튼 — iframe 안에서 찾기
+    set_stage("(3) '신청서추가' 버튼 클릭 (iframe 안)")
+    content.get_by_text("신청서추가").first.click()
     page.wait_for_timeout(1500)
 
-    # 4. 추가 버튼 (직원찾기 모달 열기) — 텍스트로 찾기
+    # 4. 추가 버튼 (직원찾기 모달 열기) — iframe 안에서
     set_stage("(4) '추가' 버튼 클릭 (직원찾기 모달 열기)")
-    page.get_by_text("추가", exact=True).first.click()
+    content.get_by_text("추가", exact=True).first.click()
     page.wait_for_timeout(1500)
 
     # 5. 직원찾기 모달에서 "기존데이터유지" 체크박스 체크
