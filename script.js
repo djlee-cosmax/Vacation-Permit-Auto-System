@@ -174,10 +174,7 @@ function updatePeriodInfo() {
     info.innerHTML = '<span class="time-hint">' + TYPE_TIMES[type] + '</span>';
     return;
   }
-  if (!startStr || !endStr) { info.textContent = ''; return; }
-  var days = countWorkdays(startStr, endStr);
-  if (days > 0) info.textContent = '(영업일 ' + days + '일)';
-  else info.textContent = '';
+  info.textContent = '';
 }
 
 // ----- 휴가증 추가 -----
