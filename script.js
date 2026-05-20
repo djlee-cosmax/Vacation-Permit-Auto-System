@@ -383,7 +383,7 @@ function onWorkerFileSelected(e) {
           var h = String(rows[i][c] || '').trim();
           if (h === '이름' || h === '성명') { nameCol = c; headerRow = i; }
           if (h === '사번' || h === '사원번호' || h.indexOf('사번') !== -1) idCol = c;
-          if (h === '조' || h === '소속' || h === '팀' || h === '설비') teamCol = c;
+          if (h === '근무지' || h === '조' || h === '소속' || h === '팀' || h === '설비') teamCol = c;
           if (h === '연락처' || h === '전화' || h.indexOf('연락') !== -1 || h.indexOf('휴대') !== -1) phoneCol = c;
         }
         if (headerRow !== -1) break;
@@ -435,7 +435,7 @@ function exportLeaves() {
     return;
   }
   var aoa = [
-    ['번호', '이름', '사번', '조/설비', '구분', '시작일', '종료일', '사유', '연락처', '작성일시']
+    ['번호', '이름', '사번', '근무지', '구분', '시작일', '종료일', '사유', '연락처', '작성일시']
   ];
   // 작성 순서대로 (오래된 것부터)
   leaves.slice().reverse().forEach(function(l, i) {
