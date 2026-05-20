@@ -3,3 +3,8 @@ server.log
 
 # Windows 다운로드 표식
 *Zone.Identifier
+
+# 자동화 영구 프로필 (쿠키 등 민감 정보)
+automation/profile/
+automation/__pycache__/
+*.pyc
