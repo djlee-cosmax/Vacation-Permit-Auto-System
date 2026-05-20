@@ -24,12 +24,12 @@ var leaves = JSON.parse(localStorage.getItem('p5_leaves') || '[]');
 // 기간이 단일 일자(반차/반반차)인 구분
 var SINGLE_DAY_TYPES = ['반차(오전)', '반차(오후)', '반반차(오전)', '반반차(오후)'];
 
-// 구분별 시간대
+// 구분별 출퇴근 안내
 var TYPE_TIMES = {
-  '반차(오전)':   '08:00 ~ 12:50',
-  '반차(오후)':   '12:00 ~ 16:40',
-  '반반차(오전)': '08:00 ~ 10:00',
-  '반반차(오후)': '15:00 ~ 16:50'
+  '반차(오전)':   '오후 12시 50분 출근',
+  '반차(오후)':   '오후 12시 퇴근',
+  '반반차(오전)': '오전 10시 출근',
+  '반반차(오후)': '오후 3시 퇴근'
 };
 
 // ----- 유틸 -----
@@ -262,7 +262,8 @@ function renderLeaveList() {
   list.innerHTML = leaves.map(function(l) {
     var typeCls = 'leave-type-' + l.type.replace(/[()·]/g, '-').replace(/--/g, '-');
     var periodText = l.start === l.end ? l.start : (l.start + ' ~ ' + l.end);
-    if (l.time) periodText += ' <span class="leave-time">' + l.time + '</span>';
+    var timeText = TYPE_TIMES[l.type] || l.time || '';
+    if (timeText) periodText += ' <span class="leave-time">' + timeText + '</span>';
     var sub = [l.employeeId, l.team].filter(Boolean).join(' / ');
     return '<div class="leave-item">' +
       '<div class="leave-item-head">' +
@@ -445,7 +446,7 @@ function exportLeaves() {
     return;
   }
   var aoa = [
-    ['번호', '이름', '사번', '근무지', '구분', '시작일', '종료일', '시간', '사유', '연락처', '작성일시']
+    ['번호', '이름', '사번', '근무지', '구분', '시작일', '종료일', '출퇴근 안내', '사유', '연락처', '작성일시']
   ];
   // 작성 순서대로 (오래된 것부터)
   leaves.slice().reverse().forEach(function(l, i) {
@@ -457,7 +458,7 @@ function exportLeaves() {
       l.type,
       l.start,
       l.end,
-      l.time || (TYPE_TIMES[l.type] || ''),
+      TYPE_TIMES[l.type] || l.time || '',
       l.reason,
       l.phone,
       new Date(l.createdAt).toLocaleString('ko-KR')
