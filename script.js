@@ -48,6 +48,20 @@ var TYPE_TIMES = {
   '결근(오후)':   '오후 12시 퇴근'
 };
 
+// 그룹웨어 휴가 유형 매핑 (우리 양식 → 그룹웨어 드롭다운 옵션 텍스트)
+var GROUPWARE_TYPE_MAPPING = {
+  '연차': '연차',
+  '반차(오전)': '반차(오전)',
+  '반차(오후)': '반차(오후)',
+  '반반차(오전)': '반반차(오전)',
+  '반반차(오후)': '반반차(오후)',
+  '생휴': '생휴',
+  '경조': '경조휴가',
+  '결근': '결근',
+  '결근(오전)': '결근(오전)',
+  '결근(오후)': '결근(오후)'
+};
+
 // 항목 1개의 일수 = 가중치 × 개수
 function calcItemDays(item) {
   var w = TYPE_WEIGHT[item.type] || 0;
@@ -578,6 +592,7 @@ function exportLeaves() {
     var sumDays = entries.reduce(function(s, x) { return s + (x.days || 0); }, 0);
     return {
       type: type,
+      groupwareType: GROUPWARE_TYPE_MAPPING[type] || type,
       time: TYPE_TIMES[type] || '',
       totalEntries: entries.length,
       totalDays: sumDays,
