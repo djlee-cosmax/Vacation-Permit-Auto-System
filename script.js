@@ -22,7 +22,7 @@ var leaves = JSON.parse(localStorage.getItem('p5_leaves') || '[]');
 // leave: { id, name, employeeId, team, type, start, end, reason, phone, createdAt }
 
 // 구분 옵션 (드롭다운에 표시되는 순서)
-var LEAVE_TYPES = ['연차', '반차(오전)', '반차(오후)', '반반차(오전)', '반반차(오후)', '생휴', '경조', '무결'];
+var LEAVE_TYPES = ['연차', '반차(오전)', '반차(오후)', '반반차(오전)', '반반차(오후)', '생휴', '경조', '결근', '결근(오전)', '결근(오후)'];
 
 // 구분별 1개당 일수 가중치
 var TYPE_WEIGHT = {
@@ -33,15 +33,19 @@ var TYPE_WEIGHT = {
   '반반차(오후)': 0.25,
   '생휴': 1,
   '경조': 1,
-  '무결': 1
+  '결근': 1,
+  '결근(오전)': 0.5,
+  '결근(오후)': 0.5
 };
 
-// 구분별 출퇴근 안내 (반차/반반차만)
+// 구분별 출퇴근 안내 (반차/반반차 + 결근 오전/오후)
 var TYPE_TIMES = {
   '반차(오전)':   '오후 12시 50분 출근',
   '반차(오후)':   '오후 12시 퇴근',
   '반반차(오전)': '오전 10시 출근',
-  '반반차(오후)': '오후 3시 퇴근'
+  '반반차(오후)': '오후 3시 퇴근',
+  '결근(오전)':   '오후 12시 50분 출근',
+  '결근(오후)':   '오후 12시 퇴근'
 };
 
 // 항목 1개의 일수 = 가중치 × 개수
@@ -56,11 +60,23 @@ function calcTotalDays(items) {
   return (items || []).reduce(function(s, it) { return s + calcItemDays(it); }, 0);
 }
 
+// 기존 type 명칭 → 신 명칭 매핑 (호환성)
+var TYPE_RENAME = {
+  '무결': '결근'
+};
+function renameType(t) { return TYPE_RENAME[t] || t; }
+
 // 기존(단일 type) leave 데이터를 items 배열로 정규화 (호환성)
 function normalizeLeaveItems(l) {
-  if (l.items && l.items.length > 0) return l.items;
-  if (l.type) return [{ type: l.type, count: 1 }];
-  return [];
+  var arr;
+  if (l.items && l.items.length > 0) {
+    arr = l.items.map(function(it) { return { type: renameType(it.type), count: it.count }; });
+  } else if (l.type) {
+    arr = [{ type: renameType(l.type), count: 1 }];
+  } else {
+    arr = [];
+  }
+  return arr;
 }
 
 // 일수 포맷 (정수면 정수, 아니면 소수점 2자리)
@@ -129,6 +145,18 @@ var formItems = [{ type: '연차', count: 1 }]; // 기본 한 줄
 
 // ----- 초기화 -----
 (function init() {
+  // 기존 leave 데이터에 옛 type명(예: '무결')이 있으면 신 명칭으로 마이그레이션
+  var migrated = false;
+  leaves.forEach(function(l) {
+    if (l.type && TYPE_RENAME[l.type]) { l.type = TYPE_RENAME[l.type]; migrated = true; }
+    if (l.items && l.items.length > 0) {
+      l.items.forEach(function(it) {
+        if (TYPE_RENAME[it.type]) { it.type = TYPE_RENAME[it.type]; migrated = true; }
+      });
+    }
+  });
+  if (migrated) saveLeaves();
+
   var today = new Date();
   document.getElementById('todayLabel').textContent =
     today.getFullYear() + '-' + pad(today.getMonth() + 1) + '-' + pad(today.getDate());
