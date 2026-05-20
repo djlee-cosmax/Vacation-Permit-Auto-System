@@ -45,7 +45,6 @@ input, select, textarea { font-family: inherit; }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 32px;
-  align-items: start;
 }
 
 @media (max-width: 1200px) {
@@ -311,8 +310,7 @@ input, select, textarea { font-family: inherit; }
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 140px);
-  position: sticky;
-  top: 32px;
+  overflow: hidden;
 }
 .list-header {
   display: flex;
