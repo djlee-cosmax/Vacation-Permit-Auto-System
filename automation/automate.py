@@ -95,9 +95,11 @@ def try_click(parent, selectors: list, timeout_each: int = 3000) -> str | None:
 
 def register_application(page, application: dict, app_idx: int, total_apps: int):
     """한 신청서(applications 배열의 한 항목) 등록"""
-    gw_type = application["groupwareType"]
+    category = application.get("category", "?")
     entries = application["entries"]
-    print(f"\n[{app_idx}/{total_apps}] '{gw_type}' 신청서 — 인원 {len(entries)}명")
+    # 신청서 안에 들어갈 type들 요약 표시
+    type_summary = ", ".join(sorted(set(e.get("type", "?") for e in entries)))
+    print(f"\n[{app_idx}/{total_apps}] '{category}' 신청서 — 인원 {len(entries)}명 ({type_summary})")
 
     # 1. 신청서 메뉴 (상단) — 첫 신청서일 때만 (이미 신청서 화면이면 생략)
     set_stage("(1) 상단 '신청서' 메뉴 클릭")
@@ -254,9 +256,10 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
     """)
     print(f"    그리드 행 {len(rows_info)}개 발견")
 
-    # 각 entry를 EMP_NM으로 매칭하여 SetCellValue로 입력
+    # 각 entry를 EMP_NM으로 매칭하여 SetCellValue로 입력 (각 행마다 자기 type 사용)
     for entry in entries:
         nm = entry["name"]
+        entry_gw_type = entry.get("groupwareType") or entry.get("type") or ""
         matched = next((r for r in rows_info if r["empNm"] == nm), None)
         if not matched:
             print(f"    [경고] {nm} 행을 그리드에서 찾지 못함. 건너뜀")
@@ -266,16 +269,14 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
         end_ymd = entry["end"].replace("-", "")
         reason = (entry.get("reason") or "").replace("`", "'").replace("\\", "\\\\")
         phone = entry.get("phone") or ""
-        # SetCellValue + 명시적으로 행 상태를 'U'(Update) 또는 'I'(Insert)로
         iframe01_obj.evaluate(f"""
             (() => {{
                 const g = (typeof Grids !== 'undefined' && Grids[0]) || sheet1;
-                g.SetCellValue({row_idx}, "ATTEND_CD", "{gw_type}", 1);
+                g.SetCellValue({row_idx}, "ATTEND_CD", "{entry_gw_type}", 1);
                 g.SetCellValue({row_idx}, "STA_YMD", "{start_ymd}", 1);
                 g.SetCellValue({row_idx}, "END_YMD", "{end_ymd}", 1);
                 g.SetCellValue({row_idx}, "ATTEND_RSN_TXT", `{reason}`, 1);
                 g.SetCellValue({row_idx}, "EGC_TEL_NO", "{phone}", 1);
-                // 행 상태가 Normal이면 Insert로 변경 (신규 행 가정)
                 try {{
                     const status = g.GetRowStatus({row_idx});
                     if (status === 'R' || status === 'N' || !status) {{
@@ -284,7 +285,6 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
                 }} catch (e) {{}}
             }})()
         """)
-        # 입력 직후 값 검증
         verify = iframe01_obj.evaluate(f"""
             (() => {{
                 const g = (typeof Grids !== 'undefined' && Grids[0]) || sheet1;
@@ -298,7 +298,7 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
                 }};
             }})()
         """)
-        print(f"    {nm} (행 {row_idx}) 입력값: {verify}")
+        print(f"    {nm} (행 {row_idx}, {entry_gw_type}) 입력값: {verify}")
 
     # 10. 임시저장 — JS 함수 직접 호출
     set_stage("(10) 임시저장 클릭")
@@ -324,7 +324,7 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
     except Exception:
         pass
 
-    print(f"  → '{gw_type}' 신청서 임시저장 완료")
+    print(f"  → '{category}' 신청서 임시저장 완료")
 
 
 def main():
@@ -403,9 +403,9 @@ def main():
                 register_application(page, application, idx, len(applications))
                 success += 1
             except Exception as e:
-                failures.append((application.get("type", "?"), CURRENT_STAGE, str(e)))
-                log_error(f"신청서 {idx} ({application.get('type', '?')}) - 단계: {CURRENT_STAGE}", e)
-                print(f"  [실패] {application.get('type', '?')} | 단계: {CURRENT_STAGE}")
+                failures.append((application.get("category", "?"), CURRENT_STAGE, str(e)))
+                log_error(f"신청서 {idx} ({application.get('category', '?')}) - 단계: {CURRENT_STAGE}", e)
+                print(f"  [실패] {application.get('category', '?')} | 단계: {CURRENT_STAGE}")
                 print(f"          에러: {e}")
                 # 에러 시점 페이지 스크린샷 자동 저장 (디버그용)
                 try:
