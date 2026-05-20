@@ -509,49 +509,67 @@ function onWorkerFileSelected(e) {
   e.target.value = '';
 }
 
-// ----- 파일 내보내기 (작성된 휴가증) -----
+// ----- 파일 내보내기 (작성된 휴가증) — JSON -----
 function exportLeaves() {
   if (leaves.length === 0) {
     showToast('내보낼 휴가증이 없습니다.', 'error');
     return;
   }
-  var aoa = [
-    ['번호', '이름', '사번', '근무지', '구분 내역', '시작일', '종료일', '일수', '출퇴근 안내', '사유', '연락처', '작성일시']
-  ];
-  // 작성 순서대로 (오래된 것부터)
-  leaves.slice().reverse().forEach(function(l, i) {
+  var totalDays = leaves.reduce(function(s, l) {
     var items = normalizeLeaveItems(l);
-    var d = (l.days != null) ? l.days : calcTotalDays(items);
-    var typeStr = items.map(function(it) {
-      return it.type + (it.count > 1 ? ' x' + it.count : '');
-    }).join(' + ');
-    var times = [];
-    items.forEach(function(it) {
-      if (TYPE_TIMES[it.type] && times.indexOf(TYPE_TIMES[it.type]) === -1) times.push(TYPE_TIMES[it.type]);
-    });
-    aoa.push([
-      i + 1,
-      l.name,
-      l.employeeId,
-      l.team,
-      typeStr,
-      l.start,
-      l.end,
-      d || 0,
-      times.join(' / '),
-      l.reason,
-      l.phone,
-      new Date(l.createdAt).toLocaleString('ko-KR')
-    ]);
-  });
-  var ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [
-    { wch: 5 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 24 },
-    { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 20 }, { wch: 30 }, { wch: 14 }, { wch: 20 }
-  ];
-  var wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '휴가증');
+    return s + ((l.days != null) ? l.days : calcTotalDays(items));
+  }, 0);
+
+  // 자동화 입력에 최적화된 구조
+  var payload = {
+    schema: 'cosmax-vacation-v1',
+    exportedAt: new Date().toISOString(),
+    team: '생산3팀 파우더 성형실',
+    totalLeaves: leaves.length,
+    totalDays: totalDays,
+    leaves: leaves.slice().reverse().map(function(l, idx) {
+      var items = normalizeLeaveItems(l).map(function(it) {
+        var perItem = TYPE_WEIGHT[it.type] || 0;
+        return {
+          type: it.type,
+          count: it.count || 1,
+          perItemDays: perItem,
+          subtotal: perItem * (it.count || 1),
+          time: TYPE_TIMES[it.type] || ''
+        };
+      });
+      var times = [];
+      items.forEach(function(it) {
+        if (it.time && times.indexOf(it.time) === -1) times.push(it.time);
+      });
+      return {
+        seq: idx + 1,
+        name: l.name,
+        employeeId: l.employeeId || '',
+        workplace: l.team || '',
+        start: l.start,
+        end: l.end,
+        days: (l.days != null) ? l.days : calcTotalDays(items),
+        items: items,
+        times: times,
+        reason: l.reason,
+        phone: l.phone,
+        createdAt: l.createdAt
+      };
+    })
+  };
+
+  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
   var today = dateToStr(new Date());
-  XLSX.writeFile(wb, '휴가증_' + today + '.xlsx');
-  showToast(leaves.length + '건 내보내기 완료', 'success');
+  var fname = '휴가증_' + today + '.json';
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+
+  showToast(leaves.length + '건 JSON 내보내기 완료', 'success');
 }
