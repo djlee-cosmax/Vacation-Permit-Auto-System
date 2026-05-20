@@ -399,6 +399,7 @@ input, select, textarea { font-family: inherit; }
 .worker-table td {
   padding: 6px 8px;
   border-bottom: 1px solid #f5f5f5;
+  text-align: center;
 }
 .worker-table input {
   width: 100%;
@@ -407,6 +408,7 @@ input, select, textarea { font-family: inherit; }
   border-radius: 4px;
   font-size: 13px;
   background: transparent;
+  text-align: center;
 }
 .worker-table input:focus {
   outline: none;
