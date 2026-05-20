@@ -4,6 +4,20 @@
 var workers = JSON.parse(localStorage.getItem('p5_workers') || '[]');
 // worker: { name, employeeId, team, phone }
 
+// workers.json (코드 내장 기본 명단) — 페이지 로드 시 fetch
+var DEFAULT_WORKERS = [];
+fetch('workers.json', { cache: 'no-cache' })
+  .then(function(r) { return r.ok ? r.json() : []; })
+  .then(function(data) {
+    DEFAULT_WORKERS = Array.isArray(data) ? data : [];
+    // localStorage 명단이 비어있으면 기본 명단으로 자동 채움
+    if (workers.length === 0 && DEFAULT_WORKERS.length > 0) {
+      workers = DEFAULT_WORKERS.slice();
+      localStorage.setItem('p5_workers', JSON.stringify(workers));
+    }
+  })
+  .catch(function() {}); // workers.json 없거나 실패해도 무시
+
 var leaves = JSON.parse(localStorage.getItem('p5_leaves') || '[]');
 // leave: { id, name, employeeId, team, type, start, end, reason, phone, createdAt }
 
@@ -308,6 +322,30 @@ function addWorkerRow() {
 function deleteWorkerRow(idx) {
   workerModalState.splice(idx, 1);
   renderWorkerTable();
+}
+
+function resetToDefaultWorkers() {
+  if (DEFAULT_WORKERS.length === 0) {
+    // 다시 한 번 fetch 시도 (초기 로드 실패한 경우)
+    fetch('workers.json', { cache: 'no-cache' })
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(function(data) {
+        DEFAULT_WORKERS = Array.isArray(data) ? data : [];
+        if (DEFAULT_WORKERS.length === 0) {
+          showToast('서버에 등록된 기본 명단이 없습니다.', 'error');
+          return;
+        }
+        if (!confirm('현재 명단을 서버 기본 명단(' + DEFAULT_WORKERS.length + '명)으로 재설정합니다.\n계속하시겠습니까?')) return;
+        workerModalState = DEFAULT_WORKERS.map(function(w) { return Object.assign({}, w); });
+        renderWorkerTable();
+        showToast('기본 명단으로 재설정되었습니다. 저장 버튼을 눌러 확정해 주세요.', 'success');
+      });
+    return;
+  }
+  if (!confirm('현재 명단을 서버 기본 명단(' + DEFAULT_WORKERS.length + '명)으로 재설정합니다.\n계속하시겠습니까?')) return;
+  workerModalState = DEFAULT_WORKERS.map(function(w) { return Object.assign({}, w); });
+  renderWorkerTable();
+  showToast('기본 명단으로 재설정되었습니다. 저장 버튼을 눌러 확정해 주세요.', 'success');
 }
 
 function saveWorkerList() {
