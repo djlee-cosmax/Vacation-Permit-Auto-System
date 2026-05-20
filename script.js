@@ -327,14 +327,7 @@ function resetAllLeaves() {
 
 function renderLeaveList() {
   var list = document.getElementById('leaveList');
-  var totalDays = leaves.reduce(function(s, l) {
-    var items = normalizeLeaveItems(l);
-    var d = (l.days != null) ? l.days : calcTotalDays(items);
-    return s + (d || 0);
-  }, 0);
-  var countLabel = leaves.length + '건';
-  if (totalDays > 0) countLabel += ' / 총 ' + fmtDays(totalDays);
-  document.getElementById('listCount').textContent = countLabel;
+  document.getElementById('listCount').textContent = leaves.length + '건';
 
   if (leaves.length === 0) {
     list.innerHTML = '<div class="empty-state">아직 작성된 휴가증이 없습니다.</div>';
