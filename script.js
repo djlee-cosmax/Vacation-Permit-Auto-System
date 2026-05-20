@@ -161,19 +161,6 @@ function renderFormItems() {
 function refreshFormTotals() {
   var total = calcTotalDays(formItems);
   document.getElementById('leaveItemsTotal').textContent = '합계: ' + fmtDays(total);
-  // 반차/반반차 출퇴근 안내 (포함된 종류만 모아서 표시)
-  var times = [];
-  formItems.forEach(function(it) {
-    if (TYPE_TIMES[it.type] && times.indexOf(TYPE_TIMES[it.type]) === -1) {
-      times.push(TYPE_TIMES[it.type]);
-    }
-  });
-  var timeEl = document.getElementById('leaveItemsTime');
-  if (times.length > 0) {
-    timeEl.innerHTML = times.map(function(t) { return '<span class="time-hint">' + t + '</span>'; }).join(' ');
-  } else {
-    timeEl.innerHTML = '';
-  }
 }
 
 function addLeaveItem() {
@@ -339,17 +326,6 @@ function renderLeaveList() {
     var days = (l.days != null) ? l.days : calcTotalDays(items);
     var periodText = l.start === l.end ? l.start : (l.start + ' ~ ' + l.end);
     if (days > 0) periodText += ' <span class="leave-days">' + fmtDays(days) + '</span>';
-
-    // 시간 안내 (반차/반반차 포함된 경우만)
-    var seenTimes = {};
-    var timeHints = '';
-    items.forEach(function(it) {
-      if (TYPE_TIMES[it.type] && !seenTimes[TYPE_TIMES[it.type]]) {
-        seenTimes[TYPE_TIMES[it.type]] = 1;
-        timeHints += '<span class="leave-time">' + TYPE_TIMES[it.type] + '</span>';
-      }
-    });
-    if (timeHints) periodText += ' ' + timeHints;
 
     // 구분 배지들 (항목별)
     var typeBadges = items.map(function(it) {
