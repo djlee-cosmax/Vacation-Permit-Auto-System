@@ -313,6 +313,18 @@ function removeLeave(id) {
   renderLeaveList();
 }
 
+function resetAllLeaves() {
+  if (leaves.length === 0) {
+    showToast('초기화할 휴가증이 없습니다.', 'error');
+    return;
+  }
+  if (!confirm('작성된 휴가증 ' + leaves.length + '건을 모두 삭제하시겠습니까?\n이 동작은 되돌릴 수 없습니다.')) return;
+  leaves = [];
+  saveLeaves();
+  renderLeaveList();
+  showToast('전체 초기화되었습니다.', 'success');
+}
+
 function renderLeaveList() {
   var list = document.getElementById('leaveList');
   var totalDays = leaves.reduce(function(s, l) {
