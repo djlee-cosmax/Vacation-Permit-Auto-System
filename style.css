@@ -39,12 +39,12 @@ input, select, textarea { font-family: inherit; }
 
 /* ===== 메인 컨테이너 ===== */
 .container {
-  max-width: 1700px;
+  max-width: 1920px;
   margin: 0 auto;
-  padding: 40px 32px;
+  padding: 40px 48px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 32px;
+  gap: 36px;
 }
 
 @media (max-width: 1200px) {
@@ -132,29 +132,33 @@ input, select, textarea { font-family: inherit; }
 /* 폼 안내 문구 (구분 select 아래) */
 .form-hint-text {
   margin-top: 8px;
-  font-size: 12px;
-  color: #2962ff;
-  background: #f0f5ff;
-  padding: 6px 10px;
+  font-size: 13px;
+  color: #c8102e;
+  background: #fff5f5;
+  padding: 8px 12px;
   border-radius: 6px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.5;
+  border: 1px solid #ffe0e0;
 }
 
 /* 개수 + 합계 일수 표시 */
 .count-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 .count-row input[type="number"] {
-  flex: 0 0 110px;
+  flex: 0 0 160px;
   text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  padding: 14px 18px;
 }
 .count-suffix {
-  font-size: 15px;
+  font-size: 17px;
   color: #555;
-  font-weight: 600;
+  font-weight: 700;
 }
 .leave-items-total {
   margin-left: auto;
