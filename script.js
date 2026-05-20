@@ -32,6 +32,22 @@ var TYPE_TIMES = {
   '반반차(오후)': '오후 3시 퇴근'
 };
 
+// 휴가 1건당 일수 계산
+function getLeaveDays(type, start, end) {
+  if (!type) return 0;
+  if (type === '반차(오전)' || type === '반차(오후)') return 0.5;
+  if (type === '반반차(오전)' || type === '반반차(오후)') return 0.25;
+  // 연차/생휴/무결/경조 — 시작~종료 영업일 수
+  return countWorkdays(start, end);
+}
+
+// 일수 포맷 (정수면 정수, 아니면 소수점 2자리)
+function fmtDays(n) {
+  if (n == null) return '';
+  if (n % 1 === 0) return n + '일';
+  return n.toFixed(2).replace(/\.?0+$/, '') + '일';
+}
+
 // ----- 유틸 -----
 function pad(n) { return n < 10 ? '0' + n : '' + n; }
 function dateToStr(d) {
@@ -168,13 +184,20 @@ function updatePeriodInfo() {
   var endStr = document.getElementById('leaveEnd').value;
   var info = document.getElementById('periodDayInfo');
 
-  // 단일 일자형은 종료일을 시작일과 동기화 + 시간 안내
+  // 단일 일자형: 종료일 = 시작일 + 시간 안내 + 일수
   if (SINGLE_DAY_TYPES.indexOf(type) !== -1) {
     document.getElementById('leaveEnd').value = startStr;
-    info.innerHTML = '<span class="time-hint">' + TYPE_TIMES[type] + '</span>';
+    var d = getLeaveDays(type, startStr, startStr);
+    info.innerHTML = '<span class="day-count">' + fmtDays(d) + '</span>' +
+                     '<span class="time-hint">' + TYPE_TIMES[type] + '</span>';
     return;
   }
-  info.textContent = '';
+
+  // 구분이 비어있거나 기간이 비어있으면 표시 안 함
+  if (!type || !startStr || !endStr) { info.textContent = ''; return; }
+  var days = getLeaveDays(type, startStr, endStr);
+  if (days > 0) info.innerHTML = '<span class="day-count">' + fmtDays(days) + '</span>';
+  else info.textContent = '';
 }
 
 // ----- 휴가증 추가 -----
@@ -210,6 +233,7 @@ function addLeave() {
     start: start,
     end: SINGLE_DAY_TYPES.indexOf(type) !== -1 ? start : end,
     time: TYPE_TIMES[type] || '',
+    days: getLeaveDays(type, start, SINGLE_DAY_TYPES.indexOf(type) !== -1 ? start : end),
     reason: reason,
     phone: phone,
     createdAt: new Date().toISOString()
@@ -249,7 +273,13 @@ function removeLeave(id) {
 
 function renderLeaveList() {
   var list = document.getElementById('leaveList');
-  document.getElementById('listCount').textContent = leaves.length + '건';
+  var totalDays = leaves.reduce(function(s, l) {
+    var d = (l.days != null) ? l.days : getLeaveDays(l.type, l.start, l.end);
+    return s + (d || 0);
+  }, 0);
+  var countLabel = leaves.length + '건';
+  if (totalDays > 0) countLabel += ' / 총 ' + fmtDays(totalDays);
+  document.getElementById('listCount').textContent = countLabel;
 
   if (leaves.length === 0) {
     list.innerHTML = '<div class="empty-state">아직 작성된 휴가증이 없습니다.</div>';
@@ -259,6 +289,8 @@ function renderLeaveList() {
   list.innerHTML = leaves.map(function(l) {
     var typeCls = 'leave-type-' + l.type.replace(/[()·]/g, '-').replace(/--/g, '-');
     var periodText = l.start === l.end ? l.start : (l.start + ' ~ ' + l.end);
+    var days = (l.days != null) ? l.days : getLeaveDays(l.type, l.start, l.end);
+    if (days > 0) periodText += ' <span class="leave-days">' + fmtDays(days) + '</span>';
     var timeText = TYPE_TIMES[l.type] || l.time || '';
     if (timeText) periodText += ' <span class="leave-time">' + timeText + '</span>';
     var sub = [l.employeeId, l.team].filter(Boolean).join(' / ');
@@ -443,10 +475,11 @@ function exportLeaves() {
     return;
   }
   var aoa = [
-    ['번호', '이름', '사번', '근무지', '구분', '시작일', '종료일', '출퇴근 안내', '사유', '연락처', '작성일시']
+    ['번호', '이름', '사번', '근무지', '구분', '시작일', '종료일', '일수', '출퇴근 안내', '사유', '연락처', '작성일시']
   ];
   // 작성 순서대로 (오래된 것부터)
   leaves.slice().reverse().forEach(function(l, i) {
+    var d = (l.days != null) ? l.days : getLeaveDays(l.type, l.start, l.end);
     aoa.push([
       i + 1,
       l.name,
@@ -455,6 +488,7 @@ function exportLeaves() {
       l.type,
       l.start,
       l.end,
+      d || 0,
       TYPE_TIMES[l.type] || l.time || '',
       l.reason,
       l.phone,
@@ -464,7 +498,7 @@ function exportLeaves() {
   var ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [
     { wch: 5 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
-    { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 30 }, { wch: 14 }, { wch: 20 }
+    { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 16 }, { wch: 30 }, { wch: 14 }, { wch: 20 }
   ];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '휴가증');
