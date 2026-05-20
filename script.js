@@ -537,54 +537,143 @@ function onWorkerFileSelected(e) {
   e.target.value = '';
 }
 
-// ----- 파일 내보내기 (작성된 휴가증) — JSON -----
+// ----- 영업일 리스트 (start~end 사이 주말/공휴일 제외) -----
+function getWorkdaysList(start, end) {
+  if (!start || !end) return [];
+  var list = [];
+  var s = new Date(start);
+  var e = new Date(end);
+  if (e < s) return [];
+  var d = new Date(s);
+  while (d <= e) {
+    var dow = d.getDay();
+    var key = dateToStr(d);
+    if (dow !== 0 && dow !== 6 && !KR_HOLIDAYS_SHORT[key]) {
+      list.push(key);
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return list;
+}
+
+// ----- 한 휴가증을 그룹웨어 신청서 entry(들)로 분해 -----
+// 다중 items를 영업일 순서대로 1개씩 할당하고 같은 type 연속 구간끼리 묶음
+function splitLeaveToEntries(l) {
+  var items = normalizeLeaveItems(l);
+  var dates = getWorkdaysList(l.start, l.end);
+  // items 펼치기: [연차, 연차, 반차(오후)] 형태로
+  var flat = [];
+  items.forEach(function(it) {
+    var n = parseInt(it.count, 10) || 1;
+    for (var i = 0; i < n; i++) flat.push(it.type);
+  });
+  // 각 영업일에 1개씩 할당 (가능한 한)
+  var slots = [];
+  var maxN = Math.min(dates.length, flat.length);
+  for (var i = 0; i < maxN; i++) slots.push({ date: dates[i], type: flat[i] });
+  // 같은 type 연속 구간 묶음
+  var groups = [];
+  var cur = null;
+  slots.forEach(function(s) {
+    if (!cur || cur.type !== s.type) {
+      cur = { type: s.type, dates: [s.date] };
+      groups.push(cur);
+    } else {
+      cur.dates.push(s.date);
+    }
+  });
+  // entry 객체로 변환
+  return groups.map(function(g) {
+    return {
+      name: l.name,
+      employeeId: l.employeeId || '',
+      workplace: l.team || '',
+      type: g.type,
+      start: g.dates[0],
+      end: g.dates[g.dates.length - 1],
+      days: (TYPE_WEIGHT[g.type] || 0) * g.dates.length,
+      time: TYPE_TIMES[g.type] || '',
+      reason: l.reason || '',
+      phone: l.phone || '',
+      sourceLeaveId: l.id || null
+    };
+  });
+}
+
+// ----- 파일 내보내기 (작성된 휴가증) — JSON (그룹웨어 신청서 단위) -----
 function exportLeaves() {
   if (leaves.length === 0) {
     showToast('내보낼 휴가증이 없습니다.', 'error');
     return;
   }
-  var totalDays = leaves.reduce(function(s, l) {
-    var items = normalizeLeaveItems(l);
-    return s + ((l.days != null) ? l.days : calcTotalDays(items));
-  }, 0);
 
-  // 자동화 입력에 최적화된 구조
+  // 작성된 모든 휴가증을 entry 배열로 분해
+  var allEntries = [];
+  leaves.slice().reverse().forEach(function(l) {
+    splitLeaveToEntries(l).forEach(function(e) { allEntries.push(e); });
+  });
+
+  // type별 그룹화 → applications
+  var byType = {};
+  allEntries.forEach(function(e) {
+    if (!byType[e.type]) byType[e.type] = [];
+    byType[e.type].push(e);
+  });
+  var applications = Object.keys(byType).map(function(type) {
+    var entries = byType[type];
+    var sumDays = entries.reduce(function(s, x) { return s + (x.days || 0); }, 0);
+    return {
+      type: type,
+      time: TYPE_TIMES[type] || '',
+      totalEntries: entries.length,
+      totalDays: sumDays,
+      entries: entries.map(function(e, i) {
+        return {
+          seq: i + 1,
+          name: e.name,
+          employeeId: e.employeeId,
+          workplace: e.workplace,
+          start: e.start,
+          end: e.end,
+          days: e.days,
+          reason: e.reason,
+          phone: e.phone
+        };
+      })
+    };
+  });
+
+  var totalDays = applications.reduce(function(s, a) { return s + a.totalDays; }, 0);
+
+  // 원본 휴가증 (참고/디버깅용)
+  var originalLeaves = leaves.slice().reverse().map(function(l, idx) {
+    var items = normalizeLeaveItems(l).map(function(it) {
+      return { type: it.type, count: it.count || 1 };
+    });
+    return {
+      seq: idx + 1,
+      name: l.name,
+      employeeId: l.employeeId || '',
+      workplace: l.team || '',
+      start: l.start,
+      end: l.end,
+      days: (l.days != null) ? l.days : calcTotalDays(items),
+      items: items,
+      reason: l.reason,
+      phone: l.phone,
+      createdAt: l.createdAt
+    };
+  });
+
   var payload = {
-    schema: 'cosmax-vacation-v1',
+    schema: 'cosmax-vacation-v2',
     exportedAt: new Date().toISOString(),
     team: '생산3팀 파우더 성형실',
     totalLeaves: leaves.length,
+    totalApplications: applications.length,
     totalDays: totalDays,
-    leaves: leaves.slice().reverse().map(function(l, idx) {
-      var items = normalizeLeaveItems(l).map(function(it) {
-        var perItem = TYPE_WEIGHT[it.type] || 0;
-        return {
-          type: it.type,
-          count: it.count || 1,
-          perItemDays: perItem,
-          subtotal: perItem * (it.count || 1),
-          time: TYPE_TIMES[it.type] || ''
-        };
-      });
-      var times = [];
-      items.forEach(function(it) {
-        if (it.time && times.indexOf(it.time) === -1) times.push(it.time);
-      });
-      return {
-        seq: idx + 1,
-        name: l.name,
-        employeeId: l.employeeId || '',
-        workplace: l.team || '',
-        start: l.start,
-        end: l.end,
-        days: (l.days != null) ? l.days : calcTotalDays(items),
-        items: items,
-        times: times,
-        reason: l.reason,
-        phone: l.phone,
-        createdAt: l.createdAt
-      };
-    })
+    applications: applications,
+    originalLeaves: originalLeaves
   };
 
   var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
@@ -599,5 +688,5 @@ function exportLeaves() {
   document.body.removeChild(a);
   setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
 
-  showToast(leaves.length + '건 JSON 내보내기 완료', 'success');
+  showToast(leaves.length + '건 → 신청서 ' + applications.length + '건 분해 완료', 'success');
 }
