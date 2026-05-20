@@ -225,42 +225,63 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
     dialog.locator("#choose01").click()
     page.wait_for_timeout(1500)
 
-    # 9. 메인 표의 각 행에 근태구분/시작일/종료일/사유 입력
-    for idx, entry in enumerate(entries):
-        row = page.locator("tbody tr").nth(idx)
+    # 9. 신청서 표 입력 — iframe01 안의 IBSheet 그리드 (JS API 사용)
+    set_stage("(9) 신청서 표 입력 (근태구분/기간/사유)")
+    iframe01_obj = None
+    for f in page.frames:
+        if f.name == "iframe01":
+            iframe01_obj = f
+            break
+    if iframe01_obj is None:
+        raise Exception("iframe01(신청서 작성 화면)을 찾을 수 없습니다.")
 
-        # 근태구분 드롭다운 (행 안의 select 또는 커스텀 dropdown)
-        # 일반 select라면 select_option, 커스텀 div라면 클릭 후 옵션 선택
-        try:
-            row.locator("select").first.select_option(label=gw_type)
-        except Exception:
-            # 커스텀 드롭다운: 화살표 클릭 → 옵션 클릭
-            row.locator("xpath=.//button[contains(@class, 'dropdown') or contains(., '▼')]").first.click()
-            page.wait_for_timeout(300)
-            page.get_by_role("option", name=gw_type).first.click()
-            page.wait_for_timeout(200)
+    # 그리드의 현재 행 정보 조회 (EMP_NM 매칭용)
+    rows_info = iframe01_obj.evaluate("""
+        (() => {
+            const g = (typeof Grids !== 'undefined' && Grids[0]) || sheet1;
+            const hr = g.HeaderRows();
+            const rc = g.RowCount();
+            const out = [];
+            for (let r = hr; r < hr + rc; r++) {
+                out.push({
+                    rowIdx: r,
+                    empNm: g.GetCellValue(r, "EMP_NM"),
+                    empId: g.GetCellValue(r, "EMP_ID")
+                });
+            }
+            return out;
+        })()
+    """)
+    print(f"    그리드 행 {len(rows_info)}개 발견")
 
-        # 신청시작일
-        start_input = row.locator("xpath=.//input[contains(@class, 'date') or @type='date' or @placeholder*='시작']").first
-        start_input.fill(entry["start"].replace("-", "."))
-        page.keyboard.press("Tab")
-        page.wait_for_timeout(150)
+    # 각 entry를 EMP_NM으로 매칭하여 SetCellValue로 입력
+    for entry in entries:
+        nm = entry["name"]
+        matched = next((r for r in rows_info if r["empNm"] == nm), None)
+        if not matched:
+            print(f"    [경고] {nm} 행을 그리드에서 찾지 못함. 건너뜀")
+            continue
+        row_idx = matched["rowIdx"]
+        start_ymd = entry["start"].replace("-", "")  # 20260521
+        end_ymd = entry["end"].replace("-", "")
+        reason = (entry.get("reason") or "").replace("`", "'").replace("\\", "\\\\")
+        phone = entry.get("phone") or ""
+        iframe01_obj.evaluate(f"""
+            (() => {{
+                const g = (typeof Grids !== 'undefined' && Grids[0]) || sheet1;
+                g.SetCellValue({row_idx}, "ATTEND_CD", "{gw_type}", 1);
+                g.SetCellValue({row_idx}, "STA_YMD", "{start_ymd}", 1);
+                g.SetCellValue({row_idx}, "END_YMD", "{end_ymd}", 1);
+                g.SetCellValue({row_idx}, "ATTEND_RSN_TXT", `{reason}`, 1);
+                g.SetCellValue({row_idx}, "EGC_TEL_NO", "{phone}", 1);
+            }})()
+        """)
+        print(f"    {nm} (행 {row_idx}): {gw_type} / {entry['start']}~{entry['end']}")
 
-        # 신청종료일
-        end_input = row.locator("xpath=.//input[contains(@class, 'date') or @type='date' or @placeholder*='종료']").first
-        end_input.fill(entry["end"].replace("-", "."))
-        page.keyboard.press("Tab")
-        page.wait_for_timeout(150)
-
-        # 신청사유 (텍스트 입력)
-        reason_input = row.locator("xpath=.//input[contains(@placeholder, '사유') or contains(@class, 'reason')]").first
-        reason_input.fill(entry.get("reason", ""))
-        page.wait_for_timeout(100)
-
-    # 10. 임시저장 버튼 클릭
-    page.wait_for_timeout(500)
-    page.get_by_role("button", name="임시저장").click()
-    page.wait_for_timeout(2000)
+    # 10. 임시저장 — JS 함수 직접 호출
+    set_stage("(10) 임시저장 클릭")
+    iframe01_obj.evaluate("Apply.doSave()")
+    page.wait_for_timeout(2500)
     print(f"  → '{gw_type}' 신청서 임시저장 완료")
 
 
