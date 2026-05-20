@@ -316,6 +316,11 @@ input, select, textarea { font-family: inherit; }
   align-items: center;
   margin-bottom: 20px;
 }
+.list-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .list-count {
   font-size: 14px;
   font-weight: 700;

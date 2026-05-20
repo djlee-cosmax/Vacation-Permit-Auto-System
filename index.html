@@ -78,7 +78,10 @@
     <section class="card list-card">
       <div class="list-header">
         <h2>작성된 휴가증</h2>
-        <span class="list-count" id="listCount">0건</span>
+        <div class="list-header-right">
+          <span class="list-count" id="listCount">0건</span>
+          <button class="btn-secondary btn-small" onclick="resetAllLeaves()">초기화</button>
+        </div>
       </div>
       <div class="leave-list" id="leaveList">
         <div class="empty-state">아직 작성된 휴가증이 없습니다.</div>
