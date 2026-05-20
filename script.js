@@ -21,10 +21,22 @@ fetch('workers.json', { cache: 'no-cache' })
 var leaves = JSON.parse(localStorage.getItem('p5_leaves') || '[]');
 // leave: { id, name, employeeId, team, type, start, end, reason, phone, createdAt }
 
-// 기간이 단일 일자(반차/반반차)인 구분
-var SINGLE_DAY_TYPES = ['반차(오전)', '반차(오후)', '반반차(오전)', '반반차(오후)'];
+// 구분 옵션 (드롭다운에 표시되는 순서)
+var LEAVE_TYPES = ['연차', '반차(오전)', '반차(오후)', '반반차(오전)', '반반차(오후)', '생휴', '경조', '무결'];
 
-// 구분별 출퇴근 안내
+// 구분별 1개당 일수 가중치
+var TYPE_WEIGHT = {
+  '연차': 1,
+  '반차(오전)': 0.5,
+  '반차(오후)': 0.5,
+  '반반차(오전)': 0.25,
+  '반반차(오후)': 0.25,
+  '생휴': 1,
+  '경조': 1,
+  '무결': 1
+};
+
+// 구분별 출퇴근 안내 (반차/반반차만)
 var TYPE_TIMES = {
   '반차(오전)':   '오후 12시 50분 출근',
   '반차(오후)':   '오후 12시 퇴근',
@@ -32,13 +44,23 @@ var TYPE_TIMES = {
   '반반차(오후)': '오후 3시 퇴근'
 };
 
-// 휴가 1건당 일수 계산
-function getLeaveDays(type, start, end) {
-  if (!type) return 0;
-  if (type === '반차(오전)' || type === '반차(오후)') return 0.5;
-  if (type === '반반차(오전)' || type === '반반차(오후)') return 0.25;
-  // 연차/생휴/무결/경조 — 시작~종료 영업일 수
-  return countWorkdays(start, end);
+// 항목 1개의 일수 = 가중치 × 개수
+function calcItemDays(item) {
+  var w = TYPE_WEIGHT[item.type] || 0;
+  var c = parseFloat(item.count) || 0;
+  return w * c;
+}
+
+// 항목 배열의 총 일수
+function calcTotalDays(items) {
+  return (items || []).reduce(function(s, it) { return s + calcItemDays(it); }, 0);
+}
+
+// 기존(단일 type) leave 데이터를 items 배열로 정규화 (호환성)
+function normalizeLeaveItems(l) {
+  if (l.items && l.items.length > 0) return l.items;
+  if (l.type) return [{ type: l.type, count: 1 }];
+  return [];
 }
 
 // 일수 포맷 (정수면 정수, 아니면 소수점 2자리)
@@ -102,6 +124,9 @@ function countWorkdays(startStr, endStr) {
   return n;
 }
 
+// ----- 현재 작성 폼의 휴가 항목 -----
+var formItems = [{ type: '연차', count: 1 }]; // 기본 한 줄
+
 // ----- 초기화 -----
 (function init() {
   var today = new Date();
@@ -112,12 +137,68 @@ function countWorkdays(startStr, endStr) {
   document.getElementById('leaveStart').value = todayStr;
   document.getElementById('leaveEnd').value = todayStr;
 
-  document.getElementById('leaveStart').addEventListener('change', updatePeriodInfo);
-  document.getElementById('leaveEnd').addEventListener('change', updatePeriodInfo);
-
+  renderFormItems();
   renderLeaveList();
-  updatePeriodInfo();
 })();
+
+function renderFormItems() {
+  var list = document.getElementById('leaveItemsList');
+  var html = formItems.map(function(it, idx) {
+    var optHtml = '<option value="">선택</option>' + LEAVE_TYPES.map(function(t) {
+      return '<option value="' + t + '"' + (it.type === t ? ' selected' : '') + '>' + t + '</option>';
+    }).join('');
+    return '<div class="leave-item-row">' +
+      '<select class="item-type" onchange="updateFormItem(' + idx + ',\'type\',this.value)">' + optHtml + '</select>' +
+      '<input type="number" class="item-count" min="1" max="30" step="1" value="' + (it.count || 1) + '" oninput="updateFormItem(' + idx + ',\'count\',this.value)">' +
+      '<span class="item-suffix">개</span>' +
+      '<button type="button" class="item-remove" onclick="removeFormItem(' + idx + ')" ' + (formItems.length === 1 ? 'disabled' : '') + '>×</button>' +
+    '</div>';
+  }).join('');
+  list.innerHTML = html;
+  refreshFormTotals();
+}
+
+function refreshFormTotals() {
+  var total = calcTotalDays(formItems);
+  document.getElementById('leaveItemsTotal').textContent = '합계: ' + fmtDays(total);
+  // 반차/반반차 출퇴근 안내 (포함된 종류만 모아서 표시)
+  var times = [];
+  formItems.forEach(function(it) {
+    if (TYPE_TIMES[it.type] && times.indexOf(TYPE_TIMES[it.type]) === -1) {
+      times.push(TYPE_TIMES[it.type]);
+    }
+  });
+  var timeEl = document.getElementById('leaveItemsTime');
+  if (times.length > 0) {
+    timeEl.innerHTML = times.map(function(t) { return '<span class="time-hint">' + t + '</span>'; }).join(' ');
+  } else {
+    timeEl.innerHTML = '';
+  }
+}
+
+function addLeaveItem() {
+  formItems.push({ type: '연차', count: 1 });
+  renderFormItems();
+}
+
+function removeFormItem(idx) {
+  if (formItems.length <= 1) return;
+  formItems.splice(idx, 1);
+  renderFormItems();
+}
+
+function updateFormItem(idx, key, val) {
+  if (!formItems[idx]) return;
+  if (key === 'count') {
+    var n = parseInt(val, 10);
+    if (!n || n < 1) n = 1;
+    if (n > 30) n = 30;
+    formItems[idx][key] = n;
+  } else {
+    formItems[idx][key] = val;
+  }
+  refreshFormTotals();
+}
 
 // ----- 자동완성 (이름) -----
 var activeSuggestionIdx = -1;
@@ -161,79 +242,42 @@ function hideNameSuggestions() {
   }, 150);
 }
 
-// ----- 구분 변경 (기간 입력 자동 전환) -----
-function onLeaveTypeChange() {
-  var type = document.getElementById('leaveType').value;
-  var endInput = document.getElementById('leaveEnd');
-  var sep = document.getElementById('periodSep');
-  if (SINGLE_DAY_TYPES.indexOf(type) !== -1) {
-    // 단일 일자 (반차/반반차) — 종료일 숨김 + 시작일=종료일 자동
-    endInput.style.display = 'none';
-    sep.style.display = 'none';
-    endInput.value = document.getElementById('leaveStart').value;
-  } else {
-    endInput.style.display = '';
-    sep.style.display = '';
-  }
-  updatePeriodInfo();
-}
-
-function updatePeriodInfo() {
-  var type = document.getElementById('leaveType').value;
-  var startStr = document.getElementById('leaveStart').value;
-  var endStr = document.getElementById('leaveEnd').value;
-  var info = document.getElementById('periodDayInfo');
-
-  // 단일 일자형: 종료일 = 시작일 + 시간 안내 + 일수
-  if (SINGLE_DAY_TYPES.indexOf(type) !== -1) {
-    document.getElementById('leaveEnd').value = startStr;
-    var d = getLeaveDays(type, startStr, startStr);
-    info.innerHTML = '<span class="day-count">' + fmtDays(d) + '</span>' +
-                     '<span class="time-hint">' + TYPE_TIMES[type] + '</span>';
-    return;
-  }
-
-  // 구분이 비어있거나 기간이 비어있으면 표시 안 함
-  if (!type || !startStr || !endStr) { info.textContent = ''; return; }
-  var days = getLeaveDays(type, startStr, endStr);
-  if (days > 0) info.innerHTML = '<span class="day-count">' + fmtDays(days) + '</span>';
-  else info.textContent = '';
-}
-
 // ----- 휴가증 추가 -----
 function addLeave() {
   var name = document.getElementById('leaveName').value.trim();
-  var type = document.getElementById('leaveType').value;
   var start = document.getElementById('leaveStart').value;
   var end = document.getElementById('leaveEnd').value;
   var reason = document.getElementById('leaveReason').value.trim();
   var phone = document.getElementById('leavePhone').value.trim();
 
+  // 항목 검증
+  var validItems = formItems.filter(function(it) {
+    return it.type && (parseInt(it.count, 10) || 0) > 0;
+  });
+  if (validItems.length === 0) {
+    showToast('휴가 사용 내역을 한 줄 이상 입력해 주세요.', 'error'); return;
+  }
+
   // 검증
   if (!name) { showToast('이름을 입력해 주세요.', 'error'); return; }
-  if (!type) { showToast('구분을 선택해 주세요.', 'error'); return; }
   if (!start) { showToast('시작일을 입력해 주세요.', 'error'); return; }
-  if (SINGLE_DAY_TYPES.indexOf(type) === -1 && !end) {
-    showToast('종료일을 입력해 주세요.', 'error'); return;
-  }
-  if (SINGLE_DAY_TYPES.indexOf(type) === -1 && end < start) {
-    showToast('종료일이 시작일보다 빠릅니다.', 'error'); return;
-  }
+  if (!end) { showToast('종료일을 입력해 주세요.', 'error'); return; }
+  if (end < start) { showToast('종료일이 시작일보다 빠릅니다.', 'error'); return; }
   if (!reason) { showToast('사유를 입력해 주세요.', 'error'); return; }
   if (!phone) { showToast('연락처를 입력해 주세요.', 'error'); return; }
 
   // 명단 매칭 (있으면 사번/근무지 자동 채움)
   var matched = workers.find(function(w) { return w.name === name; });
+  var totalDays = calcTotalDays(validItems);
   var leave = {
     id: uuid(),
     name: name,
     employeeId: matched ? (matched.employeeId || '') : '',
     team: matched ? (matched.team || '') : '',
-    type: type,
+    items: validItems.map(function(it) { return { type: it.type, count: parseInt(it.count, 10) || 1 }; }),
+    days: totalDays,
     start: start,
-    end: SINGLE_DAY_TYPES.indexOf(type) !== -1 ? start : end,
-    time: TYPE_TIMES[type] || '',
-    days: getLeaveDays(type, start, SINGLE_DAY_TYPES.indexOf(type) !== -1 ? start : end),
+    end: end,
     reason: reason,
     phone: phone,
     createdAt: new Date().toISOString()
@@ -243,7 +287,7 @@ function addLeave() {
   saveLeaves();
   renderLeaveList();
   resetForm();
-  showToast(name + ' 휴가증이 추가되었습니다.', 'success');
+  showToast(name + ' 휴가증이 추가되었습니다. (' + fmtDays(totalDays) + ')', 'success');
 }
 
 function saveLeaves() {
@@ -252,15 +296,13 @@ function saveLeaves() {
 
 function resetForm() {
   document.getElementById('leaveName').value = '';
-  document.getElementById('leaveType').value = '';
   var today = dateToStr(new Date());
   document.getElementById('leaveStart').value = today;
   document.getElementById('leaveEnd').value = today;
-  document.getElementById('leaveEnd').style.display = '';
-  document.getElementById('periodSep').style.display = '';
   document.getElementById('leaveReason').value = '';
   document.getElementById('leavePhone').value = '';
-  updatePeriodInfo();
+  formItems = [{ type: '연차', count: 1 }];
+  renderFormItems();
   document.getElementById('leaveName').focus();
 }
 
@@ -274,7 +316,8 @@ function removeLeave(id) {
 function renderLeaveList() {
   var list = document.getElementById('leaveList');
   var totalDays = leaves.reduce(function(s, l) {
-    var d = (l.days != null) ? l.days : getLeaveDays(l.type, l.start, l.end);
+    var items = normalizeLeaveItems(l);
+    var d = (l.days != null) ? l.days : calcTotalDays(items);
     return s + (d || 0);
   }, 0);
   var countLabel = leaves.length + '건';
@@ -287,19 +330,36 @@ function renderLeaveList() {
   }
 
   list.innerHTML = leaves.map(function(l) {
-    var typeCls = 'leave-type-' + l.type.replace(/[()·]/g, '-').replace(/--/g, '-');
+    var items = normalizeLeaveItems(l);
+    var days = (l.days != null) ? l.days : calcTotalDays(items);
     var periodText = l.start === l.end ? l.start : (l.start + ' ~ ' + l.end);
-    var days = (l.days != null) ? l.days : getLeaveDays(l.type, l.start, l.end);
     if (days > 0) periodText += ' <span class="leave-days">' + fmtDays(days) + '</span>';
-    var timeText = TYPE_TIMES[l.type] || l.time || '';
-    if (timeText) periodText += ' <span class="leave-time">' + timeText + '</span>';
+
+    // 시간 안내 (반차/반반차 포함된 경우만)
+    var seenTimes = {};
+    var timeHints = '';
+    items.forEach(function(it) {
+      if (TYPE_TIMES[it.type] && !seenTimes[TYPE_TIMES[it.type]]) {
+        seenTimes[TYPE_TIMES[it.type]] = 1;
+        timeHints += '<span class="leave-time">' + TYPE_TIMES[it.type] + '</span>';
+      }
+    });
+    if (timeHints) periodText += ' ' + timeHints;
+
+    // 구분 배지들 (항목별)
+    var typeBadges = items.map(function(it) {
+      var cls = 'leave-type-' + it.type.replace(/[()·]/g, '-').replace(/--/g, '-');
+      var label = it.type + (it.count > 1 ? ' x' + it.count : '');
+      return '<span class="leave-item-type ' + cls + '">' + label + '</span>';
+    }).join(' ');
+
     var sub = [l.employeeId, l.team].filter(Boolean).join(' / ');
     return '<div class="leave-item">' +
       '<div class="leave-item-head">' +
         '<div><span class="leave-item-name">' + escapeHtml(l.name) + '</span>' +
           (sub ? '<span class="leave-item-sub">' + escapeHtml(sub) + '</span>' : '') +
         '</div>' +
-        '<span class="leave-item-type ' + typeCls + '">' + l.type + '</span>' +
+        '<div class="leave-item-types">' + typeBadges + '</div>' +
       '</div>' +
       '<div class="leave-item-body">' +
         '<div><span class="label">기간</span> ' + periodText + '</div>' +
@@ -475,21 +535,29 @@ function exportLeaves() {
     return;
   }
   var aoa = [
-    ['번호', '이름', '사번', '근무지', '구분', '시작일', '종료일', '일수', '출퇴근 안내', '사유', '연락처', '작성일시']
+    ['번호', '이름', '사번', '근무지', '구분 내역', '시작일', '종료일', '일수', '출퇴근 안내', '사유', '연락처', '작성일시']
   ];
   // 작성 순서대로 (오래된 것부터)
   leaves.slice().reverse().forEach(function(l, i) {
-    var d = (l.days != null) ? l.days : getLeaveDays(l.type, l.start, l.end);
+    var items = normalizeLeaveItems(l);
+    var d = (l.days != null) ? l.days : calcTotalDays(items);
+    var typeStr = items.map(function(it) {
+      return it.type + (it.count > 1 ? ' x' + it.count : '');
+    }).join(' + ');
+    var times = [];
+    items.forEach(function(it) {
+      if (TYPE_TIMES[it.type] && times.indexOf(TYPE_TIMES[it.type]) === -1) times.push(TYPE_TIMES[it.type]);
+    });
     aoa.push([
       i + 1,
       l.name,
       l.employeeId,
       l.team,
-      l.type,
+      typeStr,
       l.start,
       l.end,
       d || 0,
-      TYPE_TIMES[l.type] || l.time || '',
+      times.join(' / '),
       l.reason,
       l.phone,
       new Date(l.createdAt).toLocaleString('ko-KR')
@@ -497,8 +565,8 @@ function exportLeaves() {
   });
   var ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [
-    { wch: 5 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
-    { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 16 }, { wch: 30 }, { wch: 14 }, { wch: 20 }
+    { wch: 5 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 24 },
+    { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 20 }, { wch: 30 }, { wch: 14 }, { wch: 20 }
   ];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '휴가증');

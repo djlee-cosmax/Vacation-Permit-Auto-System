@@ -128,29 +128,92 @@ input, select, textarea { font-family: inherit; }
   min-width: 140px;
 }
 .period-sep { color: #999; font-weight: 700; font-size: 15px; }
-.period-day-info {
-  margin-left: 4px;
-  font-size: 13px;
-  color: #2962ff;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
+
+/* 휴가 사용 내역 (다중 항목) */
+.leave-items-list {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
-.period-day-info .day-count {
-  display: inline-block;
-  background: #e3f2fd;
-  color: #1565c0;
-  padding: 3px 10px;
+.leave-item-row {
+  display: grid;
+  grid-template-columns: 1fr 90px auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.leave-item-row .item-type {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.leave-item-row .item-count {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: center;
+}
+.leave-item-row .item-suffix {
+  font-size: 13px;
+  color: #555;
+  font-weight: 600;
+}
+.leave-item-row .item-remove {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #ddd;
+  background: #fff;
   border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  color: #c8102e;
+}
+.leave-item-row .item-remove:hover { background: #fff5f5; }
+.leave-item-row .item-remove:disabled {
+  color: #ccc;
+  cursor: not-allowed;
+  background: #fafafa;
+}
+.leave-items-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+.btn-add-item {
+  background: #2962ff;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
   font-size: 13px;
   font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
 }
-.period-day-info .time-hint {
+.btn-add-item:hover { background: #1e4dd1; }
+.leave-items-total {
+  background: #e3f2fd;
+  color: #1565c0;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.leave-items-time {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.leave-items-time .time-hint {
   display: inline-block;
   background: #fff3e0;
   color: #e65100;
-  padding: 3px 10px;
+  padding: 4px 12px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: 700;
@@ -303,6 +366,12 @@ input, select, textarea { font-family: inherit; }
   color: #999;
   margin-left: 10px;
   font-weight: 500;
+}
+.leave-item-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
 }
 .leave-item-type {
   display: inline-block;

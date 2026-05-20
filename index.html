@@ -37,19 +37,14 @@
           </div>
         </div>
 
-        <div class="form-group">
-          <label for="leaveType">구분 <span class="req">*</span></label>
-          <select id="leaveType" onchange="onLeaveTypeChange()">
-            <option value="">선택해 주세요</option>
-            <option value="연차">연차 (종일)</option>
-            <option value="반차(오전)">반차 (오전)</option>
-            <option value="반차(오후)">반차 (오후)</option>
-            <option value="반반차(오전)">반반차 (오전)</option>
-            <option value="반반차(오후)">반반차 (오후)</option>
-            <option value="생휴">생휴</option>
-            <option value="경조">경조</option>
-            <option value="무결">무결</option>
-          </select>
+        <div class="form-group form-row-full">
+          <label>휴가 사용 내역 <span class="req">*</span></label>
+          <div class="leave-items-list" id="leaveItemsList"></div>
+          <div class="leave-items-footer">
+            <button type="button" class="btn-add-item" onclick="addLeaveItem()">+ 휴가 추가</button>
+            <span class="leave-items-total" id="leaveItemsTotal">합계: 0일</span>
+          </div>
+          <div class="leave-items-time" id="leaveItemsTime"></div>
         </div>
 
         <div class="form-group form-row-period">
@@ -58,7 +53,6 @@
             <input type="date" id="leaveStart">
             <span class="period-sep" id="periodSep">~</span>
             <input type="date" id="leaveEnd">
-            <span class="period-day-info" id="periodDayInfo"></span>
           </div>
         </div>
 
