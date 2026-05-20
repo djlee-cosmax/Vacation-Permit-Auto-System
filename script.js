@@ -140,9 +140,6 @@ function countWorkdays(startStr, endStr) {
   return n;
 }
 
-// ----- 현재 작성 폼의 휴가 항목 -----
-var formItems = [{ type: '연차', count: 1 }]; // 기본 한 줄
-
 // ----- 초기화 -----
 (function init() {
   // 기존 leave 데이터에 옛 type명(예: '무결')이 있으면 신 명칭으로 마이그레이션
@@ -165,54 +162,15 @@ var formItems = [{ type: '연차', count: 1 }]; // 기본 한 줄
   document.getElementById('leaveStart').value = todayStr;
   document.getElementById('leaveEnd').value = todayStr;
 
-  renderFormItems();
+  refreshFormTotals();
   renderLeaveList();
 })();
 
-function renderFormItems() {
-  var list = document.getElementById('leaveItemsList');
-  var html = formItems.map(function(it, idx) {
-    var optHtml = '<option value="">선택</option>' + LEAVE_TYPES.map(function(t) {
-      return '<option value="' + t + '"' + (it.type === t ? ' selected' : '') + '>' + t + '</option>';
-    }).join('');
-    return '<div class="leave-item-row">' +
-      '<select class="item-type" onchange="updateFormItem(' + idx + ',\'type\',this.value)">' + optHtml + '</select>' +
-      '<input type="number" class="item-count" min="1" max="30" step="1" value="' + (it.count || 1) + '" oninput="updateFormItem(' + idx + ',\'count\',this.value)">' +
-      '<span class="item-suffix">개</span>' +
-      '<button type="button" class="item-remove" onclick="removeFormItem(' + idx + ')" ' + (formItems.length === 1 ? 'disabled' : '') + '>×</button>' +
-    '</div>';
-  }).join('');
-  list.innerHTML = html;
-  refreshFormTotals();
-}
-
 function refreshFormTotals() {
-  var total = calcTotalDays(formItems);
-  document.getElementById('leaveItemsTotal').textContent = '합계: ' + fmtDays(total);
-}
-
-function addLeaveItem() {
-  formItems.push({ type: '연차', count: 1 });
-  renderFormItems();
-}
-
-function removeFormItem(idx) {
-  if (formItems.length <= 1) return;
-  formItems.splice(idx, 1);
-  renderFormItems();
-}
-
-function updateFormItem(idx, key, val) {
-  if (!formItems[idx]) return;
-  if (key === 'count') {
-    var n = parseInt(val, 10);
-    if (!n || n < 1) n = 1;
-    if (n > 30) n = 30;
-    formItems[idx][key] = n;
-  } else {
-    formItems[idx][key] = val;
-  }
-  refreshFormTotals();
+  var type = document.getElementById('leaveType').value;
+  var count = parseInt(document.getElementById('leaveCount').value, 10) || 1;
+  var days = (TYPE_WEIGHT[type] || 0) * count;
+  document.getElementById('leaveItemsTotal').textContent = fmtDays(days);
 }
 
 // ----- 자동완성 (이름) -----
@@ -260,21 +218,16 @@ function hideNameSuggestions() {
 // ----- 휴가증 추가 -----
 function addLeave() {
   var name = document.getElementById('leaveName').value.trim();
+  var type = document.getElementById('leaveType').value;
+  var count = parseInt(document.getElementById('leaveCount').value, 10) || 1;
   var start = document.getElementById('leaveStart').value;
   var end = document.getElementById('leaveEnd').value;
   var reason = document.getElementById('leaveReason').value.trim();
   var phone = document.getElementById('leavePhone').value.trim();
 
-  // 항목 검증
-  var validItems = formItems.filter(function(it) {
-    return it.type && (parseInt(it.count, 10) || 0) > 0;
-  });
-  if (validItems.length === 0) {
-    showToast('휴가 사용 내역을 한 줄 이상 입력해 주세요.', 'error'); return;
-  }
-
-  // 검증
   if (!name) { showToast('이름을 입력해 주세요.', 'error'); return; }
+  if (!type) { showToast('구분을 선택해 주세요.', 'error'); return; }
+  if (!count || count < 1) { showToast('개수를 1 이상으로 입력해 주세요.', 'error'); return; }
   if (!start) { showToast('시작일을 입력해 주세요.', 'error'); return; }
   if (!end) { showToast('종료일을 입력해 주세요.', 'error'); return; }
   if (end < start) { showToast('종료일이 시작일보다 빠릅니다.', 'error'); return; }
@@ -283,14 +236,14 @@ function addLeave() {
 
   // 명단 매칭 (있으면 사번/근무지 자동 채움)
   var matched = workers.find(function(w) { return w.name === name; });
-  var totalDays = calcTotalDays(validItems);
+  var days = (TYPE_WEIGHT[type] || 0) * count;
   var leave = {
     id: uuid(),
     name: name,
     employeeId: matched ? (matched.employeeId || '') : '',
     team: matched ? (matched.team || '') : '',
-    items: validItems.map(function(it) { return { type: it.type, count: parseInt(it.count, 10) || 1 }; }),
-    days: totalDays,
+    items: [{ type: type, count: count }],
+    days: days,
     start: start,
     end: end,
     reason: reason,
@@ -302,7 +255,7 @@ function addLeave() {
   saveLeaves();
   renderLeaveList();
   resetForm();
-  showToast(name + ' 휴가증이 추가되었습니다. (' + fmtDays(totalDays) + ')', 'success');
+  showToast(name + ' / ' + type + ' ' + count + '개 (' + fmtDays(days) + ') 추가됨', 'success');
 }
 
 function saveLeaves() {
@@ -311,13 +264,14 @@ function saveLeaves() {
 
 function resetForm() {
   document.getElementById('leaveName').value = '';
+  document.getElementById('leaveType').value = '연차';
+  document.getElementById('leaveCount').value = '1';
   var today = dateToStr(new Date());
   document.getElementById('leaveStart').value = today;
   document.getElementById('leaveEnd').value = today;
   document.getElementById('leaveReason').value = '';
   document.getElementById('leavePhone').value = '';
-  formItems = [{ type: '연차', count: 1 }];
-  renderFormItems();
+  refreshFormTotals();
   document.getElementById('leaveName').focus();
 }
 
