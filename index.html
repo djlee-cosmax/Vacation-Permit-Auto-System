@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>휴가증 자동 반영 프로그램</title>
+  <link rel="icon" href="logo.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="logo-full.png" alt="COSMAX" class="logo">
+      <span class="divider">|</span>
+      <h1>휴가증 자동 반영 프로그램</h1>
+      <span class="subtitle">생산3팀 파우더 성형실</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-secondary" onclick="openWorkerModal()">작업자 명단</button>
+      <button class="btn-secondary" onclick="exportLeaves()">파일로 내보내기</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- 좌측: 휴가증 작성 폼 -->
+    <section class="card form-card">
+      <h2>휴가증 작성</h2>
+      <p class="form-hint">작성일: <span id="todayLabel"></span></p>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="leaveName">이름 <span class="req">*</span></label>
+          <div class="autocomplete">
+            <input type="text" id="leaveName" placeholder="작업자 이름" autocomplete="off"
+              oninput="onNameInput()" onfocus="onNameInput()" onblur="hideNameSuggestions()">
+            <div class="suggestions" id="nameSuggestions" style="display:none"></div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="leaveType">구분 <span class="req">*</span></label>
+          <select id="leaveType" onchange="onLeaveTypeChange()">
+            <option value="">선택해 주세요</option>
+            <option value="연차">연차 (종일)</option>
+            <option value="반차(오전)">반차 (오전)</option>
+            <option value="반차(오후)">반차 (오후)</option>
+            <option value="반반차(오전)">반반차 (오전)</option>
+            <option value="반반차(오후)">반반차 (오후)</option>
+            <option value="생휴">생휴</option>
+            <option value="경조">경조</option>
+            <option value="훈련">훈련</option>
+            <option value="무결">무결</option>
+          </select>
+        </div>
+
+        <div class="form-group form-row-period">
+          <label>기간 <span class="req">*</span></label>
+          <div class="period-row">
+            <input type="date" id="leaveStart">
+            <span class="period-sep" id="periodSep">~</span>
+            <input type="date" id="leaveEnd">
+            <span class="period-day-info" id="periodDayInfo"></span>
+          </div>
+        </div>
+
+        <div class="form-group form-row-full">
+          <label for="leaveReason">사유 <span class="req">*</span></label>
+          <textarea id="leaveReason" rows="2" placeholder="휴가 사유"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="leavePhone">연락처 <span class="req">*</span></label>
+          <input type="text" id="leavePhone" placeholder="010-0000-0000" maxlength="13"
+            oninput="formatPhone(this)">
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn-primary" onclick="addLeave()">+ 추가</button>
+        <button class="btn-secondary" onclick="resetForm()">초기화</button>
+      </div>
+    </section>
+
+    <!-- 우측: 작성된 휴가증 목록 -->
+    <section class="card list-card">
+      <div class="list-header">
+        <h2>작성된 휴가증</h2>
+        <span class="list-count" id="listCount">0건</span>
+      </div>
+      <div class="leave-list" id="leaveList">
+        <div class="empty-state">아직 작성된 휴가증이 없습니다.</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 작업자 명단 관리 모달 -->
+  <div class="modal-overlay" id="workerModal" style="display:none" onclick="closeWorkerModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeWorkerModal()">x</button>
+      <h3>작업자 명단 관리 <span class="modal-hint" id="workerHint"></span></h3>
+
+      <div class="worker-toolbar">
+        <button class="btn-secondary btn-small" onclick="document.getElementById('workerFile').click()">파일 업로드</button>
+        <input type="file" id="workerFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="onWorkerFileSelected(event)">
+        <button class="btn-secondary btn-small" onclick="addWorkerRow()">+ 직접 추가</button>
+        <span class="worker-toolbar-hint">엑셀 양식: 이름 | 사번 | 조 | 연락처 (헤더 행 자동 인식)</span>
+      </div>
+
+      <div class="worker-table-wrap">
+        <table class="worker-table" id="workerTable">
+          <thead>
+            <tr><th style="width:32%">이름</th><th style="width:22%">사번</th><th style="width:16%">조</th><th style="width:22%">연락처</th><th style="width:8%"></th></tr>
+          </thead>
+          <tbody id="workerTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-primary" onclick="saveWorkerList()">저장</button>
+        <button class="btn-secondary" onclick="closeWorkerModal()">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 토스트 -->
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
