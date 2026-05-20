@@ -221,7 +221,7 @@ def main():
             user_data_dir=str(PROFILE_DIR),
             channel="msedge",
             headless=False,
-            viewport={"width": 1366, "height": 900},
+            no_viewport=True,  # viewport 고정 해제 → 창 크기에 맞춰짐
             args=["--start-maximized"],
         )
 
