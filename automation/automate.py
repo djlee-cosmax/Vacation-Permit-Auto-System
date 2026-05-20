@@ -6,6 +6,7 @@
 import json
 import sys
 import traceback
+from datetime import datetime
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -14,6 +15,19 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 GROUPWARE_URL = "https://coin.cosmax.com/"
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROFILE_DIR = SCRIPT_DIR / "profile"
+LOG_FILE = SCRIPT_DIR / "last_error.log"
+
+
+def log_error(stage: str, exc: Exception):
+    """에러를 로그 파일에 기록 (사용자가 보내주기 편하게)"""
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(f"\n[{ts}] 단계: {stage}\n")
+        f.write(f"에러 타입: {type(exc).__name__}\n")
+        f.write(f"에러 메시지: {exc}\n")
+        f.write("스택 트레이스:\n")
+        traceback.print_exc(file=f)
+        f.write("=" * 60 + "\n")
 
 
 # ------------------------------------------------------------------
@@ -60,6 +74,14 @@ def confirm(title: str, msg: str) -> bool:
 # ------------------------------------------------------------------
 # 자동화 본체
 # ------------------------------------------------------------------
+CURRENT_STAGE = ""  # 디버깅용 — 현재 진행 중인 단계
+
+def set_stage(stage: str):
+    global CURRENT_STAGE
+    CURRENT_STAGE = stage
+    print(f"  >> {stage}")
+
+
 def register_application(page, application: dict, app_idx: int, total_apps: int):
     """한 신청서(applications 배열의 한 항목) 등록"""
     gw_type = application["groupwareType"]
@@ -67,19 +89,23 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
     print(f"\n[{app_idx}/{total_apps}] '{gw_type}' 신청서 — 인원 {len(entries)}명")
 
     # 1. 신청서 메뉴 (상단)
+    set_stage("(1) 상단 '신청서' 메뉴 클릭")
     page.get_by_role("link", name="신청서").first.click()
     page.wait_for_load_state("domcontentloaded")
     page.wait_for_timeout(800)
 
     # 2. 좌측 메뉴 — 근태/휴가신청
+    set_stage("(2) 좌측 메뉴 '근태/휴가신청' 클릭")
     page.get_by_text("근태/휴가신청", exact=True).click()
     page.wait_for_timeout(800)
 
     # 3. 신청서추가 버튼
+    set_stage("(3) '신청서추가' 버튼 클릭")
     page.get_by_role("button", name="신청서추가").click()
     page.wait_for_timeout(800)
 
     # 4. 추가 버튼 (직원찾기 모달 열기)
+    set_stage("(4) '추가' 버튼 클릭 (직원찾기 모달 열기)")
     page.get_by_role("button", name="추가").click()
     page.wait_for_timeout(800)
 
@@ -226,17 +252,19 @@ def main():
                 register_application(page, application, idx, len(applications))
                 success += 1
             except Exception as e:
-                failures.append((application.get("type", "?"), str(e)))
-                print(f"  [실패] {application.get('type', '?')}: {e}")
+                failures.append((application.get("type", "?"), CURRENT_STAGE, str(e)))
+                log_error(f"신청서 {idx} ({application.get('type', '?')}) - 단계: {CURRENT_STAGE}", e)
+                print(f"  [실패] {application.get('type', '?')} | 단계: {CURRENT_STAGE}")
+                print(f"          에러: {e}")
                 traceback.print_exc()
 
         # 결과 보고
         if failures:
-            failure_msg = "\n".join([f"- {t}: {e[:100]}" for t, e in failures])
+            failure_msg = "\n".join([f"- [{t}] 단계 '{stage}': {str(e)[:120]}" for t, stage, e in failures])
             show_error(
                 "일부 실패",
                 f"성공: {success}건 / 실패: {len(failures)}건\n\n실패 내역:\n{failure_msg}\n\n"
-                f"이미 등록된 임시저장본은 그룹웨어에서 확인 가능합니다.",
+                f"상세 로그: {LOG_FILE}",
             )
         else:
             show_info(
@@ -245,9 +273,7 @@ def main():
                 f"그룹웨어에서 검토 후 직접 신청해 주세요.",
             )
 
-        # 자동 종료 안 함 — 사용자가 검토할 수 있게 창 유지
         print("\n자동화 완료. Edge 창은 직접 닫아 주세요.")
-        # context.close()  # 일부러 비활성화 (사용자가 결과 확인 가능)
 
 
 if __name__ == "__main__":
@@ -255,4 +281,16 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         traceback.print_exc()
-        show_error("예기치 못한 오류", str(e))
+        log_error("main()", e)
+        show_error("예기치 못한 오류", f"{e}\n\n상세 로그: {LOG_FILE}")
+    finally:
+        # 콘솔 창이 자동으로 닫히지 않게
+        print("\n" + "=" * 60)
+        print("실행 종료. 에러 메시지를 확인하셨다면 아무 키나 눌러 종료하세요.")
+        print(f"에러가 있었다면 다음 파일을 확인/공유해 주세요:")
+        print(f"  {LOG_FILE}")
+        print("=" * 60)
+        try:
+            input("Press Enter to exit... ")
+        except Exception:
+            pass
