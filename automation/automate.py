@@ -101,16 +101,16 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
     # 2. 좌측 메뉴 — 근태/휴가신청 (#divMenu 영역으로 한정)
     set_stage("(2) 좌측 메뉴 '근태/휴가신청' 클릭")
     page.locator("#divMenu").get_by_text("근태/휴가신청").first.click()
-    page.wait_for_timeout(1000)
+    page.wait_for_timeout(2500)  # 페이지 로딩 대기 (표 데이터 로드 등)
 
-    # 3. 신청서추가 버튼 (페이지 본문의 버튼)
+    # 3. 신청서추가 버튼 — role 무관, 텍스트로 찾기
     set_stage("(3) '신청서추가' 버튼 클릭")
-    page.get_by_role("button", name="신청서추가").first.click()
-    page.wait_for_timeout(1000)
+    page.get_by_text("신청서추가").first.click()
+    page.wait_for_timeout(1500)
 
-    # 4. 추가 버튼 (직원찾기 모달 열기) — 페이지 곳곳에 있을 수 있으니 모달 열기 직전 버튼만
+    # 4. 추가 버튼 (직원찾기 모달 열기) — 텍스트로 찾기
     set_stage("(4) '추가' 버튼 클릭 (직원찾기 모달 열기)")
-    page.get_by_role("button", name="추가").first.click()
+    page.get_by_text("추가", exact=True).first.click()
     page.wait_for_timeout(1500)
 
     # 5. 직원찾기 모달에서 "기존데이터유지" 체크박스 체크
@@ -260,6 +260,18 @@ def main():
                 log_error(f"신청서 {idx} ({application.get('type', '?')}) - 단계: {CURRENT_STAGE}", e)
                 print(f"  [실패] {application.get('type', '?')} | 단계: {CURRENT_STAGE}")
                 print(f"          에러: {e}")
+                # 에러 시점 페이지 스크린샷 자동 저장 (디버그용)
+                try:
+                    ts = datetime.now().strftime("%H%M%S")
+                    shot_path = SCRIPT_DIR / f"error_screenshot_{ts}.png"
+                    page.screenshot(path=str(shot_path), full_page=True)
+                    print(f"          스크린샷 저장: {shot_path}")
+                    # HTML 일부 저장 (텍스트 검색용)
+                    html_path = SCRIPT_DIR / f"error_page_{ts}.html"
+                    html_path.write_text(page.content(), encoding="utf-8")
+                    print(f"          HTML 저장: {html_path}")
+                except Exception as snap_err:
+                    print(f"          (스크린샷 저장 실패: {snap_err})")
                 traceback.print_exc()
 
         # 결과 보고
