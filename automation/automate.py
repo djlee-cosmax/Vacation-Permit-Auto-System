@@ -75,11 +75,31 @@ def confirm(title: str, msg: str) -> bool:
 # 자동화 본체
 # ------------------------------------------------------------------
 CURRENT_STAGE = ""  # 디버깅용 — 현재 진행 중인 단계
+DIALOG_LOG = []     # 그룹웨어가 띄운 다이얼로그 메시지 누적 (응답/검증 메시지)
 
 def set_stage(stage: str):
     global CURRENT_STAGE
     CURRENT_STAGE = stage
     print(f"  >> {stage}")
+
+
+def handle_dialog(d):
+    """모든 alert/confirm을 자동 수락하고 메시지를 누적"""
+    msg = (d.message or "").strip()
+    DIALOG_LOG.append({"type": d.type, "msg": msg})
+    print(f"  [dialog] {d.type}: {msg}")
+    try:
+        d.accept()
+    except Exception:
+        pass
+
+
+def is_save_success(messages: list[str]) -> bool:
+    """다이얼로그 메시지 목록에서 임시저장 성공 패턴 검사"""
+    for m in messages:
+        if "저장되었습니다" in m or "저장 되었습니다" in m or "저장 완료" in m:
+            return True
+    return False
 
 
 def try_click(parent, selectors: list, timeout_each: int = 3000) -> str | None:
@@ -94,12 +114,15 @@ def try_click(parent, selectors: list, timeout_each: int = 3000) -> str | None:
 
 
 def register_application(page, application: dict, app_idx: int, total_apps: int):
-    """한 신청서(applications 배열의 한 항목) 등록"""
+    """한 신청서(applications 배열의 한 항목) 등록. 성공 시 True, 실패 시 예외."""
     category = application.get("category", "?")
     entries = application["entries"]
     # 신청서 안에 들어갈 type들 요약 표시
     type_summary = ", ".join(sorted(set(e.get("type", "?") for e in entries)))
     print(f"\n[{app_idx}/{total_apps}] '{category}' 신청서 — 인원 {len(entries)}명 ({type_summary})")
+
+    # 이 신청서 시작 시점의 다이얼로그 인덱스
+    dialog_start_idx = len(DIALOG_LOG)
 
     # 1. 신청서 메뉴 (상단) — 첫 신청서일 때만 (이미 신청서 화면이면 생략)
     set_stage("(1) 상단 '신청서' 메뉴 클릭")
@@ -352,7 +375,15 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
     # 다음 신청서를 위한 안전 대기 (추가 1.5초)
     page.wait_for_timeout(1500)
 
-    print(f"  → '{category}' 신청서 임시저장 완료")
+    # 이 신청서 동안 그룹웨어가 띄운 다이얼로그 메시지들로 성공/실패 판정
+    new_dialogs = DIALOG_LOG[dialog_start_idx:]
+    dialog_msgs = [d["msg"] for d in new_dialogs]
+    if is_save_success(dialog_msgs):
+        print(f"  → '{category}' 신청서 임시저장 완료")
+    else:
+        # 실패: '저장되었습니다' 메시지 없음 → 잔여일수 부족 등 검증 실패
+        reason = " / ".join(m for m in dialog_msgs if m) or "(응답 메시지 없음)"
+        raise Exception(f"임시저장 실패 — 그룹웨어 응답: {reason}")
 
 
 def main():
@@ -397,8 +428,8 @@ def main():
             args=["--start-maximized"],
         )
 
-        # alert/confirm 자동 수락 (저장 성공/확인 메시지)
-        context.on("dialog", lambda d: (print(f"  [dialog] {d.type}: {d.message}"), d.accept()))
+        # alert/confirm 자동 수락 + 메시지 누적
+        context.on("dialog", handle_dialog)
 
         page = context.pages[0] if context.pages else context.new_page()
         page.goto(GROUPWARE_URL, wait_until="domcontentloaded")
@@ -478,10 +509,21 @@ def main():
 
         # 결과 보고
         if failures:
-            failure_msg = "\n".join([f"- [{t}] 단계 '{stage}': {str(e)[:120]}" for t, stage, e in failures])
+            lines = []
+            for t, stage, e in failures:
+                # 임시저장 실패 메시지는 핵심만 표시
+                short = str(e)
+                if "임시저장 실패" in short:
+                    lines.append(f"× [{t}] {short}")
+                else:
+                    lines.append(f"× [{t}] 단계 '{stage}': {short[:150]}")
+            failure_msg = "\n".join(lines)
             show_error(
-                "일부 실패",
-                f"성공: {success}건 / 실패: {len(failures)}건\n\n실패 내역:\n{failure_msg}\n\n"
+                "일부 신청서 실패",
+                f"성공: {success}건 / 실패: {len(failures)}건\n\n"
+                f"실패 내역:\n{failure_msg}\n\n"
+                f"※ 실패한 신청서는 그룹웨어에 들어가지 않았습니다.\n"
+                f"※ 실패한 작업자의 휴가증을 확인 후 다시 작성·자동등록하거나, 그룹웨어에서 수동 처리해 주세요.\n\n"
                 f"상세 로그: {LOG_FILE}",
             )
         else:
