@@ -104,13 +104,13 @@
         <input type="file" id="workerFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="onWorkerFileSelected(event)">
         <button class="btn-secondary btn-small" onclick="addWorkerRow()">+ 직접 추가</button>
         <button class="btn-secondary btn-small" onclick="resetToDefaultWorkers()" title="서버에 등록된 기본 명단으로 되돌립니다">기본 명단으로 재설정</button>
-        <span class="worker-toolbar-hint">엑셀 양식: 이름 | 사번 | 조 | 연락처 (헤더 행 자동 인식)</span>
+        <span class="worker-toolbar-hint">엑셀 양식: 이름 | 사번 | 근무지 | 연락처 (헤더 행 자동 인식)</span>
       </div>
 
       <div class="worker-table-wrap">
         <table class="worker-table" id="workerTable">
           <thead>
-            <tr><th style="width:32%">이름</th><th style="width:22%">사번</th><th style="width:16%">조</th><th style="width:22%">연락처</th><th style="width:8%"></th></tr>
+            <tr><th style="width:32%">이름</th><th style="width:22%">사번</th><th style="width:16%">근무지</th><th style="width:22%">연락처</th><th style="width:8%"></th></tr>
           </thead>
           <tbody id="workerTableBody"></tbody>
         </table>
