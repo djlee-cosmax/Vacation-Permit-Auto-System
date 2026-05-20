@@ -88,26 +88,30 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
     entries = application["entries"]
     print(f"\n[{app_idx}/{total_apps}] '{gw_type}' 신청서 — 인원 {len(entries)}명")
 
-    # 1. 신청서 메뉴 (상단)
+    # 1. 신청서 메뉴 (상단) — 첫 신청서일 때만 (이미 신청서 화면이면 생략)
     set_stage("(1) 상단 '신청서' 메뉴 클릭")
-    page.get_by_role("link", name="신청서").first.click()
-    page.wait_for_load_state("domcontentloaded")
+    try:
+        page.get_by_role("link", name="신청서").first.click()
+        page.wait_for_load_state("domcontentloaded")
+    except Exception:
+        # 이미 신청서 화면일 가능성
+        pass
     page.wait_for_timeout(800)
 
-    # 2. 좌측 메뉴 — 근태/휴가신청
+    # 2. 좌측 메뉴 — 근태/휴가신청 (#divMenu 영역으로 한정)
     set_stage("(2) 좌측 메뉴 '근태/휴가신청' 클릭")
-    page.get_by_text("근태/휴가신청", exact=True).click()
-    page.wait_for_timeout(800)
+    page.locator("#divMenu").get_by_text("근태/휴가신청").first.click()
+    page.wait_for_timeout(1000)
 
-    # 3. 신청서추가 버튼
+    # 3. 신청서추가 버튼 (페이지 본문의 버튼)
     set_stage("(3) '신청서추가' 버튼 클릭")
-    page.get_by_role("button", name="신청서추가").click()
-    page.wait_for_timeout(800)
+    page.get_by_role("button", name="신청서추가").first.click()
+    page.wait_for_timeout(1000)
 
-    # 4. 추가 버튼 (직원찾기 모달 열기)
+    # 4. 추가 버튼 (직원찾기 모달 열기) — 페이지 곳곳에 있을 수 있으니 모달 열기 직전 버튼만
     set_stage("(4) '추가' 버튼 클릭 (직원찾기 모달 열기)")
-    page.get_by_role("button", name="추가").click()
-    page.wait_for_timeout(800)
+    page.get_by_role("button", name="추가").first.click()
+    page.wait_for_timeout(1500)
 
     # 5. 직원찾기 모달에서 "기존데이터유지" 체크박스 체크
     keep_check = page.locator("label:has-text('기존데이터유지') input[type='checkbox']")
