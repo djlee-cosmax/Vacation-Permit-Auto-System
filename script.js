@@ -22,7 +22,7 @@ var leaves = JSON.parse(localStorage.getItem('p5_leaves') || '[]');
 // leave: { id, name, employeeId, team, type, start, end, reason, phone, createdAt }
 
 // 구분 옵션 (드롭다운에 표시되는 순서)
-var LEAVE_TYPES = ['연차', '반차(오전)', '반차(오후)', '반반차(오전)', '반반차(오후)', '생휴', '결근', '결근(오전)', '결근(오후)'];
+var LEAVE_TYPES = ['연차', '반차(오전)', '반차(오후)', '반반차(오전)', '반반차(오후)', '생휴', '하기휴가', '결근', '결근(오전)', '결근(오후)'];
 
 // 구분별 1개당 일수 가중치 (경조는 호환을 위해 매핑은 유지)
 var TYPE_WEIGHT = {
@@ -32,11 +32,15 @@ var TYPE_WEIGHT = {
   '반반차(오전)': 0.25,
   '반반차(오후)': 0.25,
   '생휴': 1,
+  '하기휴가': 1,  // 영업일 1일당 1일 (3일 연속이라는 의미는 작성 폼에서 안내)
   '경조': 1,
   '결근': 1,
   '결근(오전)': 0.5,
   '결근(오후)': 0.5
 };
+
+// 입력된 기간 전체를 차지하는 유형 (count 무시, 일수는 영업일 수)
+var FULL_RANGE_TYPES = ['하기휴가'];
 
 // 구분별 출퇴근 안내 (반차/반반차 + 결근 오전/오후)
 var TYPE_TIMES = {
@@ -56,6 +60,7 @@ var GROUPWARE_TYPE_MAPPING = {
   '반반차(오전)': '반반차(오전)',
   '반반차(오후)': '반반차(오후)',
   '생휴': '생휴',
+  '하기휴가': '하기휴가',
   '경조': '경조휴가',
   '결근': '결근',
   '결근(오전)': '결근(오전)',
@@ -176,6 +181,10 @@ function countWorkdays(startStr, endStr) {
   document.getElementById('leaveStart').value = todayStr;
   document.getElementById('leaveEnd').value = todayStr;
 
+  // 기간 변경 시 합계 갱신 (하기휴가 등 영업일 기반 type 위해)
+  document.getElementById('leaveStart').addEventListener('change', refreshFormTotals);
+  document.getElementById('leaveEnd').addEventListener('change', refreshFormTotals);
+
   refreshFormTotals();
   renderLeaveList();
 })();
@@ -183,7 +192,20 @@ function countWorkdays(startStr, endStr) {
 function refreshFormTotals() {
   var type = document.getElementById('leaveType').value;
   var count = parseInt(document.getElementById('leaveCount').value, 10) || 1;
-  var days = (TYPE_WEIGHT[type] || 0) * count;
+  var days;
+  if (FULL_RANGE_TYPES.indexOf(type) !== -1) {
+    // 하기휴가 등: 기간의 영업일 수 그대로
+    var startStr = document.getElementById('leaveStart').value;
+    var endStr = document.getElementById('leaveEnd').value;
+    days = countWorkdays(startStr, endStr);
+    // 개수 입력란을 1로 고정하고 비활성화
+    var countEl = document.getElementById('leaveCount');
+    countEl.value = '1';
+    countEl.disabled = true;
+  } else {
+    days = (TYPE_WEIGHT[type] || 0) * count;
+    document.getElementById('leaveCount').disabled = false;
+  }
   document.getElementById('leaveItemsTotal').textContent = fmtDays(days);
 }
 
@@ -250,7 +272,14 @@ function addLeave() {
 
   // 명단 매칭 (있으면 사번/근무지 자동 채움)
   var matched = workers.find(function(w) { return w.name === name; });
-  var days = (TYPE_WEIGHT[type] || 0) * count;
+  // 하기휴가 등 영업일 전체 차지하는 유형은 영업일 수로 일수 계산
+  var days;
+  if (FULL_RANGE_TYPES.indexOf(type) !== -1) {
+    days = countWorkdays(start, end);
+    count = 1;  // 강제 1
+  } else {
+    days = (TYPE_WEIGHT[type] || 0) * count;
+  }
   var leave = {
     id: uuid(),
     name: name,
@@ -530,10 +559,15 @@ function splitLeaveToEntries(l) {
   var items = normalizeLeaveItems(l);
   var dates = getWorkdaysList(l.start, l.end);
   // items 펼치기: [연차, 연차, 반차(오후)] 형태로
+  // 하기휴가 등 영업일 전체 차지 유형은 dates 수만큼 펼침
   var flat = [];
   items.forEach(function(it) {
     var n = parseInt(it.count, 10) || 1;
-    for (var i = 0; i < n; i++) flat.push(it.type);
+    if (FULL_RANGE_TYPES.indexOf(it.type) !== -1) {
+      for (var i = 0; i < dates.length; i++) flat.push(it.type);
+    } else {
+      for (var j = 0; j < n; j++) flat.push(it.type);
+    }
   });
   // 각 영업일에 1개씩 할당 (가능한 한)
   var slots = [];

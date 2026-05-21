@@ -361,6 +361,7 @@ input, select, textarea { font-family: inherit; }
 .leave-type-반반차-오전    { background: #ffa726; }
 .leave-type-반반차-오후    { background: #ffa726; }
 .leave-type-생휴          { background: #ec407a; }
+.leave-type-하기휴가      { background: #00897b; }
 .leave-type-경조          { background: #7c4dff; }
 .leave-type-훈련          { background: #26a69a; }
 .leave-type-결근          { background: #757575; }
