@@ -446,6 +446,45 @@ input, select, textarea { font-family: inherit; }
   margin-left: 8px;
 }
 
+.worker-search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  position: relative;
+}
+.worker-search-row input[type="text"] {
+  flex: 1;
+  padding: 10px 36px 10px 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.worker-search-row input[type="text"]:focus {
+  border-color: #c8102e;
+  box-shadow: 0 0 0 3px rgba(200, 16, 46, 0.08);
+}
+.worker-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: #f0f0f0;
+  border-radius: 50%;
+  font-size: 14px;
+  color: #999;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.worker-search-clear:hover { background: #e0e0e0; color: #333; }
+
 .worker-toolbar {
   display: flex;
   gap: 8px;
