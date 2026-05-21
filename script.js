@@ -46,7 +46,10 @@ function getPhone4(phone) {
   else if (leaderParam === '0') localStorage.removeItem('p5_leader');
 })();
 var LEADER_MODE = localStorage.getItem('p5_leader') === '1';
-// 모바일에서도 서무 모드 그대로 (관리자처럼 강제 비활성 X)
+// 모바일(600px 이하)에서는 서무 모드 강제 비활성 — 모바일은 작업자 전용
+if (window.innerWidth <= 600) {
+  LEADER_MODE = false;
+}
 if (LEADER_MODE) document.documentElement.classList.add('leader-mode');
 
 // ----- 관리자 권한 체크 -----
