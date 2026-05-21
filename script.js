@@ -13,6 +13,10 @@
   }
 })();
 var ADMIN_MODE = localStorage.getItem('p5_admin') === '1';
+// 모바일(600px 이하)에서는 관리자 모드 강제 비활성 — 명단 편집/백업/복원 모두 숨김
+if (window.innerWidth <= 600) {
+  ADMIN_MODE = false;
+}
 if (ADMIN_MODE) {
   document.documentElement.classList.add('admin-mode');
 }
