@@ -604,6 +604,8 @@ html.admin-mode .not-admin-only { display: none !important; }
 
 /* 모바일 (~ 600px) */
 @media (max-width: 600px) {
+  /* 모바일에서는 관리자 기능 모두 숨김 (JS 측에서도 ADMIN_MODE를 false로 강제) */
+  .admin-only { display: none !important; }
   body { font-size: 14px; }
   .topbar {
     padding: 10px 14px;
