@@ -1,5 +1,22 @@
 // ============ 휴가증 자동 반영 프로그램 ============
 
+// ----- 관리자 권한 체크 -----
+// URL ?admin=1 진입 시 localStorage에 저장 (이후 같은 PC에서 유지)
+// URL ?admin=0 으로 해제 가능
+(function checkAdminParam() {
+  var urlParams = new URLSearchParams(window.location.search);
+  var adminParam = urlParams.get('admin');
+  if (adminParam === '1') {
+    localStorage.setItem('p5_admin', '1');
+  } else if (adminParam === '0') {
+    localStorage.removeItem('p5_admin');
+  }
+})();
+var ADMIN_MODE = localStorage.getItem('p5_admin') === '1';
+if (ADMIN_MODE) {
+  document.documentElement.classList.add('admin-mode');
+}
+
 // ----- 데이터 -----
 var workers = JSON.parse(localStorage.getItem('p5_workers') || '[]');
 // worker: { name, employeeId, team, phone }
@@ -392,17 +409,28 @@ function closeWorkerModal() {
 function renderWorkerTable() {
   var tbody = document.getElementById('workerTableBody');
   if (workerModalState.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#ccc;padding:24px">명단이 비어있습니다. 파일 업로드 또는 직접 추가로 등록해 주세요.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#ccc;padding:24px">명단이 비어있습니다.</td></tr>';
     return;
   }
   tbody.innerHTML = workerModalState.map(function(w, i) {
-    return '<tr>' +
-      '<td><input type="text" value="' + escapeHtml(w.name || '') + '" oninput="updateWorker(' + i + ',\'name\',this.value)"></td>' +
-      '<td><input type="text" value="' + escapeHtml(w.employeeId || '') + '" oninput="updateWorker(' + i + ',\'employeeId\',this.value)"></td>' +
-      '<td><input type="text" value="' + escapeHtml(w.team || '') + '" oninput="updateWorker(' + i + ',\'team\',this.value)"></td>' +
-      '<td><input type="text" value="' + escapeHtml(w.phone || '') + '" oninput="updateWorker(' + i + ',\'phone\',this.value)"></td>' +
-      '<td><button class="worker-row-del" onclick="deleteWorkerRow(' + i + ')">×</button></td>' +
-    '</tr>';
+    if (ADMIN_MODE) {
+      return '<tr>' +
+        '<td><input type="text" value="' + escapeHtml(w.name || '') + '" oninput="updateWorker(' + i + ',\'name\',this.value)"></td>' +
+        '<td><input type="text" value="' + escapeHtml(w.employeeId || '') + '" oninput="updateWorker(' + i + ',\'employeeId\',this.value)"></td>' +
+        '<td><input type="text" value="' + escapeHtml(w.team || '') + '" oninput="updateWorker(' + i + ',\'team\',this.value)"></td>' +
+        '<td><input type="text" value="' + escapeHtml(w.phone || '') + '" oninput="updateWorker(' + i + ',\'phone\',this.value)"></td>' +
+        '<td><button class="worker-row-del" onclick="deleteWorkerRow(' + i + ')">×</button></td>' +
+      '</tr>';
+    } else {
+      // 비관리자: 텍스트만 표시 (편집 불가)
+      return '<tr>' +
+        '<td class="worker-readonly-cell">' + escapeHtml(w.name || '') + '</td>' +
+        '<td class="worker-readonly-cell">' + escapeHtml(w.employeeId || '') + '</td>' +
+        '<td class="worker-readonly-cell">' + escapeHtml(w.team || '') + '</td>' +
+        '<td class="worker-readonly-cell">' + escapeHtml(w.phone || '') + '</td>' +
+        '<td></td>' +
+      '</tr>';
+    }
   }).join('');
 }
 
