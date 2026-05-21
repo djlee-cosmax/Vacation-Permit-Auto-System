@@ -1,5 +1,38 @@
 // ============ 휴가증 자동 반영 프로그램 ============
 
+// ----- Firebase 초기화 (클라우드 공유 휴가증 저장소) -----
+var firebaseConfig = {
+  apiKey: "AIzaSyBK_OijdnrC0_fAFr8vQ91jWIMv7aIu3uQ",
+  authDomain: "vacation-manage-auto-system.firebaseapp.com",
+  projectId: "vacation-manage-auto-system",
+  storageBucket: "vacation-manage-auto-system.firebasestorage.app",
+  messagingSenderId: "707114921205",
+  appId: "1:707114921205:web:d2d840a81961de6ec5a9bc"
+};
+var FB_DB = null;
+var FB_UID = null;
+try {
+  if (typeof firebase !== 'undefined') {
+    firebase.initializeApp(firebaseConfig);
+    FB_DB = firebase.firestore();
+    firebase.auth().signInAnonymously()
+      .then(function(cred) { FB_UID = cred.user.uid; console.log('Firebase 익명 인증:', FB_UID); })
+      .catch(function(err) { console.warn('Firebase 익명 인증 실패:', err); });
+  }
+} catch (e) {
+  console.warn('Firebase 초기화 실패:', e);
+}
+
+// ----- 조장 권한 체크 (URL ?leader=1 진입 시 활성화, localStorage 유지) -----
+(function checkLeaderParam() {
+  var leaderParam = new URLSearchParams(window.location.search).get('leader');
+  if (leaderParam === '1') localStorage.setItem('p5_leader', '1');
+  else if (leaderParam === '0') localStorage.removeItem('p5_leader');
+})();
+var LEADER_MODE = localStorage.getItem('p5_leader') === '1';
+// 모바일에서는 조장 모드 그대로 (관리자처럼 강제 비활성 X — 조장이 모바일로 조회 가능)
+if (LEADER_MODE) document.documentElement.classList.add('leader-mode');
+
 // ----- 관리자 권한 체크 -----
 // URL ?admin=1 진입 시 localStorage에 저장 (이후 같은 PC에서 유지)
 // URL ?admin=0 으로 해제 가능
@@ -309,7 +342,26 @@ function addLeave() {
   saveLeaves();
   renderLeaveList();
   resetForm();
+  uploadLeaveToCloud(leave);  // Firestore에도 저장 (실패해도 로컬은 유지)
   showToast(name + ' / ' + type + ' ' + count + '개 (' + fmtDays(days) + ') 추가됨', 'success');
+}
+
+// ----- Firestore 업로드/삭제 -----
+function uploadLeaveToCloud(leave) {
+  if (!FB_DB || !FB_UID) return;
+  var doc = Object.assign({}, leave);
+  doc.submittedBy = FB_UID;
+  doc.serverCreatedAt = firebase.firestore.FieldValue.serverTimestamp();
+  // 14일 후 자동 삭제용 TTL 필드
+  doc.expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  FB_DB.collection('leaves').doc(leave.id).set(doc)
+    .catch(function(err) { console.warn('Firestore 저장 실패:', err); });
+}
+
+function deleteLeaveFromCloud(id) {
+  if (!FB_DB) return;
+  FB_DB.collection('leaves').doc(id).delete()
+    .catch(function(err) { console.warn('Firestore 삭제 실패:', err); });
 }
 
 function saveLeaves() {
@@ -334,6 +386,7 @@ function removeLeave(id) {
   leaves = leaves.filter(function(l) { return l.id !== id; });
   saveLeaves();
   renderLeaveList();
+  deleteLeaveFromCloud(id);
 }
 
 function resetAllLeaves() {
@@ -341,11 +394,60 @@ function resetAllLeaves() {
     showToast('초기화할 휴가증이 없습니다.', 'error');
     return;
   }
-  if (!confirm('작성된 휴가증 ' + leaves.length + '건을 모두 삭제하시겠습니까?\n이 동작은 되돌릴 수 없습니다.')) return;
+  if (!confirm('작성된 휴가증 ' + leaves.length + '건을 모두 삭제하시겠습니까?\n이 동작은 되돌릴 수 없습니다.\n\n(서버에 업로드된 휴가증은 삭제되지 않습니다)')) return;
   leaves = [];
   saveLeaves();
   renderLeaveList();
-  showToast('전체 초기화되었습니다.', 'success');
+  showToast('로컬 휴가증 전체 초기화됨.', 'success');
+}
+
+// ----- 조장: 오늘 작성된 모든 사용자 휴가증을 서버에서 가져오기 -----
+function fetchTodayLeavesFromCloud() {
+  if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
+  if (!FB_UID) { showToast('인증 진행 중입니다. 잠시 후 다시 시도해 주세요.', 'error'); return; }
+
+  var now = new Date();
+  var startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  showToast('서버에서 휴가증을 가져오는 중...', '');
+  FB_DB.collection('leaves')
+    .where('serverCreatedAt', '>=', firebase.firestore.Timestamp.fromDate(startOfDay))
+    .get()
+    .then(function(snapshot) {
+      var fetched = [];
+      snapshot.forEach(function(doc) {
+        var data = doc.data();
+        // 서버 전용 필드 제거
+        delete data.submittedBy;
+        delete data.expiresAt;
+        delete data.serverCreatedAt;
+        fetched.push(data);
+      });
+      if (fetched.length === 0) {
+        showToast('오늘 작성된 휴가증이 없습니다.', 'error');
+        return;
+      }
+      var existingIds = {};
+      leaves.forEach(function(l) { existingIds[l.id] = 1; });
+      var newOnes = fetched.filter(function(l) { return !existingIds[l.id]; });
+      if (newOnes.length === 0) {
+        showToast('이미 모두 가져온 상태입니다. (서버 ' + fetched.length + '건 = 로컬과 동일)', '');
+        return;
+      }
+      if (!confirm(
+        '서버에서 ' + fetched.length + '건의 휴가증을 발견했습니다.\n' +
+        '그 중 ' + newOnes.length + '건이 현재 화면에 없는 새 휴가증입니다.\n\n' +
+        '추가하시겠습니까? (기존 휴가증은 유지)'
+      )) return;
+      newOnes.forEach(function(l) { leaves.unshift(l); });
+      saveLeaves();
+      renderLeaveList();
+      showToast(newOnes.length + '건 추가됨 (총 ' + leaves.length + '건)', 'success');
+    })
+    .catch(function(err) {
+      console.error('Firestore 조회 실패:', err);
+      showToast('가져오기 실패: ' + (err.message || err), 'error');
+    });
 }
 
 function renderLeaveList() {
