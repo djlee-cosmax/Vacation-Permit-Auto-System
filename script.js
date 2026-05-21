@@ -735,9 +735,25 @@ function exportLeaves() {
 
   var today = dateToStr(new Date());
 
+  // 작성된 휴가증의 근무지를 카운트하여 다수 작업장을 파일명에 표기
+  var workplaceCount = {};
+  leaves.forEach(function(l) {
+    var wp = (l.team || '').trim();
+    if (wp) workplaceCount[wp] = (workplaceCount[wp] || 0) + 1;
+  });
+  var dominantWorkplace = '';
+  var maxCount = 0;
+  Object.keys(workplaceCount).forEach(function(wp) {
+    if (workplaceCount[wp] > maxCount) {
+      maxCount = workplaceCount[wp];
+      dominantWorkplace = wp;
+    }
+  });
+  var workplaceSuffix = dominantWorkplace ? ' (' + dominantWorkplace + ')' : '';
+
   // ----- JSON 파일 다운로드 -----
   var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
-  var jsonName = '휴가증_' + today + '.json';
+  var jsonName = '휴가증_' + today + workplaceSuffix + '.json';
   var jsonUrl = URL.createObjectURL(blob);
   var a1 = document.createElement('a');
   a1.href = jsonUrl;
@@ -748,13 +764,14 @@ function exportLeaves() {
   setTimeout(function() { URL.revokeObjectURL(jsonUrl); }, 1000);
 
   // ----- XLSX 파일 다운로드 (서무 담당자 검토용) -----
-  exportLeavesAsXlsx(payload, today);
+  exportLeavesAsXlsx(payload, today, workplaceSuffix);
 
   showToast(leaves.length + '건 → 신청서 ' + applications.length + '건 (JSON + 엑셀 다운로드 완료)', 'success');
 }
 
 // ----- XLSX 출력 -----
-function exportLeavesAsXlsx(payload, today) {
+function exportLeavesAsXlsx(payload, today, workplaceSuffix) {
+  workplaceSuffix = workplaceSuffix || '';
   var wb = XLSX.utils.book_new();
 
   // 시트 1: 신청서별 (그룹웨어 등록 단위) — 서무 담당자가 그룹웨어 검토 시 비교
@@ -819,5 +836,5 @@ function exportLeavesAsXlsx(payload, today) {
   ];
   XLSX.utils.book_append_sheet(wb, ws2, '원본 입력');
 
-  XLSX.writeFile(wb, '휴가증_' + today + '.xlsx');
+  XLSX.writeFile(wb, '휴가증_' + today + workplaceSuffix + '.xlsx');
 }
