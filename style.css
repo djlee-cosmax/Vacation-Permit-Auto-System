@@ -602,6 +602,137 @@ html:not(.leader-mode) .leader-only { display: none !important; }
   color: #333;
 }
 
+/* ===== 내 휴가증 모달 ===== */
+.my-leaves-notice {
+  font-size: 12px;
+  color: #555;
+  background: #f9f9f9;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #eee;
+  margin-bottom: 14px;
+  line-height: 1.6;
+}
+.my-leaves-notice div { margin-bottom: 2px; }
+
+.my-auth-form {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  padding: 12px;
+  background: #fff5f5;
+  border: 1px solid #ffe0e0;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.my-auth-row {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 140px;
+}
+.my-auth-row label {
+  font-size: 11px;
+  color: #777;
+  margin-bottom: 4px;
+}
+.my-auth-row input {
+  padding: 9px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+}
+.my-auth-row input:focus {
+  border-color: #c8102e;
+}
+.my-auth-form .btn-primary {
+  padding: 10px 22px;
+  font-size: 14px;
+  flex: 0 0 auto;
+}
+
+.my-leaves-list {
+  max-height: 50vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 0;
+}
+.my-leaves-empty {
+  text-align: center;
+  color: #aaa;
+  padding: 28px 12px;
+  font-size: 13px;
+}
+.my-leaves-empty.error { color: #c62828; }
+
+.my-leave-card {
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #fafafa;
+}
+.my-leave-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.my-leave-card-type {
+  font-weight: 700;
+  color: #c8102e;
+  font-size: 14px;
+}
+.my-leave-card-days {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+.my-leave-card-period {
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 4px;
+}
+.my-leave-card-reason {
+  font-size: 12px;
+  color: #777;
+  margin-bottom: 8px;
+}
+.my-leave-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.my-leave-card-created {
+  font-size: 11px;
+  color: #aaa;
+}
+.my-leave-del {
+  background: #c8102e;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.my-leave-del:hover { background: #a30d24; }
+.my-leave-locked {
+  font-size: 11px;
+  color: #999;
+}
+
+@media (max-width: 600px) {
+  .my-auth-form { flex-direction: column; align-items: stretch; }
+  .my-auth-row { flex: 1 1 auto; }
+  .my-auth-form .btn-primary { width: 100%; }
+}
+
 /* ===== 토스트 ===== */
 .toast {
   position: fixed;

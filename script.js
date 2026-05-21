@@ -23,6 +23,22 @@ try {
   console.warn('Firebase 초기화 실패:', e);
 }
 
+// ----- 본인 정보 (localStorage) -----
+// 한 번 작성한 휴대폰은 본인 정보를 기억 → 다음 작성/조회 시 자동 사용
+function getMyInfo() {
+  try { return JSON.parse(localStorage.getItem('p5_me')) || null; }
+  catch (e) { return null; }
+}
+function setMyInfo(name, phone4) {
+  if (!name || !phone4) return;
+  localStorage.setItem('p5_me', JSON.stringify({ name: name, phone4: phone4 }));
+}
+function getPhone4(phone) {
+  if (!phone) return '';
+  var digits = String(phone).replace(/[^0-9]/g, '');
+  return digits.length >= 4 ? digits.slice(-4) : '';
+}
+
 // ----- 서무 권한 체크 (URL ?leader=1 진입 시 활성화, localStorage 유지) -----
 (function checkLeaderParam() {
   var leaderParam = new URLSearchParams(window.location.search).get('leader');
@@ -324,6 +340,9 @@ function addLeave() {
   var matched = workers.find(function(w) { return w.name === name; });
   if (FULL_RANGE_TYPES.indexOf(type) !== -1) count = 1;  // 하기휴가: count 강제 1
   var days = (TYPE_WEIGHT[type] || 0) * count;
+  // 본인 식별자: 연락처에서 마지막 4자리 추출
+  var phone4 = getPhone4(phone);
+  setMyInfo(name, phone4);  // localStorage에 본인 정보 저장 (다음 작성·조회 시 자동 사용)
   var leave = {
     id: uuid(),
     name: name,
@@ -335,6 +354,7 @@ function addLeave() {
     end: end,
     reason: reason,
     phone: phone,
+    submitterPhone4: phone4,
     createdAt: new Date().toISOString()
   };
 
@@ -399,6 +419,126 @@ function resetAllLeaves() {
   saveLeaves();
   renderLeaveList();
   showToast('로컬 휴가증 전체 초기화됨.', 'success');
+}
+
+// ----- 내 휴가증 모달 (개인이 본인 휴가증 조회/취소) -----
+var myLeavesCache = [];
+
+function openMyLeavesModal() {
+  // localStorage에 본인 정보 있으면 자동 채움 (수정 가능)
+  var me = getMyInfo();
+  document.getElementById('myAuthName').value = me ? me.name : '';
+  document.getElementById('myAuthPhone4').value = me ? me.phone4 : '';
+  document.getElementById('myLeavesList').innerHTML = '<div class="my-leaves-empty">조회 정보를 입력하고 조회 버튼을 눌러 주세요.</div>';
+  document.getElementById('myLeavesModal').style.display = 'flex';
+  // 본인 정보 있으면 자동 조회
+  if (me && me.name && me.phone4) fetchMyLeaves();
+}
+
+function closeMyLeavesModal() {
+  document.getElementById('myLeavesModal').style.display = 'none';
+  myLeavesCache = [];
+}
+
+function fetchMyLeaves() {
+  var name = document.getElementById('myAuthName').value.trim();
+  var phone4 = document.getElementById('myAuthPhone4').value.trim();
+  if (!name) { showToast('이름을 입력해 주세요.', 'error'); return; }
+  if (!/^[0-9]{4}$/.test(phone4)) { showToast('휴대폰 마지막 4자리를 숫자로 정확히 입력해 주세요.', 'error'); return; }
+  if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
+  if (!FB_UID) { showToast('인증 진행 중입니다. 잠시 후 다시 시도해 주세요.', 'error'); return; }
+
+  // localStorage 본인 정보 갱신 (조회 성공 시 작성도 본인으로 인식)
+  setMyInfo(name, phone4);
+
+  var fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+  document.getElementById('myLeavesList').innerHTML = '<div class="my-leaves-empty">조회 중...</div>';
+
+  FB_DB.collection('leaves')
+    .where('name', '==', name)
+    .get()
+    .then(function(snapshot) {
+      var results = [];
+      snapshot.forEach(function(doc) {
+        var d = doc.data();
+        if (d.submitterPhone4 !== phone4) return;
+        var t = d.serverCreatedAt && d.serverCreatedAt.toDate ? d.serverCreatedAt.toDate() : null;
+        if (t && t < fourteenDaysAgo) return;
+        results.push({
+          docId: doc.id,
+          id: d.id,
+          name: d.name,
+          items: d.items || [],
+          days: d.days,
+          start: d.start,
+          end: d.end,
+          reason: d.reason,
+          submittedBy: d.submittedBy,
+          serverCreatedAt: t
+        });
+      });
+      // 최신순 정렬
+      results.sort(function(a, b) {
+        return (b.serverCreatedAt ? b.serverCreatedAt.getTime() : 0) - (a.serverCreatedAt ? a.serverCreatedAt.getTime() : 0);
+      });
+      myLeavesCache = results;
+      renderMyLeavesList(results);
+    })
+    .catch(function(err) {
+      console.error('내 휴가증 조회 실패:', err);
+      document.getElementById('myLeavesList').innerHTML = '<div class="my-leaves-empty error">조회 실패: ' + (err.message || err) + '</div>';
+    });
+}
+
+function renderMyLeavesList(items) {
+  var listEl = document.getElementById('myLeavesList');
+  if (items.length === 0) {
+    listEl.innerHTML = '<div class="my-leaves-empty">최근 14일 내 작성된 휴가증이 없습니다.</div>';
+    return;
+  }
+  listEl.innerHTML = items.map(function(l, i) {
+    var canDelete = (l.submittedBy === FB_UID);
+    var typesText = (l.items || []).map(function(it) {
+      return it.type + (it.count > 1 ? ' × ' + it.count : '');
+    }).join(', ');
+    var periodText = l.start === l.end ? l.start : (l.start + ' ~ ' + l.end);
+    var createdText = l.serverCreatedAt ? l.serverCreatedAt.toLocaleString('ko-KR') : '';
+    return '<div class="my-leave-card">' +
+      '<div class="my-leave-card-head">' +
+        '<div class="my-leave-card-type">' + escapeHtml(typesText) + '</div>' +
+        '<div class="my-leave-card-days">' + fmtDays(l.days) + '</div>' +
+      '</div>' +
+      '<div class="my-leave-card-period">' + escapeHtml(periodText) + '</div>' +
+      '<div class="my-leave-card-reason">' + escapeHtml(l.reason || '') + '</div>' +
+      '<div class="my-leave-card-footer">' +
+        '<span class="my-leave-card-created">' + escapeHtml(createdText) + ' 작성</span>' +
+        (canDelete
+          ? '<button class="my-leave-del" onclick="deleteMyLeave(\'' + l.docId + '\')">취소</button>'
+          : '<span class="my-leave-locked" title="이 휴가증은 다른 휴대폰에서 작성됐어요. 작성한 휴대폰 또는 서무에게 요청해 주세요.">🔒 다른 휴대폰 작성</span>') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function deleteMyLeave(docId) {
+  if (!confirm('이 휴가증을 취소(삭제)하시겠습니까?\n취소 후엔 되돌릴 수 없습니다.')) return;
+  if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
+  FB_DB.collection('leaves').doc(docId).delete()
+    .then(function() {
+      // 로컬 leaves 배열에서도 제거 (있다면)
+      var target = myLeavesCache.find(function(l) { return l.docId === docId; });
+      if (target) {
+        leaves = leaves.filter(function(l) { return l.id !== target.id; });
+        saveLeaves();
+        renderLeaveList();
+      }
+      showToast('취소 완료', 'success');
+      fetchMyLeaves();  // 목록 새로고침
+    })
+    .catch(function(err) {
+      console.error('삭제 실패:', err);
+      showToast('취소 실패: ' + (err.message || err) + ' (작성한 휴대폰에서 시도해 주세요)', 'error');
+    });
 }
 
 // ----- 서무: 오늘 작성된 모든 사용자 휴가증을 서버에서 가져오기 -----

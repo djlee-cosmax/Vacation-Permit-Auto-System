@@ -18,6 +18,7 @@
       <span class="subtitle">생산3팀 파우더 성형실</span>
     </div>
     <div class="topbar-actions">
+      <button class="btn-secondary" onclick="openMyLeavesModal()" title="내가 작성한 휴가증 조회·취소">내 휴가증</button>
       <button class="btn-secondary" onclick="openWorkerModal()">작업자 명단</button>
       <button class="btn-secondary admin-only" onclick="backupData()" title="작업자 명단 + 작성된 휴가증을 백업 JSON으로 저장">백업</button>
       <button class="btn-secondary admin-only" onclick="document.getElementById('restoreFile').click()" title="이전에 백업한 JSON 파일로 데이터 복원">복원</button>
@@ -149,6 +150,38 @@
       <div class="modal-actions">
         <button class="btn-primary admin-only" onclick="saveWorkerList()">저장</button>
         <button class="btn-secondary" onclick="closeWorkerModal()">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 내 휴가증 모달 -->
+  <div class="modal-overlay" id="myLeavesModal" style="display:none" onclick="closeMyLeavesModal()">
+    <div class="modal large" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeMyLeavesModal()">×</button>
+      <h3>내 휴가증 조회 (최근 14일)</h3>
+      <div class="my-leaves-notice">
+        <div>※ 본인이 작성한 휴가증을 조회하고 취소할 수 있습니다.</div>
+        <div>※ 다른 휴대폰에서 작성한 휴가증은 조회만 가능하며, 취소는 작성한 휴대폰 또는 서무에게 요청해 주세요.</div>
+      </div>
+
+      <div class="my-auth-form">
+        <div class="my-auth-row">
+          <label>이름</label>
+          <input type="text" id="myAuthName" placeholder="이름" autocomplete="off">
+        </div>
+        <div class="my-auth-row">
+          <label>휴대폰 마지막 4자리</label>
+          <input type="text" id="myAuthPhone4" placeholder="0000" maxlength="4" inputmode="numeric" pattern="[0-9]{4}" autocomplete="off">
+        </div>
+        <button class="btn-primary" onclick="fetchMyLeaves()">조회</button>
+      </div>
+
+      <div class="my-leaves-list" id="myLeavesList">
+        <div class="my-leaves-empty">조회 정보를 입력하고 조회 버튼을 눌러 주세요.</div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeMyLeavesModal()">닫기</button>
       </div>
     </div>
   </div>
