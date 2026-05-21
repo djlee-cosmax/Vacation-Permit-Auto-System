@@ -76,6 +76,7 @@ def confirm(title: str, msg: str) -> bool:
 # ------------------------------------------------------------------
 CURRENT_STAGE = ""  # 디버깅용 — 현재 진행 중인 단계
 DIALOG_LOG = []     # 그룹웨어가 띄운 다이얼로그 메시지 누적 (응답/검증 메시지)
+MISSING_WORKERS = []  # 그리드에 등장하지 않은 작업자 (app_idx, name, employeeId)
 
 def set_stage(stage: str):
     global CURRENT_STAGE
@@ -205,13 +206,15 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
         keep_check.check()
     page.wait_for_timeout(400)
 
-    # 6. 각 entry의 이름을 순차 검색 (Enter 키로 조회 trigger)
+    # 6. 각 entry를 순차 검색 — 사번 우선 (동명이인 회피), 없으면 이름
     name_input = dialog.locator("#S_EMP_NM")
     for entry in entries:
         nm = entry["name"]
-        set_stage(f"(6) 직원 검색: {nm}")
+        emp_id = entry.get("employeeId") or ""
+        search_value = emp_id if emp_id else nm
+        set_stage(f"(6) 직원 검색: {nm} ({search_value})")
         name_input.fill("")
-        name_input.fill(nm)
+        name_input.fill(search_value)
         name_input.press("Enter")
         page.wait_for_timeout(900)
 
@@ -279,13 +282,19 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
     """)
     print(f"    그리드 행 {len(rows_info)}개 발견")
 
-    # 각 entry를 EMP_NM으로 매칭하여 SetCellValue로 입력 (각 행마다 자기 type 사용)
+    # 각 entry를 사번(EMP_ID) 우선, 없으면 이름(EMP_NM)으로 매칭하여 SetCellValue로 입력
     for entry in entries:
         nm = entry["name"]
+        emp_id = entry.get("employeeId") or ""
         entry_gw_type = entry.get("groupwareType") or entry.get("type") or ""
-        matched = next((r for r in rows_info if r["empNm"] == nm), None)
+        matched = None
+        if emp_id:
+            matched = next((r for r in rows_info if str(r.get("empId") or "") == emp_id), None)
         if not matched:
-            print(f"    [경고] {nm} 행을 그리드에서 찾지 못함. 건너뜀")
+            matched = next((r for r in rows_info if r.get("empNm") == nm), None)
+        if not matched:
+            print(f"    [경고] {nm}({emp_id}) 그리드에서 찾지 못함 — 그룹웨어 직원 명단에 없거나 검색 실패")
+            MISSING_WORKERS.append({"app_idx": app_idx, "name": nm, "employeeId": emp_id, "type": entry_gw_type})
             continue
         row_idx = matched["rowIdx"]
         start_ymd = entry["start"].replace("-", "")  # 20260521
@@ -508,10 +517,19 @@ def main():
                 traceback.print_exc()
 
         # 결과 보고
+        # 누락 작업자 (그리드에 안 잡힌 사람) 별도 메시지
+        missing_section = ""
+        if MISSING_WORKERS:
+            mw_lines = ["\n[!] 그리드에서 찾지 못한 작업자 (그룹웨어에 등록되지 않음)"]
+            for m in MISSING_WORKERS:
+                mw_lines.append(f"  - 신청서 {m['app_idx']} : {m['name']}({m['employeeId']}) / {m['type']}")
+            mw_lines.append("→ 그룹웨어 직원 명단에 해당 사번이 없거나 신청서를 작성할 권한이 없을 가능성")
+            mw_lines.append("→ 휴가증 사이트의 작업자 명단과 그룹웨어 명단을 비교해 주세요.")
+            missing_section = "\n".join(mw_lines)
+
         if failures:
             lines = []
             for t, stage, e in failures:
-                # 임시저장 실패 메시지는 핵심만 표시
                 short = str(e)
                 if "임시저장 실패" in short:
                     lines.append(f"× [{t}] {short}")
@@ -523,8 +541,16 @@ def main():
                 f"성공: {success}건 / 실패: {len(failures)}건\n\n"
                 f"실패 내역:\n{failure_msg}\n\n"
                 f"※ 실패한 신청서는 그룹웨어에 들어가지 않았습니다.\n"
-                f"※ 실패한 작업자의 휴가증을 확인 후 다시 작성·자동등록하거나, 그룹웨어에서 수동 처리해 주세요.\n\n"
+                f"※ 실패한 작업자의 휴가증을 확인 후 다시 작성·자동등록하거나, 그룹웨어에서 수동 처리해 주세요."
+                + missing_section + "\n\n"
                 f"상세 로그: {LOG_FILE}",
+            )
+        elif MISSING_WORKERS:
+            show_info(
+                "완료 (누락자 있음)",
+                f"신청서 {success}건 모두 임시저장 완료.\n"
+                + missing_section + "\n\n"
+                f"그룹웨어에서 검토 후 직접 신청해 주세요.",
             )
         else:
             show_info(
