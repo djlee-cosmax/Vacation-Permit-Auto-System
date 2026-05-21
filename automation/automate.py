@@ -395,7 +395,31 @@ def register_application(page, application: dict, app_idx: int, total_apps: int)
         raise Exception(f"임시저장 실패 — 그룹웨어 응답: {reason}")
 
 
+def cleanup_debug_files():
+    """이전 실행의 디버그 자료 자동 정리 (시작 시 호출)"""
+    patterns = ["error_*.png", "error_*.html", "after_save_*.png"]
+    removed = 0
+    for pattern in patterns:
+        for f in SCRIPT_DIR.glob(pattern):
+            try:
+                f.unlink()
+                removed += 1
+            except Exception:
+                pass
+    # last_error.log도 새로 시작 (이전 에러와 혼동 방지)
+    if LOG_FILE.exists():
+        try:
+            LOG_FILE.unlink()
+        except Exception:
+            pass
+    if removed > 0:
+        print(f"[정리] 이전 디버그 파일 {removed}개 삭제")
+
+
 def main():
+    # 이전 실행의 디버그 자료 정리
+    cleanup_debug_files()
+
     # JSON 파일 선택
     json_path = select_json_file()
     if not json_path:
