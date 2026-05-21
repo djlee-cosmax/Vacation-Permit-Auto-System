@@ -399,12 +399,21 @@ function escapeHtml(s) {
 
 // ----- 작업자 명단 모달 -----
 var workerModalState = [];
+var workerSearchQuery = '';
 
 function openWorkerModal() {
   workerModalState = workers.map(function(w) { return Object.assign({}, w); });
+  workerSearchQuery = '';
+  var searchInput = document.getElementById('workerSearch');
+  if (searchInput) searchInput.value = '';
   renderWorkerTable();
   document.getElementById('workerHint').textContent = '현재 ' + workers.length + '명 등록됨';
   document.getElementById('workerModal').style.display = 'flex';
+}
+
+function onWorkerSearch(value) {
+  workerSearchQuery = (value || '').trim().toLowerCase();
+  renderWorkerTable();
 }
 function closeWorkerModal() {
   document.getElementById('workerModal').style.display = 'none';
@@ -416,7 +425,26 @@ function renderWorkerTable() {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#ccc;padding:24px">명단이 비어있습니다.</td></tr>';
     return;
   }
-  tbody.innerHTML = workerModalState.map(function(w, i) {
+  // 이름 가나다순 정렬 + 검색 필터 (원본 인덱스 보존)
+  var view = workerModalState.map(function(w, idx) { return { w: w, idx: idx }; });
+  view.sort(function(a, b) {
+    return (a.w.name || '').localeCompare(b.w.name || '', 'ko');
+  });
+  if (workerSearchQuery) {
+    view = view.filter(function(item) {
+      var hay = ((item.w.name || '') + ' ' + (item.w.employeeId || '') + ' ' + (item.w.team || '') + ' ' + (item.w.phone || '')).toLowerCase();
+      return hay.indexOf(workerSearchQuery) !== -1;
+    });
+  }
+
+  if (view.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#ccc;padding:24px">검색 결과가 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = view.map(function(item) {
+    var w = item.w;
+    var i = item.idx;  // 원본 workerModalState 인덱스 (편집·삭제 시 사용)
     if (ADMIN_MODE) {
       return '<tr>' +
         '<td><input type="text" value="' + escapeHtml(w.name || '') + '" oninput="updateWorker(' + i + ',\'name\',this.value)"></td>' +

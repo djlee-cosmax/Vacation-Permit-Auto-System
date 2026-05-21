@@ -116,6 +116,11 @@
       <button class="modal-close" onclick="closeWorkerModal()">x</button>
       <h3>작업자 명단 관리 <span class="modal-hint" id="workerHint"></span></h3>
 
+      <div class="worker-search-row">
+        <input type="text" id="workerSearch" placeholder="이름·사번·근무지·연락처로 검색" oninput="onWorkerSearch(this.value)" autocomplete="off">
+        <button class="worker-search-clear" type="button" onclick="document.getElementById('workerSearch').value=''; onWorkerSearch('');" title="검색 초기화">×</button>
+      </div>
+
       <div class="worker-toolbar admin-only">
         <button class="btn-secondary btn-small" onclick="document.getElementById('workerFile').click()">파일 업로드</button>
         <input type="file" id="workerFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="onWorkerFileSelected(event)">
