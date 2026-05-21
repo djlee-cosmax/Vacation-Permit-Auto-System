@@ -7,7 +7,7 @@
   <meta name="x-apple-disable-message-reformatting" content="yes">
   <title>휴가증 자동 반영 프로그램</title>
   <link rel="icon" href="logo.png">
-  <link rel="stylesheet" href="style.css?v=20260521f">
+  <link rel="stylesheet" href="style.css?v=20260521g">
 </head>
 <body>
   <header class="topbar">
@@ -23,7 +23,7 @@
       <button class="btn-secondary admin-only" onclick="backupData()" title="작업자 명단 + 작성된 휴가증을 백업 JSON으로 저장">백업</button>
       <button class="btn-secondary admin-only" onclick="document.getElementById('restoreFile').click()" title="이전에 백업한 JSON 파일로 데이터 복원">복원</button>
       <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="onRestoreFileSelected(event)">
-      <button class="btn-secondary hide-on-mobile" onclick="exportLeaves()">파일로 내보내기</button>
+      <button class="btn-secondary leader-only" onclick="exportLeaves()">파일로 내보내기</button>
     </div>
   </header>
 
@@ -194,6 +194,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=20260521b"></script>
+  <script src="script.js?v=20260521g"></script>
 </body>
 </html>
