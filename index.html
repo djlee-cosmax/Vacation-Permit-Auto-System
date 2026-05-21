@@ -101,6 +101,7 @@
         <h2>작성된 휴가증</h2>
         <div class="list-header-right">
           <span class="list-count" id="listCount">0건</span>
+          <button class="btn-secondary btn-small leader-only" onclick="fetchTodayLeavesFromCloud()" title="오늘 작성된 모든 사용자의 휴가증을 서버에서 가져옵니다">서버에서 불러오기</button>
           <button class="btn-secondary btn-small" onclick="resetAllLeaves()">초기화</button>
         </div>
       </div>
@@ -156,6 +157,10 @@
   <div class="toast" id="toast"></div>
 
   <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <!-- Firebase SDK (compat 모드) -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
