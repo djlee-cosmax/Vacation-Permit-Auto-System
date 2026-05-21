@@ -17,6 +17,9 @@
     </div>
     <div class="topbar-actions">
       <button class="btn-secondary" onclick="openWorkerModal()">작업자 명단</button>
+      <button class="btn-secondary" onclick="backupData()" title="작업자 명단 + 작성된 휴가증을 백업 JSON으로 저장">백업</button>
+      <button class="btn-secondary" onclick="document.getElementById('restoreFile').click()" title="이전에 백업한 JSON 파일로 데이터 복원">복원</button>
+      <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="onRestoreFileSelected(event)">
       <button class="btn-secondary" onclick="exportLeaves()">파일로 내보내기</button>
     </div>
   </header>

@@ -592,6 +592,64 @@ function distributeApplications(entries) {
   return apps;
 }
 
+// ----- 백업 (workers + leaves) -----
+function backupData() {
+  var backup = {
+    schema: 'cosmax-vacation-backup-v1',
+    backedUpAt: new Date().toISOString(),
+    workers: workers,
+    leaves: leaves
+  };
+  var blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+  var today = dateToStr(new Date());
+  var fname = '휴가증_백업_' + today + '.json';
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+  showToast('백업 완료 (작업자 ' + workers.length + '명 / 휴가증 ' + leaves.length + '건)', 'success');
+}
+
+// ----- 복원 (백업 JSON 업로드) -----
+function onRestoreFileSelected(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      var data = JSON.parse(ev.target.result);
+      if (data.schema !== 'cosmax-vacation-backup-v1') {
+        showToast('백업 파일 형식이 아닙니다.', 'error');
+        return;
+      }
+      var newWorkers = Array.isArray(data.workers) ? data.workers : [];
+      var newLeaves = Array.isArray(data.leaves) ? data.leaves : [];
+      var msg = '복원하시겠습니까?\n\n'
+              + '백업일시: ' + (data.backedUpAt ? new Date(data.backedUpAt).toLocaleString('ko-KR') : '미상') + '\n'
+              + '작업자: ' + workers.length + '명 → ' + newWorkers.length + '명\n'
+              + '휴가증: ' + leaves.length + '건 → ' + newLeaves.length + '건\n\n'
+              + '현재 데이터가 모두 덮어쓰여집니다.';
+      if (!confirm(msg)) { e.target.value = ''; return; }
+      workers = newWorkers;
+      leaves = newLeaves;
+      localStorage.setItem('p5_workers', JSON.stringify(workers));
+      localStorage.setItem('p5_leaves', JSON.stringify(leaves));
+      renderLeaveList();
+      showToast('복원 완료 — 페이지를 새로고침합니다.', 'success');
+      setTimeout(function() { location.reload(); }, 800);
+    } catch (err) {
+      console.error(err);
+      showToast('백업 파일 처리 오류: ' + (err.message || err), 'error');
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+  e.target.value = '';
+}
+
 // ----- 파일 내보내기 (작성된 휴가증) — JSON (생휴/비생휴 분류) -----
 function exportLeaves() {
   if (leaves.length === 0) {
