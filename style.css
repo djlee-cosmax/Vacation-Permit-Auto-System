@@ -578,12 +578,12 @@ input, select, textarea { font-family: inherit; }
   flex: 0 0 auto;
 }
 
-/* ===== 관리자 / 조장 권한 분리 ===== */
+/* ===== 관리자 / 서무 권한 분리 ===== */
 /* admin 모드일 때만 보임 (기본: 비관리자) */
 html:not(.admin-mode) .admin-only { display: none !important; }
 /* 비관리자일 때만 보임 */
 html.admin-mode .not-admin-only { display: none !important; }
-/* 조장 모드일 때만 보임 */
+/* 서무 모드일 때만 보임 */
 html:not(.leader-mode) .leader-only { display: none !important; }
 
 .worker-readonly-notice {
