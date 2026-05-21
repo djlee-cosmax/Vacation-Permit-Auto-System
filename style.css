@@ -547,3 +547,185 @@ input, select, textarea { font-family: inherit; }
 }
 .toast.success { background: #2e7d32; }
 .toast.error { background: #c62828; }
+
+/* ===========================================================
+   모바일 / 태블릿 최적화
+   =========================================================== */
+
+/* 태블릿 (~ 900px) */
+@media (max-width: 900px) {
+  .container {
+    padding: 24px 16px;
+    gap: 20px;
+    grid-template-columns: 1fr;
+    max-width: 100%;
+  }
+  .topbar {
+    padding: 12px 16px;
+  }
+  .topbar-actions { gap: 6px; }
+  .topbar-actions button { padding: 10px 14px; font-size: 13px; }
+  .card { padding: 24px 20px; }
+  .card h2 { font-size: 20px; }
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .list-card {
+    max-height: none;
+    overflow: visible;
+  }
+  .leave-list {
+    overflow-y: visible;
+  }
+}
+
+/* 모바일 (~ 600px) */
+@media (max-width: 600px) {
+  body { font-size: 14px; }
+  .topbar {
+    padding: 10px 14px;
+    gap: 8px;
+  }
+  .brand { gap: 8px; flex-wrap: wrap; }
+  .brand .logo { height: 24px; }
+  .brand h1 { font-size: 16px; }
+  .brand .divider { display: none; }
+  .brand .subtitle { display: none; }
+  .topbar-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .topbar-actions button {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+  .container {
+    padding: 16px 12px;
+    gap: 16px;
+  }
+  .card {
+    padding: 20px 16px;
+    border-radius: 10px;
+  }
+  .card h2 { font-size: 18px; }
+  .form-card .form-hint { font-size: 12px; margin-bottom: 16px; }
+
+  .form-group label { font-size: 12px; margin-bottom: 6px; }
+  .form-group input[type="text"],
+  .form-group input[type="date"],
+  .form-group input[type="number"],
+  .form-group select,
+  .form-group textarea {
+    padding: 10px 12px;
+    font-size: 16px;  /* iOS zoom 방지 */
+    border-radius: 8px;
+  }
+  .form-group textarea { min-height: 60px; }
+  .period-row { gap: 6px; }
+  .period-row input[type="date"] { min-width: 110px; }
+
+  .count-row input[type="number"] {
+    flex: 0 0 90px;
+    font-size: 18px;
+    padding: 10px 12px;
+  }
+  .count-suffix { font-size: 14px; }
+  .leave-items-total {
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+  .form-hint-text {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+  .form-actions {
+    margin-top: 18px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .btn-primary {
+    padding: 12px 18px;
+    font-size: 15px;
+    flex: 1 1 auto;
+  }
+  .btn-secondary {
+    padding: 10px 14px;
+    font-size: 13px;
+    flex: 1 1 auto;
+  }
+
+  /* 자동완성 드롭다운 */
+  .suggestion-item { padding: 10px 12px; font-size: 14px; }
+
+  /* 작성된 휴가증 카드 */
+  .list-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .list-count { font-size: 13px; padding: 4px 10px; }
+  .leave-item {
+    padding: 16px 14px;
+    border-radius: 8px;
+  }
+  .leave-item-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .leave-item-types {
+    justify-content: flex-start;
+    width: 100%;
+  }
+  .leave-item-name { font-size: 16px; }
+  .leave-item-sub { font-size: 12px; margin-left: 6px; }
+  .leave-item-type { padding: 3px 10px; font-size: 11px; }
+  .leave-item-body { font-size: 13px; }
+  .leave-item-body .label { width: 50px; }
+  .leave-days, .leave-time {
+    margin-left: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+  }
+
+  /* 모달 */
+  .modal {
+    width: 96vw;
+    padding: 18px 14px;
+    border-radius: 10px;
+  }
+  .modal h3 { font-size: 15px; margin-bottom: 12px; }
+  .modal-hint { display: block; margin-left: 0; margin-top: 2px; font-size: 11px; }
+
+  /* 명단 모달 */
+  .worker-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .worker-toolbar-hint {
+    margin-left: 0;
+    font-size: 10px;
+    text-align: center;
+  }
+  .worker-table { font-size: 12px; }
+  .worker-table th, .worker-table td {
+    padding: 6px 4px;
+  }
+  .worker-table input { font-size: 13px; padding: 6px 4px; }
+
+  /* 토스트 */
+  .toast {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    text-align: center;
+    font-size: 13px;
+    padding: 11px 14px;
+  }
+}
