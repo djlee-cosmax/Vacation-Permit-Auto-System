@@ -23,14 +23,14 @@ try {
   console.warn('Firebase 초기화 실패:', e);
 }
 
-// ----- 조장 권한 체크 (URL ?leader=1 진입 시 활성화, localStorage 유지) -----
+// ----- 서무 권한 체크 (URL ?leader=1 진입 시 활성화, localStorage 유지) -----
 (function checkLeaderParam() {
   var leaderParam = new URLSearchParams(window.location.search).get('leader');
   if (leaderParam === '1') localStorage.setItem('p5_leader', '1');
   else if (leaderParam === '0') localStorage.removeItem('p5_leader');
 })();
 var LEADER_MODE = localStorage.getItem('p5_leader') === '1';
-// 모바일에서는 조장 모드 그대로 (관리자처럼 강제 비활성 X — 조장이 모바일로 조회 가능)
+// 모바일에서도 서무 모드 그대로 (관리자처럼 강제 비활성 X)
 if (LEADER_MODE) document.documentElement.classList.add('leader-mode');
 
 // ----- 관리자 권한 체크 -----
@@ -401,7 +401,7 @@ function resetAllLeaves() {
   showToast('로컬 휴가증 전체 초기화됨.', 'success');
 }
 
-// ----- 조장: 오늘 작성된 모든 사용자 휴가증을 서버에서 가져오기 -----
+// ----- 서무: 오늘 작성된 모든 사용자 휴가증을 서버에서 가져오기 -----
 function fetchTodayLeavesFromCloud() {
   if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
   if (!FB_UID) { showToast('인증 진행 중입니다. 잠시 후 다시 시도해 주세요.', 'error'); return; }
