@@ -17,8 +17,8 @@
     </div>
     <div class="topbar-actions">
       <button class="btn-secondary" onclick="openWorkerModal()">작업자 명단</button>
-      <button class="btn-secondary" onclick="backupData()" title="작업자 명단 + 작성된 휴가증을 백업 JSON으로 저장">백업</button>
-      <button class="btn-secondary" onclick="document.getElementById('restoreFile').click()" title="이전에 백업한 JSON 파일로 데이터 복원">복원</button>
+      <button class="btn-secondary admin-only" onclick="backupData()" title="작업자 명단 + 작성된 휴가증을 백업 JSON으로 저장">백업</button>
+      <button class="btn-secondary admin-only" onclick="document.getElementById('restoreFile').click()" title="이전에 백업한 JSON 파일로 데이터 복원">복원</button>
       <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="onRestoreFileSelected(event)">
       <button class="btn-secondary" onclick="exportLeaves()">파일로 내보내기</button>
     </div>
@@ -114,13 +114,14 @@
       <button class="modal-close" onclick="closeWorkerModal()">x</button>
       <h3>작업자 명단 관리 <span class="modal-hint" id="workerHint"></span></h3>
 
-      <div class="worker-toolbar">
+      <div class="worker-toolbar admin-only">
         <button class="btn-secondary btn-small" onclick="document.getElementById('workerFile').click()">파일 업로드</button>
         <input type="file" id="workerFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="onWorkerFileSelected(event)">
         <button class="btn-secondary btn-small" onclick="addWorkerRow()">+ 직접 추가</button>
         <button class="btn-secondary btn-small" onclick="resetToDefaultWorkers()" title="서버에 등록된 기본 명단으로 되돌립니다">기본 명단으로 재설정</button>
         <span class="worker-toolbar-hint">엑셀 양식: 이름 | 사번 | 근무지 | 연락처 (헤더 행 자동 인식)</span>
       </div>
+      <div class="worker-readonly-notice not-admin-only">※ 작업자 명단은 조회만 가능합니다. 추가·수정·삭제는 담당자(이동준)에게 요청해 주세요.</div>
 
       <div class="worker-table-wrap">
         <table class="worker-table" id="workerTable">
@@ -132,8 +133,8 @@
       </div>
 
       <div class="modal-actions">
-        <button class="btn-primary" onclick="saveWorkerList()">저장</button>
-        <button class="btn-secondary" onclick="closeWorkerModal()">취소</button>
+        <button class="btn-primary admin-only" onclick="saveWorkerList()">저장</button>
+        <button class="btn-secondary" onclick="closeWorkerModal()">닫기</button>
       </div>
     </div>
   </div>
