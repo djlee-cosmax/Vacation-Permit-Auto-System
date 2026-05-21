@@ -713,11 +713,29 @@ input, select, textarea { font-family: inherit; }
     font-size: 10px;
     text-align: center;
   }
-  .worker-table { font-size: 12px; }
-  .worker-table th, .worker-table td {
-    padding: 6px 4px;
+  /* 모바일에서 명단 표는 가로 스크롤로 잘림 방지 */
+  .worker-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
-  .worker-table input { font-size: 13px; padding: 6px 4px; }
+  .worker-table {
+    font-size: 13px;
+    min-width: 580px;  /* 4개 컬럼 + 삭제 버튼 충분히 보이게 */
+  }
+  .worker-table th, .worker-table td {
+    padding: 8px 6px;
+    white-space: nowrap;
+  }
+  .worker-table th:nth-child(1) { min-width: 80px; }   /* 이름 */
+  .worker-table th:nth-child(2) { min-width: 110px; }  /* 사번 */
+  .worker-table th:nth-child(3) { min-width: 80px; }   /* 근무지 */
+  .worker-table th:nth-child(4) { min-width: 140px; }  /* 연락처 */
+  .worker-table th:nth-child(5) { min-width: 40px; }   /* 삭제 */
+  .worker-table input {
+    font-size: 13px;
+    padding: 7px 8px;
+    min-width: 0;
+  }
 
   /* 토스트 */
   .toast {
