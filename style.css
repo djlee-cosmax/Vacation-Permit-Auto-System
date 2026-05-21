@@ -820,9 +820,11 @@ html:not(.leader-mode) .leader-only { display: none !important; }
     gap: 16px;
   }
   .card {
-    padding: 20px 16px;
+    padding: 18px 14px;
     border-radius: 10px;
   }
+  .list-card { padding: 18px 14px; }
+  .leave-list { padding: 0; gap: 12px; }
   .card h2 { font-size: 18px; }
   .form-card .form-hint { font-size: 12px; margin-bottom: 16px; }
 
@@ -884,6 +886,9 @@ html:not(.leader-mode) .leader-only { display: none !important; }
     padding: 14px 14px 12px;
     border-radius: 10px;
     border-left-width: 4px;
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
   }
   /* 헤더: 이름과 배지를 가로 정렬 (제목 줄), 사번/근무지는 별도 줄 */
   .leave-item-head {
