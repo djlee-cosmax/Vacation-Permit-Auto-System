@@ -374,6 +374,7 @@ function uploadLeaveToCloud(leave) {
   if (!FB_DB || !FB_UID) return;
   var doc = Object.assign({}, leave);
   doc.submittedBy = FB_UID;
+  doc.processed = false;  // 서무가 [처리 완료] 시 true로 변경
   doc.serverCreatedAt = firebase.firestore.FieldValue.serverTimestamp();
   // 14일 후 자동 삭제용 TTL 필드
   doc.expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
@@ -544,30 +545,34 @@ function deleteMyLeave(docId) {
     });
 }
 
-// ----- 서무: 오늘 작성된 모든 사용자 휴가증을 서버에서 가져오기 -----
+// ----- 서무: 미처리 휴가증(최근 7일)을 서버에서 가져오기 -----
 function fetchTodayLeavesFromCloud() {
   if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
   if (!FB_UID) { showToast('인증 진행 중입니다. 잠시 후 다시 시도해 주세요.', 'error'); return; }
 
-  var now = new Date();
-  var startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  var sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   showToast('서버에서 휴가증을 가져오는 중...', '');
   FB_DB.collection('leaves')
-    .where('serverCreatedAt', '>=', firebase.firestore.Timestamp.fromDate(startOfDay))
     .get()
     .then(function(snapshot) {
       var fetched = [];
       snapshot.forEach(function(doc) {
         var data = doc.data();
+        // 이미 처리 완료된 휴가증 제외
+        if (data.processed === true) return;
+        // 7일 이상 지난 휴가증 제외 (안전망)
+        var t = data.serverCreatedAt && data.serverCreatedAt.toDate ? data.serverCreatedAt.toDate() : null;
+        if (t && t < sevenDaysAgo) return;
         // 서버 전용 필드 제거
         delete data.submittedBy;
         delete data.expiresAt;
         delete data.serverCreatedAt;
+        delete data.processed;
         fetched.push(data);
       });
       if (fetched.length === 0) {
-        showToast('오늘 작성된 휴가증이 없습니다.', 'error');
+        showToast('미처리 휴가증이 없습니다.', 'error');
         return;
       }
       var existingIds = {};
@@ -578,18 +583,54 @@ function fetchTodayLeavesFromCloud() {
         return;
       }
       if (!confirm(
-        '서버에서 ' + fetched.length + '건의 휴가증을 발견했습니다.\n' +
+        '서버에서 미처리 휴가증 ' + fetched.length + '건을 발견했습니다.\n' +
         '그 중 ' + newOnes.length + '건이 현재 화면에 없는 새 휴가증입니다.\n\n' +
         '추가하시겠습니까? (기존 휴가증은 유지)'
       )) return;
       newOnes.forEach(function(l) { leaves.unshift(l); });
       saveLeaves();
       renderLeaveList();
-      showToast(newOnes.length + '건 추가됨 (총 ' + leaves.length + '건)', 'success');
+      showToast(newOnes.length + '건 추가됨 (총 ' + leaves.length + '건). 처리 완료 후 [처리 완료] 버튼을 눌러주세요.', 'success');
     })
     .catch(function(err) {
       console.error('Firestore 조회 실패:', err);
       showToast('가져오기 실패: ' + (err.message || err), 'error');
+    });
+}
+
+// ----- 서무: 현재 화면 휴가증들을 클라우드에서 [처리 완료]로 마크 -----
+function markLeavesAsProcessed() {
+  if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
+  if (leaves.length === 0) {
+    showToast('처리 완료 표시할 휴가증이 없습니다.', 'error');
+    return;
+  }
+  if (!confirm(
+    '현재 화면의 휴가증 ' + leaves.length + '건을 [처리 완료]로 표시하시겠습니까?\n\n' +
+    '※ 처리 완료 표시 후 [서버에서 불러오기]를 해도 이 휴가증들은 더 이상 가져오지 않습니다.\n' +
+    '※ 자동화 프로그램으로 그룹웨어 등록까지 완료된 후에 눌러주세요.'
+  )) return;
+
+  showToast('처리 완료 표시 중...', '');
+  var batch = FB_DB.batch();
+  var processedAt = firebase.firestore.FieldValue.serverTimestamp();
+  leaves.forEach(function(l) {
+    var ref = FB_DB.collection('leaves').doc(l.id);
+    batch.update(ref, { processed: true, processedAt: processedAt, processedBy: FB_UID });
+  });
+
+  batch.commit()
+    .then(function() {
+      var count = leaves.length;
+      // 로컬에서도 비움 (다음 불러오기는 새로 작성된 것만)
+      leaves = [];
+      saveLeaves();
+      renderLeaveList();
+      showToast(count + '건 처리 완료 표시됨. 다음 [서버에서 불러오기]는 새 휴가증만 가져옵니다.', 'success');
+    })
+    .catch(function(err) {
+      console.error('처리 완료 표시 실패:', err);
+      showToast('처리 완료 표시 실패: ' + (err.message || err), 'error');
     });
 }
 
