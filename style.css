@@ -881,29 +881,81 @@ html:not(.leader-mode) .leader-only { display: none !important; }
   }
   .list-count { font-size: 13px; padding: 4px 10px; }
   .leave-item {
-    padding: 16px 14px;
-    border-radius: 8px;
+    padding: 14px 14px 12px;
+    border-radius: 10px;
+    border-left-width: 4px;
   }
+  /* 헤더: 이름과 배지를 가로 정렬 (제목 줄), 사번/근무지는 별도 줄 */
   .leave-item-head {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
     gap: 8px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f1f1f1;
   }
-  .leave-item-types {
-    justify-content: flex-start;
-    width: 100%;
+  .leave-item-head > div:first-child {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .leave-item-name { font-size: 16px; }
-  .leave-item-sub { font-size: 12px; margin-left: 6px; }
-  .leave-item-type { padding: 3px 10px; font-size: 11px; }
-  .leave-item-body { font-size: 13px; }
-  .leave-item-body .label { width: 50px; }
-  .leave-days, .leave-time {
-    margin-left: 4px;
-    padding: 2px 8px;
-    font-size: 12px;
+  .leave-item-sub {
+    font-size: 11px;
+    margin-left: 0;
+    margin-top: 2px;
+    color: #aaa;
+    font-weight: 500;
   }
+  .leave-item-types {
+    justify-content: flex-end;
+    width: auto;
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+  .leave-item-type { padding: 4px 10px; font-size: 11px; border-radius: 12px; }
+
+  .leave-item-body {
+    font-size: 13px;
+    line-height: 1.7;
+    color: #444;
+  }
+  .leave-item-body > div {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 2px;
+    word-break: break-all;
+  }
+  .leave-item-body .label {
+    width: 44px;
+    flex: 0 0 44px;
+    font-size: 11px;
+    color: #999;
+    font-weight: 600;
+  }
+  .leave-days, .leave-time {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 8px;
+    font-size: 11px;
+    border-radius: 10px;
+    background: #fff0f3;
+    color: #c8102e;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .leave-item-actions {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #f0f0f0;
+    justify-content: flex-end;
+  }
+  .btn-mini { padding: 6px 16px; font-size: 12px; }
 
   /* 모달 */
   .modal {
