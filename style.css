@@ -782,11 +782,16 @@ html:not(.leader-mode) .leader-only { display: none !important; }
     gap: 16px;
   }
   .list-card {
-    max-height: none;
-    overflow: visible;
+    display: block !important;
+    max-height: none !important;
+    overflow: visible !important;
+    height: auto !important;
   }
   .leave-list {
-    overflow-y: visible;
+    flex: none !important;
+    overflow-y: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
   }
 }
 
