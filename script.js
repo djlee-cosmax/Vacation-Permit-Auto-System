@@ -675,17 +675,91 @@ function exportLeaves() {
     originalLeaves: originalLeaves
   };
 
-  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
   var today = dateToStr(new Date());
-  var fname = '휴가증_' + today + '.json';
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = fname;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
 
-  showToast(leaves.length + '건 → 신청서 ' + applications.length + '건 분해 완료', 'success');
+  // ----- JSON 파일 다운로드 -----
+  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+  var jsonName = '휴가증_' + today + '.json';
+  var jsonUrl = URL.createObjectURL(blob);
+  var a1 = document.createElement('a');
+  a1.href = jsonUrl;
+  a1.download = jsonName;
+  document.body.appendChild(a1);
+  a1.click();
+  document.body.removeChild(a1);
+  setTimeout(function() { URL.revokeObjectURL(jsonUrl); }, 1000);
+
+  // ----- XLSX 파일 다운로드 (서무 담당자 검토용) -----
+  exportLeavesAsXlsx(payload, today);
+
+  showToast(leaves.length + '건 → 신청서 ' + applications.length + '건 (JSON + 엑셀 다운로드 완료)', 'success');
+}
+
+// ----- XLSX 출력 -----
+function exportLeavesAsXlsx(payload, today) {
+  var wb = XLSX.utils.book_new();
+
+  // 시트 1: 신청서별 (그룹웨어 등록 단위) — 서무 담당자가 그룹웨어 검토 시 비교
+  var aoa1 = [
+    ['신청서 #', '분류', '순번', '이름', '사번', '근무지', '구분', '시작일', '종료일', '일수', '출퇴근 안내', '사유', '연락처']
+  ];
+  (payload.applications || []).forEach(function(app, appIdx) {
+    (app.entries || []).forEach(function(e) {
+      aoa1.push([
+        appIdx + 1,
+        app.category,
+        e.seq,
+        e.name,
+        e.employeeId,
+        e.workplace,
+        e.type,
+        e.start,
+        e.end,
+        e.days,
+        e.time || '',
+        e.reason,
+        e.phone
+      ]);
+    });
+  });
+  var ws1 = XLSX.utils.aoa_to_sheet(aoa1);
+  ws1['!cols'] = [
+    { wch: 9 }, { wch: 8 }, { wch: 6 }, { wch: 10 }, { wch: 12 },
+    { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 7 },
+    { wch: 20 }, { wch: 30 }, { wch: 14 }
+  ];
+  XLSX.utils.book_append_sheet(wb, ws1, '신청서별');
+
+  // 시트 2: 원본 입력 (사용자 작성 순서)
+  var aoa2 = [
+    ['순번', '이름', '사번', '근무지', '구분', '개수', '시작일', '종료일', '일수', '사유', '연락처', '작성일시']
+  ];
+  (payload.originalLeaves || []).forEach(function(l) {
+    var items = l.items || [];
+    var typeStr = items.map(function(it) { return it.type + (it.count > 1 ? '(' + it.count + ')' : ''); }).join(', ');
+    var countSum = items.reduce(function(s, it) { return s + (it.count || 1); }, 0);
+    aoa2.push([
+      l.seq,
+      l.name,
+      l.employeeId,
+      l.workplace,
+      typeStr,
+      countSum,
+      l.start,
+      l.end,
+      l.days,
+      l.reason,
+      l.phone,
+      l.createdAt ? new Date(l.createdAt).toLocaleString('ko-KR') : ''
+    ]);
+  });
+  var ws2 = XLSX.utils.aoa_to_sheet(aoa2);
+  ws2['!cols'] = [
+    { wch: 6 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 16 },
+    { wch: 6 }, { wch: 12 }, { wch: 12 }, { wch: 7 }, { wch: 30 },
+    { wch: 14 }, { wch: 22 }
+  ];
+  XLSX.utils.book_append_sheet(wb, ws2, '원본 입력');
+
+  XLSX.writeFile(wb, '휴가증_' + today + '.xlsx');
 }
