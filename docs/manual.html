@@ -300,11 +300,12 @@
 <h3>1.2 전체 흐름</h3>
 <ol class="steps">
   <li><strong>작업자 (모바일)</strong> — 본인 휴대폰으로 사이트 접속 → 휴가증 작성 → "+ 추가" 클릭</li>
-  <li><strong>클라우드 자동 저장</strong> — 작성된 휴가증이 Firebase 클라우드에 즉시 업로드 (수동 동작 불필요)</li>
-  <li><strong>서무 (PC)</strong> — 매일 아침 사이트(<span class="mono">?leader=1</span>) 접속 → "서버에서 불러오기" 클릭</li>
+  <li><strong>클라우드 자동 저장</strong> — 작성된 휴가증이 Firebase 클라우드에 미처리 상태로 즉시 업로드</li>
+  <li><strong>서무 (PC)</strong> — 사이트(<span class="mono">?leader=1</span>) 접속 → "서버에서 불러오기" 클릭 (미처리 휴가증 + 최근 7일 자동 취합)</li>
   <li><strong>서무 (PC)</strong> — 휴가증 검토 → "파일로 내보내기" → JSON + XLSX 다운로드</li>
   <li><strong>서무 (PC)</strong> — 자동화 프로그램(<span class="mono">run.bat</span>)에 JSON 입력 → 자동 임시저장</li>
   <li><strong>서무</strong> — 그룹웨어 신청 내역 + XLSX 비교 검토 → 직접 신청 처리</li>
+  <li><strong>서무 (PC)</strong> — 사이트로 돌아와 "처리 완료" 클릭 → 클라우드에서 처리 완료로 마크 (다음 불러오기 제외)</li>
 </ol>
 
 <div class="info-box">
@@ -318,7 +319,8 @@
   </thead>
   <tbody>
     <tr><td>클라우드 자동 저장</td><td>작성 즉시 Firebase 클라우드에 업로드 — 별도 전달 과정 X</td></tr>
-    <tr><td>서무 일괄 취합</td><td>매일 아침 한 클릭으로 그날 휴가증 전체 자동 수집</td></tr>
+    <tr><td>서무 일괄 취합</td><td>매일 한 클릭으로 미처리 휴가증 전체 자동 수집 (최근 7일)</td></tr>
+    <tr><td>처리 완료 마크</td><td>처리 후 [처리 완료] 클릭 시 중복 등록 방지. 늦은 저녁/주말 작성분도 안전</td></tr>
     <tr><td>본인 인증 기반 관리</td><td>이름 + 휴대폰 4자리로 본인 휴가증 조회·취소</td></tr>
     <tr><td>모바일 최적화</td><td>휴대폰 화면에 맞춰 UI 자동 조정 + 권한 분리</td></tr>
     <tr><td>10가지 휴가 유형</td><td>연차·반차(오전/오후)·반반차(오전/오후)·생휴·하기휴가·결근·결근(오전/오후)</td></tr>
@@ -479,10 +481,10 @@
   </ul>
 </div>
 
-<h3>3.2 매일 사용 절차 (사이트 → 자동화)</h3>
+<h3>3.2 매일 사용 절차 (사이트 → 자동화 → 처리 완료)</h3>
 <ol class="steps">
-  <li>매일 아침 본인 PC에서 사이트 접속 (서무 모드 URL)</li>
-  <li>우측 카드의 <strong>[서버에서 불러오기]</strong> 클릭 → "서버에서 N건의 휴가증을 발견했습니다" 확인 → 예</li>
+  <li>본인 PC에서 사이트 접속 (서무 모드 URL)</li>
+  <li>우측 카드의 <strong>[서버에서 불러오기]</strong> 클릭 → "서버에서 미처리 휴가증 N건을 발견했습니다" 확인 → 예</li>
   <li>화면에 표시된 휴가증 목록 검토 (잘못된 입력 / 누락 등 확인)</li>
   <li>잘못된 휴가증이 있으면 작성자에게 취소 요청 (또는 본인이 [내 휴가증]에서 취소)</li>
   <li>상단 <strong>[파일로 내보내기]</strong> 클릭 → JSON + XLSX 두 파일 자동 다운로드</li>
@@ -492,10 +494,20 @@
   <li>Edge가 자동으로 신청서를 차례로 임시저장</li>
   <li>완료 알림 확인 → 그룹웨어 신청 내역에서 임시저장 결과 확인</li>
   <li><strong>XLSX 파일과 비교 검토</strong> 후 그룹웨어에서 직접 신청</li>
+  <li>모든 처리가 끝나면 사이트로 돌아와 우측 카드의 <strong>[처리 완료]</strong> 클릭 → 클라우드에 마크</li>
 </ol>
 
 <div class="info-box">
-  <strong>핵심 변화:</strong> 작업자나 조장에게서 JSON 파일을 받을 필요가 없습니다. 사이트에서 직접 그날 휴가증을 받아오는 흐름입니다.
+  <strong>핵심 동작 — 처리 완료 마크:</strong>
+  <ul class="bullet" style="margin-top:2mm">
+    <li>[처리 완료]를 누른 휴가증은 클라우드에서 <span class="mono">processed=true</span>로 마크됩니다</li>
+    <li>다음 [서버에서 불러오기] 시 처리 완료된 휴가증은 더 이상 가져오지 않습니다 (중복 방지)</li>
+    <li><strong>[처리 완료]를 누르지 않으면</strong> 다음 날에도 불러올 수 있어 안전합니다 (자동화 실패 / 늦은 저녁 작성 / 주말 누적 등)</li>
+  </ul>
+</div>
+
+<div class="warn-box">
+  <strong>주의:</strong> 자동화 실행 + 그룹웨어 최종 신청까지 모두 완료된 후에 [처리 완료]를 누르세요. 그 전에 누르면 다시 불러오기 어려워질 수 있습니다.
 </div>
 
 <h3>3.3 자동화 최초 설치 (한 번만)</h3>
@@ -594,8 +606,10 @@
   <thead><tr><th style="width:40%">증상</th><th>해결</th></tr></thead>
   <tbody>
     <tr><td><strong>[서버에서 불러오기]</strong> 버튼이 안 보임</td><td>일반 URL로 들어왔을 가능성. <span class="mono">?leader=1</span>을 URL 끝에 붙여 한 번 접속</td></tr>
-    <tr><td>"서버에서 불러오기" 후 휴가증 목록이 비어있음</td><td>아직 작성자가 없음. 작업자들에게 작성 안내</td></tr>
+    <tr><td>"서버에서 불러오기" 후 "미처리 휴가증이 없습니다" 표시</td><td>이미 모두 처리 완료됐거나 작성된 휴가증이 없음 — 정상</td></tr>
     <tr><td>이미 등록된 휴가증이 또 보임</td><td>같은 휴가증은 중복 추가 안 됨 (자동 필터링). 새 휴가증만 추가됨</td></tr>
+    <tr><td>실수로 [처리 완료] 일찍 눌렀음</td><td>Firebase 콘솔에서 해당 휴가증의 <span class="mono">processed</span>를 <span class="mono">false</span>로 수정. 또는 작업자에게 다시 작성 요청</td></tr>
+    <tr><td>[처리 완료] 클릭 시 권한 오류</td><td>Firestore Rules에서 update 권한이 빠져있을 수 있음. 담당자에게 문의</td></tr>
     <tr><td>setup.bat에서 Python 없음 에러</td><td>Python 설치 후 PC 재시작. PATH 옵션 체크</td></tr>
     <tr><td>setup.bat에서 패키지 설치 실패</td><td>사내 네트워크 프록시 문제. IT팀 문의</td></tr>
     <tr><td>run.bat에서 Edge가 안 열림</td><td>setup.bat 다시 실행</td></tr>
