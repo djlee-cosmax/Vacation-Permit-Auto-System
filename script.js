@@ -32,7 +32,7 @@ var TYPE_WEIGHT = {
   '반반차(오전)': 0.25,
   '반반차(오후)': 0.25,
   '생휴': 1,
-  '하기휴가': 1,  // 영업일 1일당 1일 (3일 연속이라는 의미는 작성 폼에서 안내)
+  '하기휴가': 3,  // 1개 = 3일 (연속 3일 휴가)
   '경조': 1,
   '결근': 1,
   '결근(오전)': 0.5,
@@ -192,20 +192,16 @@ function countWorkdays(startStr, endStr) {
 function refreshFormTotals() {
   var type = document.getElementById('leaveType').value;
   var count = parseInt(document.getElementById('leaveCount').value, 10) || 1;
-  var days;
   if (FULL_RANGE_TYPES.indexOf(type) !== -1) {
-    // 하기휴가 등: 기간의 영업일 수 그대로
-    var startStr = document.getElementById('leaveStart').value;
-    var endStr = document.getElementById('leaveEnd').value;
-    days = countWorkdays(startStr, endStr);
-    // 개수 입력란을 1로 고정하고 비활성화
+    // 하기휴가 등: count 1 고정
     var countEl = document.getElementById('leaveCount');
     countEl.value = '1';
     countEl.disabled = true;
+    count = 1;
   } else {
-    days = (TYPE_WEIGHT[type] || 0) * count;
     document.getElementById('leaveCount').disabled = false;
   }
+  var days = (TYPE_WEIGHT[type] || 0) * count;
   document.getElementById('leaveItemsTotal').textContent = fmtDays(days);
 }
 
@@ -272,14 +268,8 @@ function addLeave() {
 
   // 명단 매칭 (있으면 사번/근무지 자동 채움)
   var matched = workers.find(function(w) { return w.name === name; });
-  // 하기휴가 등 영업일 전체 차지하는 유형은 영업일 수로 일수 계산
-  var days;
-  if (FULL_RANGE_TYPES.indexOf(type) !== -1) {
-    days = countWorkdays(start, end);
-    count = 1;  // 강제 1
-  } else {
-    days = (TYPE_WEIGHT[type] || 0) * count;
-  }
+  if (FULL_RANGE_TYPES.indexOf(type) !== -1) count = 1;  // 하기휴가: count 강제 1
+  var days = (TYPE_WEIGHT[type] || 0) * count;
   var leave = {
     id: uuid(),
     name: name,
@@ -586,6 +576,13 @@ function splitLeaveToEntries(l) {
   });
   // entry 객체로 변환
   return groups.map(function(g) {
+    var dayCount;
+    if (FULL_RANGE_TYPES.indexOf(g.type) !== -1) {
+      // 하기휴가 등: 1개당 weight (3일) 고정, dates 길이 무관
+      dayCount = TYPE_WEIGHT[g.type] || 0;
+    } else {
+      dayCount = (TYPE_WEIGHT[g.type] || 0) * g.dates.length;
+    }
     return {
       name: l.name,
       employeeId: l.employeeId || '',
@@ -593,7 +590,7 @@ function splitLeaveToEntries(l) {
       type: g.type,
       start: g.dates[0],
       end: g.dates[g.dates.length - 1],
-      days: (TYPE_WEIGHT[g.type] || 0) * g.dates.length,
+      days: dayCount,
       time: TYPE_TIMES[g.type] || '',
       reason: l.reason || '',
       phone: l.phone || '',
