@@ -14,9 +14,46 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="휴가증">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="style.css?v=20260521h">
+  <link rel="stylesheet" href="style.css?v=20260522a">
+  <!-- 즉시 인증 상태 검사 (메인 콘텐츠 깜빡임 방지) -->
+  <script>
+    (function() {
+      try {
+        var raw = localStorage.getItem('p5_session');
+        if (!raw) return;
+        var s = JSON.parse(raw);
+        if (s && s.expires && new Date(s.expires) > new Date()) {
+          document.documentElement.classList.add('authenticated');
+        } else {
+          localStorage.removeItem('p5_session');
+        }
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
+  <!-- 로그인 화면 (인증 전에만 표시) -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-card">
+      <img src="logo-full.png" alt="COSMAX" class="login-logo">
+      <h2>휴가증 자동 반영 프로그램</h2>
+      <p class="login-subtitle">생산3팀 파우더 성형실</p>
+      <div class="login-form">
+        <div class="login-field">
+          <label>사번</label>
+          <input type="text" id="loginEmpId" placeholder="예: 122130120" autocomplete="username" inputmode="numeric">
+        </div>
+        <div class="login-field">
+          <label>비밀번호</label>
+          <input type="password" id="loginPw" placeholder="비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter'){login();}">
+        </div>
+        <button class="btn-primary login-submit" onclick="login()">로그인</button>
+      </div>
+      <p class="login-hint">최초 비밀번호: <strong>1234</strong></p>
+      <p class="login-hint-small">로그인이 안 될 경우 관리자(이동준)에게 문의해 주세요.</p>
+    </div>
+  </div>
+
   <header class="topbar">
     <div class="brand">
       <img src="logo-full.png" alt="COSMAX" class="logo">
@@ -31,6 +68,7 @@
       <button class="btn-secondary admin-only" onclick="document.getElementById('restoreFile').click()" title="이전에 백업한 JSON 파일로 데이터 복원">복원</button>
       <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="onRestoreFileSelected(event)">
       <button class="btn-secondary leader-only" onclick="exportLeaves()">파일로 내보내기</button>
+      <button class="btn-secondary btn-logout" onclick="logout()" title="로그아웃">로그아웃</button>
     </div>
   </header>
 
@@ -201,7 +239,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=20260521h"></script>
+  <script src="script.js?v=20260522a"></script>
   <!-- PWA Service Worker 등록 -->
   <script>
     if ('serviceWorker' in navigator) {

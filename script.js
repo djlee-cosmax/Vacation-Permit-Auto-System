@@ -1,5 +1,55 @@
 // ============ 휴가증 자동 반영 프로그램 ============
 
+// ----- 로그인 / 세션 -----
+var DEFAULT_PASSWORD = '1234';
+
+function getSession() {
+  try {
+    var raw = localStorage.getItem('p5_session');
+    if (!raw) return null;
+    var s = JSON.parse(raw);
+    if (s.expires && new Date(s.expires) > new Date()) return s;
+    localStorage.removeItem('p5_session');
+    return null;
+  } catch (e) { return null; }
+}
+
+function login() {
+  var empId = document.getElementById('loginEmpId').value.trim();
+  var pw = document.getElementById('loginPw').value;
+  if (!empId) { showToast('사번을 입력해 주세요.', 'error'); return; }
+  if (!pw) { showToast('비밀번호를 입력해 주세요.', 'error'); return; }
+  // workers는 페이지 로드 시 이미 로딩됨
+  var worker = workers.find(function(w) { return String(w.employeeId || '').trim() === empId; });
+  if (!worker) { showToast('등록되지 않은 사번입니다.', 'error'); return; }
+  if (pw !== DEFAULT_PASSWORD) { showToast('비밀번호가 일치하지 않습니다.', 'error'); return; }
+  // 30일 세션
+  var expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  var session = {
+    empId: empId,
+    name: worker.name,
+    team: worker.team || '',
+    expires: expires.toISOString()
+  };
+  localStorage.setItem('p5_session', JSON.stringify(session));
+  document.documentElement.classList.add('authenticated');
+  showToast(worker.name + '님 환영합니다.', 'success');
+  // 이름이 본인 식별자가 없으면 기본 자동 채움 정보로 활용
+  if (!getMyInfo() && worker.phone) {
+    var phone4 = getPhone4(worker.phone);
+    if (phone4) setMyInfo(worker.name, phone4);
+  }
+}
+
+function logout() {
+  if (!confirm('로그아웃하시겠습니까?')) return;
+  localStorage.removeItem('p5_session');
+  document.documentElement.classList.remove('authenticated');
+  document.getElementById('loginEmpId').value = '';
+  document.getElementById('loginPw').value = '';
+  showToast('로그아웃되었습니다.', 'success');
+}
+
 // ----- Firebase 초기화 (클라우드 공유 휴가증 저장소) -----
 var firebaseConfig = {
   apiKey: "AIzaSyBK_OijdnrC0_fAFr8vQ91jWIMv7aIu3uQ",
