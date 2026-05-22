@@ -30,6 +30,18 @@ function getSession() {
   } catch (e) { return null; }
 }
 
+// 세션 자동 갱신 — 활동 시마다 만료 시간을 30일로 리셋
+function touchSession() {
+  try {
+    var raw = localStorage.getItem('p5_session');
+    if (!raw) return;
+    var s = JSON.parse(raw);
+    if (!s.expires || new Date(s.expires) <= new Date()) return; // 이미 만료
+    s.expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    localStorage.setItem('p5_session', JSON.stringify(s));
+  } catch (e) {}
+}
+
 function login() {
   var empId = document.getElementById('loginEmpId').value.trim();
   var pw = document.getElementById('loginPw').value;
@@ -391,6 +403,21 @@ function setMyInfo(name, phone4) {
   if (!name || !phone4) return;
   localStorage.setItem('p5_me', JSON.stringify({ name: name, phone4: phone4 }));
 }
+// 비밀번호 보기 / 숨기기 토글
+function togglePwVisibility(inputId, btn) {
+  var input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+    btn.title = '비밀번호 숨기기';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁';
+    btn.title = '비밀번호 보기';
+  }
+}
+
 function getPhone4(phone) {
   if (!phone) return '';
   var digits = String(phone).replace(/[^0-9]/g, '');
@@ -606,6 +633,9 @@ function countWorkdays(startStr, endStr) {
   var loginRememberEl = document.getElementById('loginRemember');
   if (rememberedId && loginEmpInput) loginEmpInput.value = rememberedId;
   if (loginRememberEl) loginRememberEl.checked = !!rememberedId;
+
+  // 세션 자동 갱신 — 사이트 들어올 때마다 만료 시간 30일 연장
+  touchSession();
 })();
 
 function refreshFormTotals() {
@@ -685,6 +715,19 @@ function addLeave() {
   if (!reason) { showToast('사유를 입력해 주세요.', 'error'); return; }
   if (!phone) { showToast('연락처를 입력해 주세요.', 'error'); return; }
 
+  // 중복 작성 검증 — 같은 이름·기간·유형의 휴가증이 이미 있는지 (로컬 기준)
+  var dup = leaves.find(function(l) {
+    if (l.name !== name) return false;
+    if (l.start !== start || l.end !== end) return false;
+    var items = l.items || [];
+    return items.some(function(it) { return it.type === type; });
+  });
+  if (dup) {
+    if (!confirm('이미 동일한 휴가증이 있습니다.\n\n[' + name + ' / ' + type + ' / ' + (start === end ? start : start + ' ~ ' + end) + ']\n\n그래도 추가하시겠습니까?')) {
+      return;
+    }
+  }
+
   // 명단 매칭 (있으면 사번/근무지 자동 채움)
   var matched = workers.find(function(w) { return w.name === name; });
   if (FULL_RANGE_TYPES.indexOf(type) !== -1) count = 1;  // 하기휴가: count 강제 1
@@ -717,7 +760,12 @@ function addLeave() {
 
 // ----- Firestore 업로드/삭제 -----
 function uploadLeaveToCloud(leave) {
-  if (!FB_DB || !FB_UID) return;
+  if (!FB_DB || !FB_UID) {
+    setTimeout(function() {
+      showToast('⚠ 서버 연결 안 됨\n휴가증이 서무에게 전달되지 않을 수 있습니다.', 'error');
+    }, 800);
+    return;
+  }
   var doc = Object.assign({}, leave);
   doc.submittedBy = FB_UID;
   doc.processed = false;  // 서무가 [처리 완료] 시 true로 변경
@@ -725,7 +773,12 @@ function uploadLeaveToCloud(leave) {
   // 14일 후 자동 삭제용 TTL 필드
   doc.expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
   FB_DB.collection('leaves').doc(leave.id).set(doc)
-    .catch(function(err) { console.warn('Firestore 저장 실패:', err); });
+    .catch(function(err) {
+      console.warn('Firestore 저장 실패:', err);
+      setTimeout(function() {
+        showToast('⚠ 서버 저장 실패\n인터넷 연결 확인 후 다시 작성해 주세요.', 'error');
+      }, 800);
+    });
 }
 
 function deleteLeaveFromCloud(id) {
