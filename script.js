@@ -147,18 +147,21 @@ function changePassword() {
   FB_DB.collection('users').doc(empId).get()
     .then(function(doc) {
       var storedPw = (doc.exists && doc.data().password) ? doc.data().password : DEFAULT_PASSWORD;
-      if (cur !== storedPw) { showToast('현재 비밀번호가 일치하지 않습니다.', 'error'); return; }
+      if (cur !== storedPw) {
+        showToast('현재 비밀번호가 일치하지 않습니다.', 'error');
+        throw new Error('PW_MISMATCH');
+      }
       return FB_DB.collection('users').doc(empId).set({
         password: newPw,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
     })
-    .then(function(result) {
-      if (result === undefined) return; // 위에서 error로 return된 경우
+    .then(function() {
       closeChangePwModal();
       showToast('비밀번호가 변경되었습니다.', 'success');
     })
     .catch(function(err) {
+      if (err && err.message === 'PW_MISMATCH') return; // 이미 토스트 표시됨
       console.error('비밀번호 변경 실패:', err);
       showToast('변경 실패: ' + (err.message || err), 'error');
     });
