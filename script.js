@@ -278,7 +278,7 @@ function forgotPwReset() {
       }
       var storedPw = (doc.exists && doc.data().password) ? doc.data().password : DEFAULT_PASSWORD;
       if (newPw === storedPw) {
-        showToast('새 비밀번호가 기존 비밀번호와 동일합니다. 다른 비밀번호를 입력해 주세요.', 'error');
+        showToast('새 비밀번호가 기존 비밀번호와 동일합니다.\n다른 비밀번호를 입력해 주세요.', 'error');
         throw new Error('SAME_PW');
       }
       return FB_DB.collection('users').doc(empId).set({

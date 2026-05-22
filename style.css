@@ -984,6 +984,8 @@ html:not(.leader-mode) .leader-only { display: none !important; }
   transition: opacity 0.2s, transform 0.2s;
   pointer-events: none;
   z-index: 99999;
+  white-space: pre-line;
+  line-height: 1.5;
 }
 .toast.show {
   opacity: 1;
