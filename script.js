@@ -276,6 +276,11 @@ function forgotPwReset() {
         showToast('답변이 일치하지 않습니다.', 'error');
         throw new Error('ANSWER_MISMATCH');
       }
+      var storedPw = (doc.exists && doc.data().password) ? doc.data().password : DEFAULT_PASSWORD;
+      if (newPw === storedPw) {
+        showToast('새 비밀번호가 기존 비밀번호와 동일합니다. 다른 비밀번호를 입력해 주세요.', 'error');
+        throw new Error('SAME_PW');
+      }
       return FB_DB.collection('users').doc(empId).set({
         password: newPw,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -289,7 +294,7 @@ function forgotPwReset() {
       showToast('비밀번호가 재설정되었습니다. 새 비밀번호로 로그인해 주세요.', 'success');
     })
     .catch(function(err) {
-      if (err && err.message === 'ANSWER_MISMATCH') return;
+      if (err && (err.message === 'ANSWER_MISMATCH' || err.message === 'SAME_PW')) return;
       console.error('비밀번호 재설정 실패:', err);
       showToast('재설정 실패: ' + (err.message || err), 'error');
     });
