@@ -138,7 +138,8 @@ function changePassword() {
 
   if (!cur) { showToast('현재 비밀번호를 입력해 주세요.', 'error'); return; }
   if (!newPw) { showToast('새 비밀번호를 입력해 주세요.', 'error'); return; }
-  if (newPw.length < 4) { showToast('새 비밀번호는 4자 이상이어야 합니다.', 'error'); return; }
+  if (!/^[0-9]+$/.test(newPw)) { showToast('새 비밀번호는 숫자만 입력 가능합니다.', 'error'); return; }
+  if (newPw.length < 6) { showToast('새 비밀번호는 6자리 이상이어야 합니다.', 'error'); return; }
   if (newPw !== confirmPw) { showToast('새 비밀번호 확인이 일치하지 않습니다.', 'error'); return; }
   if (cur === newPw) { showToast('새 비밀번호가 현재와 동일합니다.', 'error'); return; }
   if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
