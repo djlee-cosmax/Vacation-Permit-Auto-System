@@ -77,7 +77,7 @@ def main():
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.5)
     blank = prs.slide_layouts[6]
-    TOTAL = 6
+    TOTAL = 7
 
     # ===== 1. 표지 =====
     s = prs.slides.add_slide(blank)
@@ -149,15 +149,54 @@ def main():
     # 안내
     add_rounded_rect(s, Inches(1.0), Inches(5.7), Inches(11.3), Inches(1.1), LIGHT_GRAY)
     add_text(s, Inches(1.3), Inches(5.85), Inches(10.8), Inches(0.8),
-             "💡 홈 화면에 추가하면 앱처럼 사용 가능 / ⚠️ 첫 로그인 후 [비밀번호 변경] 필수",
+             "⚠️ 첫 로그인 후 상단 [비밀번호 변경] → 새 비밀번호(숫자 6자리 이상) + 보안 질문 등록",
              size=14, bold=True, color=DARK_RED, anchor=MSO_ANCHOR.MIDDLE)
     page_footer(s, 3, TOTAL)
 
-    # ===== 4. 휴가증 작성 + 유형 =====
+    # ===== 4. 홈 화면에 추가 (PWA) =====
     s = prs.slides.add_slide(blank)
     add_rect(s, 0, 0, prs.slide_width, Inches(1.0), RED)
     add_text(s, Inches(0.5), Inches(0.2), Inches(12.3), Inches(0.6),
-             "2. 휴가증 작성", size=28, bold=True, color=WHITE)
+             "2. 홈 화면에 추가하기 (권장)", size=28, bold=True, color=WHITE)
+
+    add_text(s, Inches(0.8), Inches(1.4), Inches(11.7), Inches(0.6),
+             "휴대폰 홈 화면에 추가하면 일반 앱처럼 아이콘 한 번에 실행됩니다.",
+             size=15, color=DARK, align=PP_ALIGN.CENTER)
+
+    # iOS 카드
+    add_rounded_rect(s, Inches(0.8), Inches(2.3), Inches(5.9), Inches(3.8), LIGHT_RED)
+    add_text(s, Inches(1.0), Inches(2.5), Inches(5.5), Inches(0.6),
+             "📱 iOS (Safari)", size=20, bold=True, color=RED)
+    add_text(s, Inches(1.0), Inches(3.3), Inches(5.5), Inches(2.7),
+             "① 사이트 접속\n\n"
+             "② 하단 가운데 공유 버튼 ⬆️ 탭\n\n"
+             "③ \"홈 화면에 추가\" 선택\n\n"
+             "④ 우상단 \"추가\" 탭",
+             size=14, color=DARK)
+
+    # Android 카드
+    add_rounded_rect(s, Inches(6.8), Inches(2.3), Inches(5.9), Inches(3.8), LIGHT_RED)
+    add_text(s, Inches(7.0), Inches(2.5), Inches(5.5), Inches(0.6),
+             "🤖 Android (Chrome)", size=20, bold=True, color=RED)
+    add_text(s, Inches(7.0), Inches(3.3), Inches(5.5), Inches(2.7),
+             "① 사이트 접속\n\n"
+             "② 우상단 ⋮ (점 세 개) 탭\n\n"
+             "③ \"홈 화면에 추가\" 선택\n\n"
+             "④ \"설치\" 또는 \"추가\" 확인",
+             size=14, color=DARK)
+
+    # 안내 박스
+    add_rounded_rect(s, Inches(0.8), Inches(6.3), Inches(11.9), Inches(0.7), LIGHT_GRAY)
+    add_text(s, Inches(1.0), Inches(6.3), Inches(11.5), Inches(0.7),
+             "💡 추가 후 아이콘 탭 → 풀스크린 앱으로 실행 / 새로고침은 상단 ↻ 아이콘",
+             size=12, bold=True, color=DARK_RED, anchor=MSO_ANCHOR.MIDDLE)
+    page_footer(s, 4, TOTAL)
+
+    # ===== 5. 휴가증 작성 + 유형 =====
+    s = prs.slides.add_slide(blank)
+    add_rect(s, 0, 0, prs.slide_width, Inches(1.0), RED)
+    add_text(s, Inches(0.5), Inches(0.2), Inches(12.3), Inches(0.6),
+             "3. 휴가증 작성", size=28, bold=True, color=WHITE)
 
     # 좌측 - 작성 절차
     add_text(s, Inches(0.8), Inches(1.5), Inches(6.0), Inches(0.5),
@@ -207,13 +246,13 @@ def main():
                      txt, size=12, bold=is_header,
                      color=WHITE if is_header else DARK, anchor=MSO_ANCHOR.MIDDLE)
             x += cols[ci]
-    page_footer(s, 4, TOTAL)
+    page_footer(s, 5, TOTAL)
 
-    # ===== 5. 내 휴가증 & 자주 묻는 질문 =====
+    # ===== 6. 내 휴가증 & 자주 묻는 질문 =====
     s = prs.slides.add_slide(blank)
     add_rect(s, 0, 0, prs.slide_width, Inches(1.0), RED)
     add_text(s, Inches(0.5), Inches(0.2), Inches(12.3), Inches(0.6),
-             "3. 내 휴가증 확인 & FAQ", size=28, bold=True, color=WHITE)
+             "4. 내 휴가증 확인 & FAQ", size=28, bold=True, color=WHITE)
 
     # 내 휴가증 (좌측)
     add_text(s, Inches(0.8), Inches(1.4), Inches(6.0), Inches(0.5),
@@ -244,9 +283,9 @@ def main():
                  q, size=13, bold=True, color=DARK)
         add_text(s, Inches(7.4), y + Inches(0.4), Inches(5.5), Inches(0.5),
                  "→ " + a, size=12, color=GRAY)
-    page_footer(s, 5, TOTAL)
+    page_footer(s, 6, TOTAL)
 
-    # ===== 6. 마무리 =====
+    # ===== 7. 마무리 =====
     s = prs.slides.add_slide(blank)
     add_rect(s, 0, 0, prs.slide_width, prs.slide_height, RED)
     add_text(s, Inches(0.5), Inches(2.2), Inches(12.3), Inches(1.0),
