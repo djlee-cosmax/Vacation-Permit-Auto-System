@@ -618,6 +618,8 @@ input, select, textarea { font-family: inherit; }
   justify-content: center;
   z-index: 100;
 }
+/* 로그인 화면(z-index 9999) 위에 떠야 하는 모달 */
+#forgotPwModal { z-index: 10000; }
 .modal {
   background: #fff;
   border-radius: 12px;
