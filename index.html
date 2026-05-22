@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="휴가증">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="style.css?v=20260522h">
+  <link rel="stylesheet" href="style.css?v=20260522i">
   <!-- 즉시 인증 상태 검사 (메인 콘텐츠 깜빡임 방지) -->
   <script>
     (function() {
@@ -74,6 +74,7 @@
       <button class="btn-secondary admin-only" onclick="document.getElementById('restoreFile').click()" title="이전에 백업한 JSON 파일로 데이터 복원">복원</button>
       <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="onRestoreFileSelected(event)">
       <button class="btn-secondary leader-only" onclick="exportLeaves()">파일로 내보내기</button>
+      <button class="btn-secondary" onclick="openChangePwModal()" title="비밀번호 변경">비밀번호 변경</button>
       <button class="btn-secondary btn-logout" onclick="logout()" title="로그아웃">로그아웃</button>
     </div>
   </header>
@@ -237,6 +238,32 @@
     </div>
   </div>
 
+  <!-- 비밀번호 변경 모달 -->
+  <div class="modal-overlay" id="changePwModal" style="display:none" onclick="closeChangePwModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeChangePwModal()">×</button>
+      <h3>비밀번호 변경</h3>
+      <div class="change-pw-form">
+        <div class="change-pw-field">
+          <label>현재 비밀번호</label>
+          <input type="password" id="currentPw" autocomplete="current-password">
+        </div>
+        <div class="change-pw-field">
+          <label>새 비밀번호 (4자 이상)</label>
+          <input type="password" id="newPw" autocomplete="new-password">
+        </div>
+        <div class="change-pw-field">
+          <label>새 비밀번호 확인</label>
+          <input type="password" id="newPwConfirm" autocomplete="new-password" onkeydown="if(event.key==='Enter'){changePassword();}">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" onclick="changePassword()">변경</button>
+        <button class="btn-secondary" onclick="closeChangePwModal()">취소</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 토스트 -->
   <div class="toast" id="toast"></div>
 
@@ -245,7 +272,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=20260522g"></script>
+  <script src="script.js?v=20260522i"></script>
   <!-- PWA Service Worker 등록 -->
   <script>
     if ('serviceWorker' in navigator) {
