@@ -807,6 +807,9 @@ input, select, textarea { font-family: inherit; }
 html.role-worker .worker-table th:nth-child(2),
 html.role-worker .worker-table td:nth-child(2) { display: none !important; }
 
+/* ===== 일반 작업자 — 관리자/서무 전용 요소 숨김 ===== */
+html.role-worker .staff-only { display: none !important; }
+
 /* ===== 관리자 / 서무 권한 분리 ===== */
 /* admin 모드일 때만 보임 (기본: 비관리자) */
 html:not(.admin-mode) .admin-only { display: none !important; }

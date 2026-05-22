@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="휴가증">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="style.css?v=20260522j">
+  <link rel="stylesheet" href="style.css?v=20260522k">
   <!-- 즉시 인증 상태 검사 (메인 콘텐츠 깜빡임 방지) -->
   <script>
     (function() {
@@ -70,7 +70,7 @@
     <div class="topbar-actions">
       <span class="user-name" id="userNameDisplay"></span>
       <button class="btn-secondary" onclick="openMyLeavesModal()" title="내가 작성한 휴가증 조회·취소">내 휴가증</button>
-      <button class="btn-secondary" onclick="openWorkerModal()">작업자 명단</button>
+      <button class="btn-secondary staff-only" onclick="openWorkerModal()">작업자 명단</button>
       <button class="btn-secondary admin-only" onclick="backupData()" title="작업자 명단 + 작성된 휴가증을 백업 JSON으로 저장">백업</button>
       <button class="btn-secondary admin-only" onclick="document.getElementById('restoreFile').click()" title="이전에 백업한 JSON 파일로 데이터 복원">복원</button>
       <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="onRestoreFileSelected(event)">
