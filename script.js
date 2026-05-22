@@ -4,8 +4,8 @@
 var DEFAULT_PASSWORD = '1234';
 // 관리자 / 서무 사번 (workers.json 외 별도 권한 부여)
 var STAFF_ROLES = {
-  '122210202': { role: 'admin', name: '이동준 (관리자)' },
-  '122240096': { role: 'leader', name: '서무 담당자' }
+  '122210202': { role: 'admin', name: '이동준' },
+  '122240096': { role: 'leader', name: '김가영' }
 };
 
 function getSession() {
