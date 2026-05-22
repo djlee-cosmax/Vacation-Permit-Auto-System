@@ -2,6 +2,11 @@
 
 // ----- 로그인 / 세션 -----
 var DEFAULT_PASSWORD = '1234';
+// 관리자 / 서무 사번 (workers.json 외 별도 권한 부여)
+var STAFF_ROLES = {
+  '122210202': { role: 'admin', name: '이동준 (관리자)' },
+  '122240096': { role: 'leader', name: '서무 담당자' }
+};
 
 function getSession() {
   try {
@@ -19,23 +24,53 @@ function login() {
   var pw = document.getElementById('loginPw').value;
   if (!empId) { showToast('사번을 입력해 주세요.', 'error'); return; }
   if (!pw) { showToast('비밀번호를 입력해 주세요.', 'error'); return; }
-  // workers는 페이지 로드 시 이미 로딩됨
-  var worker = workers.find(function(w) { return String(w.employeeId || '').trim() === empId; });
-  if (!worker) { showToast('등록되지 않은 사번입니다.', 'error'); return; }
   if (pw !== DEFAULT_PASSWORD) { showToast('비밀번호가 일치하지 않습니다.', 'error'); return; }
+
+  // 1) 관리자/서무 사번 우선 확인
+  var staff = STAFF_ROLES[empId];
+  var name, role, team, worker;
+  if (staff) {
+    name = staff.name;
+    role = staff.role;
+    team = '';
+  } else {
+    // 2) 작업자 명단에서 매칭
+    worker = workers.find(function(w) { return String(w.employeeId || '').trim() === empId; });
+    if (!worker) { showToast('등록되지 않은 사번입니다.', 'error'); return; }
+    name = worker.name;
+    role = 'worker';
+    team = worker.team || '';
+  }
+
+  // 권한 localStorage 설정 (모바일에서는 권한 자체가 비활성되므로 PC에서만 효과 있음)
+  if (role === 'admin') {
+    localStorage.setItem('p5_admin', '1');
+    localStorage.setItem('p5_leader', '1');
+  } else if (role === 'leader') {
+    localStorage.removeItem('p5_admin');
+    localStorage.setItem('p5_leader', '1');
+  } else {
+    localStorage.removeItem('p5_admin');
+    localStorage.removeItem('p5_leader');
+  }
+
+  // PC 환경이면 권한 클래스 즉시 적용
+  if (window.innerWidth > 600) {
+    if (role === 'admin') document.documentElement.classList.add('admin-mode');
+    else document.documentElement.classList.remove('admin-mode');
+    if (role === 'admin' || role === 'leader') document.documentElement.classList.add('leader-mode');
+    else document.documentElement.classList.remove('leader-mode');
+  }
+
   // 30일 세션
   var expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-  var session = {
-    empId: empId,
-    name: worker.name,
-    team: worker.team || '',
-    expires: expires.toISOString()
-  };
+  var session = { empId: empId, name: name, team: team, role: role, expires: expires.toISOString() };
   localStorage.setItem('p5_session', JSON.stringify(session));
   document.documentElement.classList.add('authenticated');
-  showToast(worker.name + '님 환영합니다.', 'success');
-  // 이름이 본인 식별자가 없으면 기본 자동 채움 정보로 활용
-  if (!getMyInfo() && worker.phone) {
+  showToast(name + '님 환영합니다.', 'success');
+
+  // 일반 작업자만: 본인 식별자 자동 채움 (휴가증 작성 시 phone4 자동 사용)
+  if (role === 'worker' && worker && !getMyInfo() && worker.phone) {
     var phone4 = getPhone4(worker.phone);
     if (phone4) setMyInfo(worker.name, phone4);
   }
@@ -44,7 +79,11 @@ function login() {
 function logout() {
   if (!confirm('로그아웃하시겠습니까?')) return;
   localStorage.removeItem('p5_session');
+  localStorage.removeItem('p5_admin');
+  localStorage.removeItem('p5_leader');
   document.documentElement.classList.remove('authenticated');
+  document.documentElement.classList.remove('admin-mode');
+  document.documentElement.classList.remove('leader-mode');
   document.getElementById('loginEmpId').value = '';
   document.getElementById('loginPw').value = '';
   showToast('로그아웃되었습니다.', 'success');
@@ -89,39 +128,16 @@ function getPhone4(phone) {
   return digits.length >= 4 ? digits.slice(-4) : '';
 }
 
-// ----- 서무 권한 체크 (URL ?leader=1 진입 시 활성화, localStorage 유지) -----
-(function checkLeaderParam() {
-  var leaderParam = new URLSearchParams(window.location.search).get('leader');
-  if (leaderParam === '1') localStorage.setItem('p5_leader', '1');
-  else if (leaderParam === '0') localStorage.removeItem('p5_leader');
-})();
-var LEADER_MODE = localStorage.getItem('p5_leader') === '1';
-// 모바일(600px 이하)에서는 서무 모드 강제 비활성 — 모바일은 작업자 전용
-if (window.innerWidth <= 600) {
-  LEADER_MODE = false;
-}
-if (LEADER_MODE) document.documentElement.classList.add('leader-mode');
-
-// ----- 관리자 권한 체크 -----
-// URL ?admin=1 진입 시 localStorage에 저장 (이후 같은 PC에서 유지)
-// URL ?admin=0 으로 해제 가능
-(function checkAdminParam() {
-  var urlParams = new URLSearchParams(window.location.search);
-  var adminParam = urlParams.get('admin');
-  if (adminParam === '1') {
-    localStorage.setItem('p5_admin', '1');
-  } else if (adminParam === '0') {
-    localStorage.removeItem('p5_admin');
-  }
-})();
+// ----- 권한 (사번 기반 — 로그인 시 설정됨) -----
+// 모바일에서는 권한 자체를 비활성 (작업자 모드만)
 var ADMIN_MODE = localStorage.getItem('p5_admin') === '1';
-// 모바일(600px 이하)에서는 관리자 모드 강제 비활성 — 명단 편집/백업/복원 모두 숨김
+var LEADER_MODE = localStorage.getItem('p5_leader') === '1';
 if (window.innerWidth <= 600) {
   ADMIN_MODE = false;
+  LEADER_MODE = false;
 }
-if (ADMIN_MODE) {
-  document.documentElement.classList.add('admin-mode');
-}
+if (ADMIN_MODE) document.documentElement.classList.add('admin-mode');
+if (LEADER_MODE) document.documentElement.classList.add('leader-mode');
 
 // ----- 데이터 -----
 var workers = JSON.parse(localStorage.getItem('p5_workers') || '[]');
