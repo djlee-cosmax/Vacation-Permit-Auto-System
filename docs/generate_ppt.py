@@ -77,7 +77,7 @@ def main():
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.5)
     blank = prs.slide_layouts[6]
-    TOTAL = 7
+    TOTAL = 6
 
     # ===== 1. 표지 =====
     s = prs.slides.add_slide(blank)
@@ -284,19 +284,6 @@ def main():
         add_text(s, Inches(7.4), y + Inches(0.4), Inches(5.5), Inches(0.5),
                  "→ " + a, size=12, color=GRAY)
     page_footer(s, 6, TOTAL)
-
-    # ===== 7. 마무리 =====
-    s = prs.slides.add_slide(blank)
-    add_rect(s, 0, 0, prs.slide_width, prs.slide_height, RED)
-    add_text(s, Inches(0.5), Inches(2.2), Inches(12.3), Inches(1.0),
-             "감사합니다", size=54, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
-    add_rect(s, Inches(5.5), Inches(3.6), Inches(2.3), Pt(3), WHITE)
-    add_text(s, Inches(0.5), Inches(4.2), Inches(12.3), Inches(0.6),
-             "휴가증은 본인이 직접, 빠르고 정확하게.", size=20, color=WHITE, align=PP_ALIGN.CENTER)
-    add_text(s, Inches(0.5), Inches(5.7), Inches(12.3), Inches(0.5),
-             "문의 — 관리자 이동준 (생산3팀)", size=14, color=WHITE, align=PP_ALIGN.CENTER)
-    add_text(s, Inches(0.5), Inches(6.3), Inches(12.3), Inches(0.4),
-             "사이트:  djlee-cosmax.github.io/Vacation-Permit-Auto-System/", size=12, color=WHITE, align=PP_ALIGN.CENTER)
 
     prs.save(str(OUT))
     print(f"PPT 생성 완료: {OUT}")
