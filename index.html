@@ -7,6 +7,13 @@
   <meta name="x-apple-disable-message-reformatting" content="yes">
   <title>휴가증 자동 반영 프로그램</title>
   <link rel="icon" href="logo.png">
+  <!-- PWA 메타 -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#c8102e">
+  <link rel="apple-touch-icon" href="logo.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="휴가증">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="stylesheet" href="style.css?v=20260521h">
 </head>
 <body>
@@ -196,5 +203,15 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
   <script src="script.js?v=20260521h"></script>
+  <!-- PWA Service Worker 등록 -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('service-worker.js').catch(function(err) {
+          console.warn('Service Worker 등록 실패:', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>
