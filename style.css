@@ -114,6 +114,27 @@ html.authenticated .login-overlay { display: none !important; }
   color: #c8102e !important;
 }
 
+/* 상단바 로그인 사용자 이름 */
+.user-name {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: #fff5f5;
+  color: #c8102e;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 16px;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .user-name {
+    padding: 4px 10px;
+    font-size: 12px;
+    margin-right: 2px;
+  }
+}
+
 @media (max-width: 600px) {
   .login-card {
     padding: 30px 22px;

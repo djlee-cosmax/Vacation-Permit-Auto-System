@@ -90,6 +90,21 @@ function login() {
   }
   // 작성 폼의 이름·연락처 자동 채움 + readonly
   applyWorkerProfileToForm();
+  refreshUserNameDisplay();
+}
+
+// 상단바 우측에 로그인한 사용자 이름 표시
+function refreshUserNameDisplay() {
+  var el = document.getElementById('userNameDisplay');
+  if (!el) return;
+  var session = getSession();
+  if (session && session.name) {
+    el.textContent = session.name + '님';
+    el.style.display = '';
+  } else {
+    el.textContent = '';
+    el.style.display = 'none';
+  }
 }
 
 // 작업자 로그인 시 휴가증 작성 폼의 이름·연락처를 자동 채우고 readonly 처리
@@ -132,6 +147,7 @@ function logout() {
   document.getElementById('loginEmpId').value = rememberedId || '';
   document.getElementById('loginRemember').checked = !!rememberedId;
   document.getElementById('loginPw').value = '';
+  refreshUserNameDisplay();
   showToast('로그아웃되었습니다.', 'success');
 }
 
@@ -374,6 +390,8 @@ function countWorkdays(startStr, endStr) {
   renderLeaveList();
   // 작업자 로그인 상태면 본인 정보 자동 채움 + readonly
   applyWorkerProfileToForm();
+  // 상단바 사용자 이름 표시
+  refreshUserNameDisplay();
 
   // 로그인 화면에 저장된 사번 자동 채움 (체크박스 동기화)
   var rememberedId = localStorage.getItem('p5_remembered_id');

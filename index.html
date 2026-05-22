@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="휴가증">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="style.css?v=20260522f">
+  <link rel="stylesheet" href="style.css?v=20260522g">
   <!-- 즉시 인증 상태 검사 (메인 콘텐츠 깜빡임 방지) -->
   <script>
     (function() {
@@ -67,6 +67,7 @@
       <span class="subtitle">생산3팀 파우더 성형실</span>
     </div>
     <div class="topbar-actions">
+      <span class="user-name" id="userNameDisplay"></span>
       <button class="btn-secondary" onclick="openMyLeavesModal()" title="내가 작성한 휴가증 조회·취소">내 휴가증</button>
       <button class="btn-secondary" onclick="openWorkerModal()">작업자 명단</button>
       <button class="btn-secondary admin-only" onclick="backupData()" title="작업자 명단 + 작성된 휴가증을 백업 JSON으로 저장">백업</button>
@@ -244,7 +245,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=20260522f"></script>
+  <script src="script.js?v=20260522g"></script>
   <!-- PWA Service Worker 등록 -->
   <script>
     if ('serviceWorker' in navigator) {
