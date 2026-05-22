@@ -136,7 +136,47 @@ html.authenticated .login-overlay { display: none !important; }
   font-size: 14px;
   outline: none;
 }
-.change-pw-field input:focus { border-color: #c8102e; }
+.change-pw-field input:focus,
+.change-pw-field select:focus { border-color: #c8102e; }
+.change-pw-field select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  font-family: inherit;
+  background: #fff;
+}
+.change-pw-divider {
+  margin: 8px 0 -4px;
+  padding-top: 12px;
+  border-top: 1px dashed #ddd;
+  font-size: 11px;
+  color: #999;
+  font-weight: 600;
+}
+.forgot-question {
+  background: #fff5f5;
+  color: #c8102e;
+  font-weight: 700;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+/* 로그인 화면 — 비밀번호 찾기 링크 */
+.login-forgot-link {
+  background: none;
+  border: none;
+  color: #c8102e;
+  text-decoration: underline;
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 10px;
+  padding: 4px;
+}
+.login-forgot-link:hover { color: #a30d24; }
 
 /* 상단바 로그인 사용자 이름 */
 .user-name {

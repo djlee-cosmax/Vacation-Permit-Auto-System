@@ -2,6 +2,17 @@
 
 // ----- 로그인 / 세션 -----
 var DEFAULT_PASSWORD = '1234';
+// 보안 질문 옵션 (비밀번호 찾기용)
+var SECURITY_QUESTIONS = [
+  '어머니의 성함은?',
+  '가장 좋아하는 음식은?',
+  '처음 다닌 초등학교 이름은?',
+  '본인의 별명은?',
+  '좋아하는 색상은?',
+  '좋아하는 운동·취미는?',
+  '가장 기억에 남는 여행지는?',
+  '첫 애완동물의 이름은?'
+];
 // 관리자 / 서무 사번 (workers.json 외 별도 권한 부여)
 var STAFF_ROLES = {
   '122210202': { role: 'admin', name: '이동준' },
@@ -45,7 +56,8 @@ function login() {
   // Firestore가 준비되지 않은 경우 기본 PW로 폴백
   function finalizeLogin(storedPw) {
     if (pw !== storedPw) { showToast('비밀번호가 일치하지 않습니다.', 'error'); return; }
-    doLoginSuccess(empId, name, role, team, worker);
+    var isInitialPw = (storedPw === DEFAULT_PASSWORD);
+    doLoginSuccess(empId, name, role, team, worker, isInitialPw);
   }
   if (FB_DB) {
     FB_DB.collection('users').doc(empId).get()
@@ -61,7 +73,7 @@ function login() {
   }
 }
 
-function doLoginSuccess(empId, name, role, team, worker) {
+function doLoginSuccess(empId, name, role, team, worker, isInitialPw) {
 
   // 권한 localStorage 설정 (모바일에서는 권한 자체가 비활성되므로 PC에서만 효과 있음)
   if (role === 'admin') {
@@ -112,6 +124,14 @@ function doLoginSuccess(empId, name, role, team, worker) {
   // 작성 폼의 이름·연락처 자동 채움 + readonly
   applyWorkerProfileToForm();
   refreshUserNameDisplay();
+
+  // 초기 비밀번호(1234) 사용 중이면 변경 권장 안내 + 모달 자동 오픈
+  if (isInitialPw) {
+    setTimeout(function() {
+      alert('보안을 위해 비밀번호를 변경해 주세요.\n(초기 비밀번호 1234 사용 중)');
+      openChangePwModal();
+    }, 600);
+  }
 }
 
 // 비밀번호 변경 모달
@@ -120,6 +140,25 @@ function openChangePwModal() {
   document.getElementById('currentPw').value = '';
   document.getElementById('newPw').value = '';
   document.getElementById('newPwConfirm').value = '';
+  document.getElementById('securityAnswer').value = '';
+
+  // 보안 질문 드롭다운 채우기
+  var sel = document.getElementById('securityQuestion');
+  sel.innerHTML = '<option value="">선택하지 않음</option>' +
+    SECURITY_QUESTIONS.map(function(q) { return '<option value="' + escapeHtml(q) + '">' + escapeHtml(q) + '</option>'; }).join('');
+
+  // 기존 보안 질문 (있으면 선택)
+  var session = getSession();
+  if (FB_DB && session) {
+    FB_DB.collection('users').doc(session.empId).get()
+      .then(function(doc) {
+        if (doc.exists && doc.data().securityQuestion) {
+          sel.value = doc.data().securityQuestion;
+        }
+      })
+      .catch(function() {});
+  }
+
   document.getElementById('changePwModal').style.display = 'flex';
   setTimeout(function() { document.getElementById('currentPw').focus(); }, 50);
 }
@@ -152,10 +191,17 @@ function changePassword() {
         showToast('현재 비밀번호가 일치하지 않습니다.', 'error');
         throw new Error('PW_MISMATCH');
       }
-      return FB_DB.collection('users').doc(empId).set({
+      var question = document.getElementById('securityQuestion').value;
+      var answer = document.getElementById('securityAnswer').value.trim();
+      var dataToSave = {
         password: newPw,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
+      };
+      if (question && answer) {
+        dataToSave.securityQuestion = question;
+        dataToSave.securityAnswer = answer;
+      }
+      return FB_DB.collection('users').doc(empId).set(dataToSave, { merge: true });
     })
     .then(function() {
       closeChangePwModal();
@@ -165,6 +211,87 @@ function changePassword() {
       if (err && err.message === 'PW_MISMATCH') return; // 이미 토스트 표시됨
       console.error('비밀번호 변경 실패:', err);
       showToast('변경 실패: ' + (err.message || err), 'error');
+    });
+}
+
+// 비밀번호 찾기 — 사번 입력 → 보안 질문 표시 → 답변 확인 → 새 PW 설정
+var forgotEmpIdCache = '';
+
+function openForgotPwModal() {
+  forgotEmpIdCache = '';
+  document.getElementById('forgotEmpId').value = '';
+  document.getElementById('forgotAnswer').value = '';
+  document.getElementById('forgotNewPw').value = '';
+  document.getElementById('forgotNewPwConfirm').value = '';
+  document.getElementById('forgotPwStep1').style.display = '';
+  document.getElementById('forgotPwStep2').style.display = 'none';
+  document.getElementById('forgotPwModal').style.display = 'flex';
+  setTimeout(function() { document.getElementById('forgotEmpId').focus(); }, 50);
+}
+
+function closeForgotPwModal() {
+  document.getElementById('forgotPwModal').style.display = 'none';
+}
+
+function forgotPwLookup() {
+  var empId = document.getElementById('forgotEmpId').value.trim();
+  if (!empId) { showToast('사번을 입력해 주세요.', 'error'); return; }
+  if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
+
+  FB_DB.collection('users').doc(empId).get()
+    .then(function(doc) {
+      if (!doc.exists || !doc.data().securityQuestion || !doc.data().securityAnswer) {
+        showToast('등록된 보안 질문이 없습니다. 관리자(이동준)에게 비밀번호 초기화를 요청해 주세요.', 'error');
+        return;
+      }
+      forgotEmpIdCache = empId;
+      document.getElementById('forgotQuestion').textContent = doc.data().securityQuestion;
+      document.getElementById('forgotPwStep1').style.display = 'none';
+      document.getElementById('forgotPwStep2').style.display = '';
+      setTimeout(function() { document.getElementById('forgotAnswer').focus(); }, 50);
+    })
+    .catch(function(err) {
+      console.error(err);
+      showToast('조회 실패: ' + (err.message || err), 'error');
+    });
+}
+
+function forgotPwReset() {
+  var empId = forgotEmpIdCache;
+  if (!empId) return;
+  var answer = document.getElementById('forgotAnswer').value.trim();
+  var newPw = document.getElementById('forgotNewPw').value;
+  var confirmPw = document.getElementById('forgotNewPwConfirm').value;
+
+  if (!answer) { showToast('답변을 입력해 주세요.', 'error'); return; }
+  if (!newPw) { showToast('새 비밀번호를 입력해 주세요.', 'error'); return; }
+  if (!/^[0-9]+$/.test(newPw)) { showToast('새 비밀번호는 숫자만 입력 가능합니다.', 'error'); return; }
+  if (newPw.length < 6) { showToast('새 비밀번호는 6자리 이상이어야 합니다.', 'error'); return; }
+  if (newPw !== confirmPw) { showToast('새 비밀번호 확인이 일치하지 않습니다.', 'error'); return; }
+
+  FB_DB.collection('users').doc(empId).get()
+    .then(function(doc) {
+      var storedAnswer = doc.exists ? (doc.data().securityAnswer || '') : '';
+      if (answer !== storedAnswer) {
+        showToast('답변이 일치하지 않습니다.', 'error');
+        throw new Error('ANSWER_MISMATCH');
+      }
+      return FB_DB.collection('users').doc(empId).set({
+        password: newPw,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    })
+    .then(function() {
+      closeForgotPwModal();
+      // 로그인 화면 사번 자동 채움
+      var loginEmp = document.getElementById('loginEmpId');
+      if (loginEmp) loginEmp.value = empId;
+      showToast('비밀번호가 재설정되었습니다. 새 비밀번호로 로그인해 주세요.', 'success');
+    })
+    .catch(function(err) {
+      if (err && err.message === 'ANSWER_MISMATCH') return;
+      console.error('비밀번호 재설정 실패:', err);
+      showToast('재설정 실패: ' + (err.message || err), 'error');
     });
 }
 
