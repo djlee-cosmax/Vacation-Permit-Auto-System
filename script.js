@@ -386,7 +386,12 @@ try {
     firebase.initializeApp(firebaseConfig);
     FB_DB = firebase.firestore();
     firebase.auth().signInAnonymously()
-      .then(function(cred) { FB_UID = cred.user.uid; console.log('Firebase 익명 인증:', FB_UID); })
+      .then(function(cred) {
+        FB_UID = cred.user.uid;
+        console.log('Firebase 익명 인증:', FB_UID);
+        // 본인이 작성하고 서버에서 처리 완료된 휴가증은 우측 카드에서 자동 제거
+        setTimeout(cleanupProcessedLeavesFromCloud, 200);
+      })
       .catch(function(err) { console.warn('Firebase 익명 인증 실패:', err); });
   }
 } catch (e) {
@@ -785,6 +790,29 @@ function deleteLeaveFromCloud(id) {
   if (!FB_DB) return;
   FB_DB.collection('leaves').doc(id).delete()
     .catch(function(err) { console.warn('Firestore 삭제 실패:', err); });
+}
+
+// 본인이 작성한 휴가증 중 서버에서 처리 완료(processed=true)된 건 우측 카드에서 자동 제거
+// 페이지 로드 + 인증 완료 시 호출
+function cleanupProcessedLeavesFromCloud() {
+  if (!FB_DB || !FB_UID || leaves.length === 0) return;
+  FB_DB.collection('leaves')
+    .where('processed', '==', true)
+    .get()
+    .then(function(snapshot) {
+      var processedIds = {};
+      snapshot.forEach(function(doc) {
+        var d = doc.data();
+        if (d.submittedBy === FB_UID) processedIds[doc.id] = true;
+      });
+      var before = leaves.length;
+      leaves = leaves.filter(function(l) { return !processedIds[l.id]; });
+      if (leaves.length !== before) {
+        saveLeaves();
+        renderLeaveList();
+      }
+    })
+    .catch(function(err) { console.warn('processed cleanup 실패:', err); });
 }
 
 function saveLeaves() {
