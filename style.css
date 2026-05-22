@@ -114,6 +114,29 @@ html.authenticated .login-overlay { display: none !important; }
   color: #c8102e !important;
 }
 
+/* 비밀번호 보기 토글 — input wrapper */
+.pw-input-wrap {
+  position: relative;
+}
+.pw-input-wrap input {
+  width: 100%;
+  padding-right: 40px !important;
+}
+.pw-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+  color: #999;
+  line-height: 1;
+}
+.pw-toggle:hover { color: #333; }
+
 /* 비밀번호 변경 모달 */
 .change-pw-form {
   display: flex;

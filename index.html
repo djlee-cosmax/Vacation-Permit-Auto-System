@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="휴가증">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="style.css?v=20260522n">
+  <link rel="stylesheet" href="style.css?v=20260522o">
   <!-- 즉시 인증 상태 검사 (메인 콘텐츠 깜빡임 방지) -->
   <script>
     (function() {
@@ -46,7 +46,10 @@
         </div>
         <div class="login-field">
           <label>비밀번호</label>
-          <input type="password" id="loginPw" placeholder="비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter'){login();}">
+          <div class="pw-input-wrap">
+            <input type="password" id="loginPw" placeholder="비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter'){login();}">
+            <button type="button" class="pw-toggle" title="비밀번호 보기" onclick="togglePwVisibility('loginPw', this)">👁</button>
+          </div>
         </div>
         <button class="btn-primary login-submit" onclick="login()">로그인</button>
         <label class="login-remember">
@@ -247,15 +250,24 @@
       <div class="change-pw-form">
         <div class="change-pw-field">
           <label>현재 비밀번호</label>
-          <input type="password" id="currentPw" autocomplete="current-password">
+          <div class="pw-input-wrap">
+            <input type="password" id="currentPw" autocomplete="current-password">
+            <button type="button" class="pw-toggle" onclick="togglePwVisibility('currentPw', this)">👁</button>
+          </div>
         </div>
         <div class="change-pw-field">
           <label>새 비밀번호 (숫자 6자리 이상)</label>
-          <input type="password" id="newPw" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*">
+          <div class="pw-input-wrap">
+            <input type="password" id="newPw" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*">
+            <button type="button" class="pw-toggle" onclick="togglePwVisibility('newPw', this)">👁</button>
+          </div>
         </div>
         <div class="change-pw-field">
           <label>새 비밀번호 확인</label>
-          <input type="password" id="newPwConfirm" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*">
+          <div class="pw-input-wrap">
+            <input type="password" id="newPwConfirm" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*">
+            <button type="button" class="pw-toggle" onclick="togglePwVisibility('newPwConfirm', this)">👁</button>
+          </div>
         </div>
         <div class="change-pw-divider">비밀번호 찾기용 (선택)</div>
         <div class="change-pw-field">
@@ -306,11 +318,17 @@
         </div>
         <div class="change-pw-field">
           <label>새 비밀번호 (숫자 6자리 이상)</label>
-          <input type="password" id="forgotNewPw" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*">
+          <div class="pw-input-wrap">
+            <input type="password" id="forgotNewPw" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*">
+            <button type="button" class="pw-toggle" onclick="togglePwVisibility('forgotNewPw', this)">👁</button>
+          </div>
         </div>
         <div class="change-pw-field">
           <label>새 비밀번호 확인</label>
-          <input type="password" id="forgotNewPwConfirm" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" onkeydown="if(event.key==='Enter'){forgotPwReset();}">
+          <div class="pw-input-wrap">
+            <input type="password" id="forgotNewPwConfirm" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" onkeydown="if(event.key==='Enter'){forgotPwReset();}">
+            <button type="button" class="pw-toggle" onclick="togglePwVisibility('forgotNewPwConfirm', this)">👁</button>
+          </div>
         </div>
         <div class="modal-actions">
           <button class="btn-primary" onclick="forgotPwReset()">비밀번호 재설정</button>
@@ -328,7 +346,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=20260522n"></script>
+  <script src="script.js?v=20260522o"></script>
   <!-- PWA Service Worker 등록 -->
   <script>
     if ('serviceWorker' in navigator) {
