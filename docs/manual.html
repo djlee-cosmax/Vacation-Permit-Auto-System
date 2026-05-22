@@ -237,10 +237,9 @@
   <div class="subtitle">종합 매뉴얼</div>
   <div class="divider"></div>
   <div class="meta">
-    <strong>대상:</strong> 현장 작업자 / 서무 담당자<br>
-    <strong>발행:</strong> 2026-05-21<br>
-    <strong>담당:</strong> 이동준 (생산3팀)<br>
-    <strong>저장소:</strong> github.com/djlee-cosmax/Vacation-Permit-Auto-System
+    <strong>대상:</strong> 작업자 / 서무 담당자<br>
+    <strong>발행:</strong> 2026-05-22<br>
+    <strong>담당:</strong> 이동준 (생산3팀)
   </div>
 </div>
 
@@ -251,34 +250,30 @@
     <li>
       소개서
       <ul>
-        <li>프로그램 목적</li>
+        <li>프로그램 소개</li>
         <li>전체 흐름</li>
-        <li>주요 특징</li>
-        <li>구성 요소</li>
+        <li>역할별 권한</li>
       </ul>
     </li>
     <li>
       매뉴얼 (작업자용)
       <ul>
-        <li>사이트 접속 (모바일·PC)</li>
-        <li>로그인 (사번 + 비밀번호)</li>
-        <li>앱처럼 홈 화면에 추가하기 (모바일)</li>
-        <li>휴가증 작성 절차</li>
-        <li>휴가 유형 안내</li>
+        <li>접속 &amp; 로그인</li>
+        <li>홈 화면에 추가 (모바일)</li>
+        <li>휴가증 작성</li>
+        <li>휴가 유형</li>
         <li>내 휴가증 조회·취소</li>
-        <li>작업자 명단 조회</li>
-        <li>트러블슈팅</li>
+        <li>자주 묻는 질문</li>
       </ul>
     </li>
     <li>
       매뉴얼 (서무용)
       <ul>
-        <li>서무 사번 로그인</li>
-        <li>매일 사용 절차 (사이트 → 자동화 → 처리 완료)</li>
+        <li>로그인</li>
+        <li>매일 사용 절차</li>
         <li>자동화 최초 설치</li>
-        <li>결과 해석</li>
-        <li>주요 시나리오 대응</li>
-        <li>트러블슈팅</li>
+        <li>결과 알림</li>
+        <li>자주 묻는 질문</li>
       </ul>
     </li>
   </ol>
@@ -288,86 +283,27 @@
 <section class="first">
 <h2 class="section-title">1. 소개서</h2>
 
-<p class="lead">작업자가 본인 휴대폰으로 직접 휴가증을 작성하면 클라우드에 자동 저장되고, 서무 담당자는 매일 한 번의 클릭으로 그날의 모든 휴가증을 일괄 취합하여 그룹웨어 COSMAX COIN에 자동 임시저장합니다.</p>
+<p class="lead">작업자가 본인 휴대폰으로 휴가증을 직접 작성하면 클라우드에 자동 저장됩니다. 서무는 매일 한 번 사이트에서 일괄 취합 후 자동화 프로그램으로 그룹웨어에 등록합니다.</p>
 
-<h3>1.1 프로그램 목적</h3>
-<ul class="bullet">
-  <li>기존 종이 휴가증 → 디지털 양식으로 전환 (작성 주체는 그대로 개인)</li>
-  <li>서무 담당자가 그룹웨어에 매 건 수동 입력하던 작업을 자동화</li>
-  <li>작업자가 작성한 휴가증이 클라우드에 자동 누적 — 조장·서무가 별도 취합 불필요</li>
-  <li>휴가 유형·기간·작업장 별로 신청서를 정확히 분류하여 등록</li>
-  <li>한국 공휴일·잔여일수 부족 등 검증 오류를 사전·사후에 안내</li>
-</ul>
-
-<h3>1.2 전체 흐름</h3>
+<h3>1.1 전체 흐름</h3>
 <ol class="steps">
-  <li><strong>작업자 (모바일)</strong> — 본인 휴대폰으로 사이트 접속 → 휴가증 작성 → "+ 추가" 클릭</li>
-  <li><strong>클라우드 자동 저장</strong> — 작성된 휴가증이 Firebase 클라우드에 미처리 상태로 즉시 업로드</li>
-  <li><strong>서무 (PC)</strong> — 사이트(<span class="mono">?leader=1</span>) 접속 → "서버에서 불러오기" 클릭 (미처리 휴가증 + 최근 7일 자동 취합)</li>
-  <li><strong>서무 (PC)</strong> — 휴가증 검토 → "파일로 내보내기" → JSON + XLSX 다운로드</li>
-  <li><strong>서무 (PC)</strong> — 자동화 프로그램(<span class="mono">run.bat</span>)에 JSON 입력 → 자동 임시저장</li>
-  <li><strong>서무</strong> — 그룹웨어 신청 내역 + XLSX 비교 검토 → 직접 신청 처리</li>
-  <li><strong>서무 (PC)</strong> — 사이트로 돌아와 "처리 완료" 클릭 → 클라우드에서 처리 완료로 마크 (다음 불러오기 제외)</li>
+  <li><strong>작업자</strong> 휴대폰으로 사이트 접속 → 휴가증 작성</li>
+  <li>작성 즉시 <strong>클라우드 자동 저장</strong></li>
+  <li><strong>서무</strong> 매일 PC에서 사이트 접속 → [서버에서 불러오기] → [파일로 내보내기]</li>
+  <li>자동화 프로그램(<span class="mono">run.bat</span>)으로 그룹웨어 임시저장</li>
+  <li>그룹웨어 검토·신청 후 [처리 완료]</li>
 </ol>
 
-<div class="info-box">
-  <strong>개선 효과:</strong> 조장이 작업자별 휴가 정보를 받아 사이트에 일일이 입력하는 과정이 사라지고, 작업자 본인이 자기 휴대폰으로 직접 작성하게 됩니다. 서무는 사이트에서 자동 취합된 휴가증을 받아 자동화 프로그램에 입력만 하면 됩니다.
-</div>
-
-<h3>1.3 주요 특징</h3>
+<h3>1.2 역할별 권한 (사번 로그인 기반)</h3>
 <table>
-  <thead>
-    <tr><th style="width:40%">기능</th><th>설명</th></tr>
-  </thead>
+  <thead><tr><th>역할</th><th>사번</th><th>가능한 기능</th></tr></thead>
   <tbody>
-    <tr><td>사번 로그인</td><td>사번 + 비밀번호(기본 1234)로 접근. 사번에 따라 권한 자동 부여</td></tr>
-    <tr><td>클라우드 자동 저장</td><td>작성 즉시 Firebase 클라우드에 업로드 — 별도 전달 과정 X</td></tr>
-    <tr><td>서무 일괄 취합</td><td>매일 한 클릭으로 미처리 휴가증 전체 자동 수집 (최근 7일)</td></tr>
-    <tr><td>처리 완료 마크</td><td>처리 후 [처리 완료] 클릭 시 중복 등록 방지. 늦은 저녁/주말 작성분도 안전</td></tr>
-    <tr><td>본인 인증 기반 관리</td><td>이름 + 휴대폰 4자리로 본인 휴가증 조회·취소</td></tr>
-    <tr><td>모바일 최적화</td><td>휴대폰 화면에 맞춰 UI 자동 조정 + 권한 분리</td></tr>
-    <tr><td>10가지 휴가 유형</td><td>연차·반차(오전/오후)·반반차(오전/오후)·생휴·하기휴가·결근·결근(오전/오후)</td></tr>
-    <tr><td>자동 그룹화</td><td>생휴 / 비생휴 두 분류, 같은 작업자 중복 시 자동 분리</td></tr>
-    <tr><td>한국 공휴일 자동 제외</td><td>실수로 공휴일에 휴가증 작성해도 자동 빠짐</td></tr>
-    <tr><td>그룹웨어 자동 등록</td><td>자동화 프로그램이 신청서별로 임시저장</td></tr>
-    <tr><td>실패 사유 표시</td><td>잔여일수 부족 등 그룹웨어 응답을 그대로 알림</td></tr>
-    <tr><td>작업장별 파일명</td><td>화성/평택 다수 인원 기준으로 파일명에 자동 표기</td></tr>
-    <tr><td>데이터 백업/복원</td><td>관리자 전용 — 작업자 명단·휴가증 JSON 백업</td></tr>
+    <tr><td>관리자</td><td>122210202 (이동준)</td><td>모든 기능</td></tr>
+    <tr><td>서무</td><td>122240096 (김가영)</td><td>서버 불러오기 / 파일 내보내기 / 처리 완료</td></tr>
+    <tr><td>작업자</td><td>각자 본인 사번</td><td>휴가증 작성 / 내 휴가증 조회·취소</td></tr>
   </tbody>
 </table>
-
-<h3>1.4 구성 요소</h3>
-<h4>웹 사이트 (휴가증 작성·조회용)</h4>
-<ul class="bullet">
-  <li>URL: <span class="mono">https://djlee-cosmax.github.io/Vacation-Permit-Auto-System/</span></li>
-  <li>작업자가 본인 휴대폰·PC 브라우저로 접속</li>
-  <li>GitHub Pages 호스팅 — 24시간 가용</li>
-</ul>
-
-<h4>클라우드 데이터베이스 (Firebase Firestore)</h4>
-<ul class="bullet">
-  <li>작성된 휴가증을 안전하게 보관 (한국 리전 — 서울)</li>
-  <li>익명 인증 + Security Rules로 접근 통제</li>
-  <li>사번·민감 개인정보 없음 (이름·근무지·휴가 정보만)</li>
-</ul>
-
-<h4>자동화 프로그램 (서무 PC 전용)</h4>
-<ul class="bullet">
-  <li>서무 담당자 PC에 설치</li>
-  <li>Python + Playwright + Microsoft Edge</li>
-  <li>그룹웨어(<span class="mono">coin.cosmax.com</span>)에 자동 등록</li>
-</ul>
-
-<h4>권한 분리 (사번 기반)</h4>
-<table>
-  <thead><tr><th>역할</th><th>사번</th><th>가능 기능</th></tr></thead>
-  <tbody>
-    <tr><td>관리자</td><td><span class="mono">122210202</span> (이동준)</td><td>모든 기능 (백업·복원 / 작업자 명단 편집 / 서버 불러오기 / 파일 내보내기 / 처리 완료)</td></tr>
-    <tr><td>서무</td><td><span class="mono">122240096</span> (김가영)</td><td>서버 불러오기 / 파일 내보내기 / 처리 완료</td></tr>
-    <tr><td>작업자</td><td>각 작업자 사번</td><td>휴가증 작성 / 내 휴가증 조회·취소 / 명단 조회 (사번 컬럼 비공개)</td></tr>
-  </tbody>
-</table>
-<p style="font-size:10pt;color:#666;margin-top:4mm">※ 모바일에서는 어떤 사번이든 자동으로 작업자 전용 화면 — 관리자/서무 기능 비활성</p>
+<p style="font-size:10pt;color:#666">※ 모바일은 어떤 사번이든 작업자 화면만 표시 (서무 작업은 PC 전용)</p>
 
 </section>
 
@@ -375,180 +311,63 @@
 <section>
 <h2 class="section-title">2. 매뉴얼 (작업자용)</h2>
 
-<p class="lead">작업자가 본인 휴대폰(또는 PC)으로 직접 휴가증을 작성하고, 작성된 휴가증은 자동으로 클라우드에 저장됩니다. 별도 파일 전달이나 조장에게 보내는 과정 없이 서무가 그날 휴가증을 일괄 가져갑니다.</p>
-
-<h3>2.1 사이트 접속 (모바일·PC)</h3>
-<p>휴대폰 또는 PC 브라우저(Edge / Chrome / Safari 등)에서 다음 주소로 접속합니다.</p>
-<pre>https://djlee-cosmax.github.io/Vacation-Permit-Auto-System/</pre>
-<p>휴대폰 홈 화면에 추가하거나 즐겨찾기에 등록해 두면 편리합니다.</p>
-
-<div class="info-box">
-  <strong>참고:</strong> 인터넷만 연결되어 있으면 어디서든 접속 가능합니다 (회사 와이파이 / LTE / 가정 와이파이 모두 OK). 작성된 휴가증은 클라우드에 자동 저장됩니다.
-</div>
-
-<h3>2.2 로그인</h3>
-<p>사이트 처음 진입 시 <strong>로그인 화면</strong>이 표시됩니다.</p>
-<ol class="steps">
-  <li><strong>사번</strong> 입력 (본인의 9자리 사번)</li>
-  <li><strong>비밀번호</strong> 입력 — <strong>최초 비밀번호: 1234</strong></li>
-  <li><strong>[로그인]</strong> 클릭</li>
-  <li>"OOO님 환영합니다" 토스트 표시 → 메인 화면 진입</li>
-</ol>
-
-<div class="info-box">
-  <strong>참고:</strong> 한 번 로그인하면 <strong>30일간 자동 유지</strong>됩니다. 매번 다시 입력할 필요 없어요. 다른 사람이 본인 휴대폰을 사용해야 한다면 우상단 [로그아웃] 클릭 후 새로 로그인.
-</div>
-
-<div class="info-box">
-  <strong>로그인 후 자동 적용:</strong>
-  <ul class="bullet" style="margin-top:2mm">
-    <li>휴가증 작성 폼의 <strong>이름·연락처</strong>가 본인 정보로 자동 채워집니다</li>
-    <li>본인 정보 보호를 위해 <strong>수정 불가</strong> (회색 표시) — 휴가 유형·기간·사유만 입력하면 됩니다</li>
-    <li>이름이나 연락처가 잘못되어 있으면 관리자(이동준)에게 명단 수정 요청</li>
-  </ul>
-</div>
-
-<div class="warn-box">
-  <strong>로그인 실패 시:</strong>
-  <ul class="bullet" style="margin-top:2mm">
-    <li>"등록되지 않은 사번입니다" — 작업자 명단에 본인 사번이 없음. 관리자(이동준)에게 명단 추가 요청</li>
-    <li>"비밀번호가 일치하지 않습니다" — 기본 비밀번호 <span class="mono">1234</span> 다시 확인</li>
-  </ul>
-</div>
-
-<h3>2.3 앱처럼 홈 화면에 추가하기 (권장)</h3>
-<p>매번 브라우저에서 주소를 입력하는 대신, 사이트를 <strong>휴대폰 홈 화면에 앱처럼 추가</strong>하면 아이콘 한 번 탭으로 바로 열 수 있습니다. 일반 앱과 동일한 풀스크린 화면으로 동작합니다.</p>
-
-<h4>iOS (아이폰 · Safari)</h4>
-<ol class="steps">
-  <li>Safari로 사이트 접속</li>
-  <li>화면 하단 가운데 <strong>공유 버튼</strong> (⬆️ 위쪽 화살표가 있는 네모) 탭</li>
-  <li>메뉴 아래쪽으로 스크롤 → <strong>"홈 화면에 추가"</strong> 선택</li>
-  <li>이름 확인 (기본: <strong>"휴가증"</strong>) → 우측 상단 <strong>"추가"</strong> 탭</li>
-  <li>홈 화면에 COSMAX 로고 아이콘 생성 완료</li>
-</ol>
-
-<h4>Android (안드로이드 · Chrome)</h4>
-<ol class="steps">
-  <li>Chrome으로 사이트 접속</li>
-  <li>화면 우상단 <strong>⋮ (점 세 개)</strong> 메뉴 탭</li>
-  <li><strong>"홈 화면에 추가"</strong> 또는 <strong>"앱 설치"</strong> 선택</li>
-  <li>"설치" 또는 "추가" 확인</li>
-  <li>홈 화면에 아이콘 생성 완료</li>
-</ol>
-
-<div class="info-box">
-  <strong>참고:</strong> 일부 안드로이드 기기는 사이트 접속 시 화면 하단에 <span class="mono">"앱 설치하시겠습니까?"</span> 배너가 자동으로 표시되기도 합니다. 그때 바로 설치하셔도 됩니다.
-</div>
-
-<p>추가된 아이콘을 탭하면 일반 앱처럼 <strong>풀스크린</strong>으로 실행됩니다 (주소창 없음). 자동 업데이트되므로 별도 관리도 필요 없습니다.</p>
-
-<h3>2.4 휴가증 작성 절차</h3>
-<ol class="steps">
-  <li><strong>이름</strong> — 로그인한 본인 이름으로 <strong>자동 채워짐</strong> (수정 불가)</li>
-  <li><strong>구분</strong> 선택 — 휴가 유형 (연차 / 반차 / 반반차 / 생휴 / 하기휴가 / 결근 등)</li>
-  <li><strong>개수</strong> 입력 — 연차 2개, 반차 1개 등. 합계 일수가 자동 계산되어 표시됩니다.</li>
-  <li><strong>기간</strong> 선택 — 시작일~종료일. 연차 2개라면 보통 2일 연속.</li>
-  <li><strong>사유</strong> 입력 — 휴가 사유</li>
-  <li><strong>연락처</strong> — 작업자 명단에 등록된 본인 연락처로 <strong>자동 채워짐</strong> (수정 불가)</li>
-  <li><strong>[+ 추가]</strong> 클릭 — 작성된 휴가증 카드가 우측에 추가되고 클라우드에 자동 저장됩니다.</li>
-</ol>
-
-<div class="info-box">
-  <strong>참고 (관리자·서무):</strong> 관리자 또는 서무 사번으로 로그인한 경우에는 이름·연락처도 자유 입력 가능합니다 (다른 작업자 휴가증을 대신 작성할 때).
-</div>
-
-<div class="info-box">
-  <strong>완료!</strong> 작성된 휴가증은 클라우드에 즉시 저장되며, 서무 담당자가 매일 자동으로 가져갑니다. 본인이 따로 파일을 보내거나 조장에게 전달할 필요가 없습니다.
-</div>
-
-<div class="warn-box">
-  <strong>주의:</strong> 한 작업자가 여러 유형(연차+반차 등)을 사용할 때는 휴가증을 <strong>유형별로 따로 작성</strong>합니다. 예: 김철수 연차 2개 + 반차 1개 → 휴가증 2건 작성.
-</div>
-
-<h3>2.5 휴가 유형 안내</h3>
-<table>
-  <thead>
-    <tr><th>구분</th><th>1개당 일수</th><th>출퇴근 안내</th></tr>
-  </thead>
-  <tbody>
-    <tr><td>연차</td><td>1.0일</td><td>종일 휴가</td></tr>
-    <tr><td>반차(오전)</td><td>0.5일</td><td>오후 12시 50분 출근</td></tr>
-    <tr><td>반차(오후)</td><td>0.5일</td><td>오후 12시 퇴근</td></tr>
-    <tr><td>반반차(오전)</td><td>0.25일</td><td>오전 10시 출근</td></tr>
-    <tr><td>반반차(오후)</td><td>0.25일</td><td>오후 3시 퇴근</td></tr>
-    <tr><td>생휴</td><td>1.0일</td><td>생리 휴가</td></tr>
-    <tr><td>하기휴가</td><td>3.0일</td><td>1개당 연속 3일 (기간 3일짜리로 입력)</td></tr>
-    <tr><td>결근</td><td>1.0일</td><td>연차 없이 종일 출근 못할 때</td></tr>
-    <tr><td>결근(오전)</td><td>0.5일</td><td>오후 12시 50분 출근 (반차 잔여 없을 때)</td></tr>
-    <tr><td>결근(오후)</td><td>0.5일</td><td>오후 12시 퇴근 (반차 잔여 없을 때)</td></tr>
-  </tbody>
-</table>
-
-<p>목록에 없는 휴가 유형(예: 경조사·교육 등)은 <strong>서무 담당자에게 직접 요청</strong>해 주세요.</p>
-
-<h3>2.6 내 휴가증 조회·취소</h3>
-<p>본인이 작성한 휴가증은 상단 <strong>[내 휴가증]</strong> 버튼으로 언제든 조회·취소할 수 있습니다.</p>
-<ol class="steps">
-  <li>상단 <strong>[내 휴가증]</strong> 버튼 클릭</li>
-  <li><strong>이름</strong> + <strong>휴대폰 마지막 4자리</strong> 입력 (이미 휴가증을 작성한 휴대폰이면 자동 채움)</li>
-  <li><strong>[조회]</strong> 클릭 → 최근 14일 내 본인이 작성한 휴가증 목록 표시</li>
-  <li>잘못 작성한 휴가증은 <strong>[취소]</strong> 버튼 → 확인 → 삭제</li>
-</ol>
-
-<div class="info-box">
-  <strong>핵심 동작 — 삭제 시 클라우드 동기화:</strong>
-  <ul class="bullet" style="margin-top:2mm">
-    <li>화면의 휴가증 카드 우측 <strong>[삭제]</strong> 또는 [내 휴가증] 모달의 <strong>[취소]</strong>를 누르면, 본인 화면뿐 아니라 <strong>클라우드(서버)에서도 즉시 삭제</strong>됩니다.</li>
-    <li>따라서 서무가 [서버에서 불러오기] 했을 때 사라진 휴가증은 가져오지 않습니다.</li>
-  </ul>
-</div>
-
-<h4>서무 처리 시점별 영향</h4>
-<table>
-  <thead><tr><th>삭제 시점</th><th>영향</th></tr></thead>
-  <tbody>
-    <tr>
-      <td>서무 <strong>[서버에서 불러오기] 전</strong></td>
-      <td>가장 안전. 서무는 사라진 휴가증을 알 수 없음 → 자연스럽게 처리에서 빠짐</td>
-    </tr>
-    <tr>
-      <td>서무 <strong>[서버에서 불러오기] 후 / 자동화 실행 전</strong></td>
-      <td>클라우드는 사라지지만 서무 PC 화면에는 남아 있음 → 서무가 작업자에게 확인 후 화면에서 [삭제]로 정리하거나 그대로 진행</td>
-    </tr>
-    <tr>
-      <td>서무 <strong>자동화 실행 후 (그룹웨어 등록 완료)</strong></td>
-      <td>그룹웨어 신청서는 이미 등록된 상태 → 서무가 그룹웨어에서 별도 취소 처리 필요. <strong>가능하면 자동화 전에 알려주세요</strong></td>
-    </tr>
-  </tbody>
-</table>
-
-<div class="warn-box">
-  <strong>주의 1 (휴대폰 인증):</strong> 휴가증을 작성한 휴대폰에서만 본인이 직접 <strong>[취소]</strong> 할 수 있습니다. 다른 휴대폰에서 본인 휴가증 조회는 가능하지만 🔒 표시가 되어 취소는 안 됩니다. 휴대폰을 바꾼 경우 새 휴가증은 새 휴대폰에서 작성하시고, 옛 휴가증은 서무에게 요청해 주세요.
-</div>
-
-<div class="warn-box">
-  <strong>주의 2 (가능한 한 빨리):</strong> 잘못 작성한 휴가증은 <strong>서무가 자동화를 돌리기 전에 빨리 삭제</strong>해 주세요. 자동화 후에 삭제하면 클라우드는 정리되지만 그룹웨어에는 이미 등록된 상태가 됩니다.
-</div>
-
-<h3>2.7 작업자 명단 조회</h3>
-<p>상단 <strong>[작업자 명단]</strong> 버튼으로 등록된 작업자 명단을 확인할 수 있습니다 (조회 전용).</p>
+<h3>2.1 접속 &amp; 로그인</h3>
+<p>주소: <span class="mono">https://djlee-cosmax.github.io/Vacation-Permit-Auto-System/</span></p>
 <ul class="bullet">
-  <li>이름 / 근무지 / 연락처 표시 (사번은 비공개)</li>
-  <li>검색창에서 이름·근무지·연락처로 검색</li>
-  <li>이름 가나다순 자동 정렬</li>
-  <li>명단의 <strong>추가·수정·삭제는 관리자(이동준)에게 요청</strong>해 주세요</li>
+  <li><strong>사번</strong> + <strong>비밀번호 1234</strong> 입력 → [로그인]</li>
+  <li>한 번 로그인하면 <strong>30일간 유지</strong></li>
+  <li>이름·연락처는 자동 채워지며 수정 불가</li>
 </ul>
 
-<h3>2.8 트러블슈팅 (작업자)</h3>
+<h3>2.2 홈 화면에 추가 (모바일 권장)</h3>
+<p>휴대폰 홈 화면에 앱 아이콘으로 추가하면 한 번 탭으로 실행됩니다.</p>
+<ul class="bullet">
+  <li><strong>iOS Safari</strong> — 하단 공유 버튼 → "홈 화면에 추가"</li>
+  <li><strong>Android Chrome</strong> — 우상단 ⋮ → "홈 화면에 추가"</li>
+</ul>
+
+<h3>2.3 휴가증 작성</h3>
+<ol class="steps">
+  <li><strong>구분</strong> 선택 (연차 / 반차 / 반반차 / 생휴 / 하기휴가 / 결근 등)</li>
+  <li><strong>개수</strong> 입력 (예: 연차 2개)</li>
+  <li><strong>기간</strong> 시작일~종료일 선택</li>
+  <li><strong>사유</strong> 입력</li>
+  <li><strong>[+ 추가]</strong> 클릭 → 클라우드 자동 저장</li>
+</ol>
+<p style="font-size:10pt;color:#666">※ 한 사람이 여러 유형(예: 연차+반차)을 쓸 때는 휴가증을 따로 작성</p>
+
+<h3>2.4 휴가 유형</h3>
+<table>
+  <thead><tr><th>구분</th><th>1개당 일수</th><th>비고</th></tr></thead>
+  <tbody>
+    <tr><td>연차</td><td>1.0일</td><td>종일</td></tr>
+    <tr><td>반차(오전/오후)</td><td>0.5일</td><td>오전: 12:50 출근 / 오후: 12:00 퇴근</td></tr>
+    <tr><td>반반차(오전/오후)</td><td>0.25일</td><td>오전: 10:00 출근 / 오후: 15:00 퇴근</td></tr>
+    <tr><td>생휴</td><td>1.0일</td><td>생리 휴가</td></tr>
+    <tr><td>하기휴가</td><td>3.0일</td><td>1개 = 연속 3일</td></tr>
+    <tr><td>결근(전/오전/오후)</td><td>1.0 / 0.5일</td><td>연차 잔여 없을 때</td></tr>
+  </tbody>
+</table>
+
+<h3>2.5 내 휴가증 조회·취소</h3>
+<ol class="steps">
+  <li>상단 <strong>[내 휴가증]</strong> 클릭</li>
+  <li>이름 + 휴대폰 마지막 4자리 입력 → [조회]</li>
+  <li>최근 14일 내 본인 휴가증 표시 → <strong>[취소]</strong> 클릭하면 클라우드에서도 삭제</li>
+</ol>
+<div class="warn-box">
+  <strong>주의:</strong> 잘못 작성한 휴가증은 <strong>서무가 자동화 돌리기 전</strong>에 빨리 취소해 주세요. 그 후엔 그룹웨어에 이미 등록되어 별도 처리가 필요합니다.
+</div>
+
+<h3>2.6 자주 묻는 질문</h3>
 <table>
   <thead><tr><th style="width:40%">증상</th><th>해결</th></tr></thead>
   <tbody>
-    <tr><td>이름 검색이 안 됨 (자동완성 안 됨)</td><td>작업자 명단에 등록되어 있지 않은 경우 — 관리자에게 명단 추가 요청</td></tr>
-    <tr><td>[+ 추가] 후 휴가증이 안 보임</td><td>네트워크 일시 끊김. 잠시 후 새로고침</td></tr>
-    <tr><td>잘못 작성한 휴가증 취소</td><td>[내 휴가증] → 본인 인증 → [취소]</td></tr>
-    <tr><td>휴대폰 바뀐 후 옛 휴가증 못 지움</td><td>다른 휴대폰에서 작성된 휴가증은 본인이 직접 못 지움 — 서무에게 요청</td></tr>
-    <tr><td>새 디자인이 안 보임</td><td>모바일 브라우저 캐시 문제 — 시크릿/InPrivate 창으로 접속 또는 캐시 삭제</td></tr>
+    <tr><td>"등록되지 않은 사번" 표시</td><td>관리자(이동준)에게 명단 추가 요청</td></tr>
+    <tr><td>비밀번호 오류</td><td>기본 비밀번호 <span class="mono">1234</span> 다시 확인</td></tr>
+    <tr><td>다른 휴대폰에서 본인 휴가증 안 보임</td><td>[내 휴가증]에서 이름·휴대폰 4자리 입력 후 조회</td></tr>
+    <tr><td>휴대폰 바꾼 후 옛 휴가증 못 지움</td><td>관리자에게 요청</td></tr>
+    <tr><td>화면이 옛 디자인</td><td>시크릿/InPrivate 창으로 접속 또는 캐시 삭제</td></tr>
   </tbody>
 </table>
 
@@ -558,193 +377,61 @@
 <section>
 <h2 class="section-title">3. 매뉴얼 (서무용)</h2>
 
-<p class="lead">서무 담당자는 사이트의 <strong>서무 모드</strong>에 접속하여 그날 작업자들이 작성한 휴가증을 일괄 가져오고, JSON·XLSX 파일을 다운로드한 후 자동화 프로그램으로 그룹웨어에 등록합니다.</p>
-
-<h3>3.1 서무 사번 로그인</h3>
-<p>서무 담당자는 본인 사번으로 로그인하면 자동으로 서무 권한이 부여됩니다.</p>
+<h3>3.1 로그인</h3>
+<p>주소: <span class="mono">https://djlee-cosmax.github.io/Vacation-Permit-Auto-System/</span></p>
 <ul class="bullet">
-  <li>사이트 URL: <span class="mono">https://djlee-cosmax.github.io/Vacation-Permit-Auto-System/</span></li>
-  <li>로그인 정보 — <strong>사번 122240096 (김가영)</strong> / 비밀번호 <strong>1234</strong></li>
-  <li>한 번 로그인하면 30일간 자동 유지</li>
+  <li>사번 <strong>122240096</strong> + 비밀번호 <strong>1234</strong> 입력</li>
+  <li>로그인 시 자동으로 서무 권한 부여 → 추가 버튼 표시</li>
+  <li>모바일에서는 서무 권한 비활성 — PC에서만 사용</li>
 </ul>
 
-<div class="info-box">
-  <strong>서무 사번으로 로그인 시 추가로 보이는 기능:</strong>
-  <ul class="bullet" style="margin-top:2mm">
-    <li>우측 카드에 <strong>[서버에서 불러오기]</strong> 버튼 — 미처리 휴가증 일괄 취합 (최근 7일)</li>
-    <li>우측 카드에 <strong>[처리 완료]</strong> 버튼 — 처리 후 클라우드에서 마크</li>
-    <li>상단에 <strong>[파일로 내보내기]</strong> 버튼 — JSON + XLSX 다운로드</li>
-  </ul>
-</div>
-
-<div class="warn-box">
-  <strong>주의:</strong> 일반 작업자 사번으로 로그인하면 서무 기능이 표시되지 않습니다. 반드시 서무 사번(<span class="mono">122240096</span>)으로 로그인해 주세요. 모바일에서는 어떤 사번이든 작업자 화면만 표시됩니다 — 서무 작업은 PC에서 진행하세요.
-</div>
-
-<h3>3.2 매일 사용 절차 (사이트 → 자동화 → 처리 완료)</h3>
+<h3>3.2 매일 사용 절차</h3>
 <ol class="steps">
-  <li>본인 PC에서 사이트 접속 (서무 모드 URL)</li>
-  <li>우측 카드의 <strong>[서버에서 불러오기]</strong> 클릭 → "서버에서 미처리 휴가증 N건을 발견했습니다" 확인 → 예</li>
-  <li>화면에 표시된 휴가증 목록 검토 (잘못된 입력 / 누락 등 확인)</li>
-  <li>잘못된 휴가증이 있으면 작성자에게 취소 요청 (또는 본인이 [내 휴가증]에서 취소)</li>
-  <li>상단 <strong>[파일로 내보내기]</strong> 클릭 → JSON + XLSX 두 파일 자동 다운로드</li>
-  <li>자동화 폴더의 <strong>run.bat</strong> 더블클릭</li>
-  <li>파일 선택 다이얼로그에서 방금 다운로드한 <strong>JSON 선택</strong></li>
-  <li>"신청서 N건 / 인원 N명 / 총 N일 ... 진행하시겠습니까?" 확인 → 예</li>
-  <li>Edge가 자동으로 신청서를 차례로 임시저장</li>
-  <li>완료 알림 확인 → 그룹웨어 신청 내역에서 임시저장 결과 확인</li>
-  <li><strong>XLSX 파일과 비교 검토</strong> 후 그룹웨어에서 직접 신청</li>
-  <li>모든 처리가 끝나면 사이트로 돌아와 우측 카드의 <strong>[처리 완료]</strong> 클릭 → 클라우드에 마크</li>
+  <li>PC에서 사이트 접속 → 서무 사번으로 로그인</li>
+  <li>우측 카드의 <strong>[서버에서 불러오기]</strong> 클릭 (미처리 휴가증 + 최근 7일)</li>
+  <li>화면에서 휴가증 목록 검토</li>
+  <li>상단 <strong>[파일로 내보내기]</strong> → JSON + XLSX 다운로드</li>
+  <li>자동화 폴더의 <strong>run.bat</strong> 더블클릭 → JSON 선택 → 진행</li>
+  <li>완료 알림 확인 → 그룹웨어 검토 후 신청 처리</li>
+  <li>모두 완료 후 사이트에서 <strong>[처리 완료]</strong> 클릭</li>
 </ol>
-
 <div class="info-box">
-  <strong>핵심 동작 — 처리 완료 마크:</strong>
-  <ul class="bullet" style="margin-top:2mm">
-    <li>[처리 완료]를 누른 휴가증은 클라우드에서 <span class="mono">processed=true</span>로 마크됩니다</li>
-    <li>다음 [서버에서 불러오기] 시 처리 완료된 휴가증은 더 이상 가져오지 않습니다 (중복 방지)</li>
-    <li><strong>[처리 완료]를 누르지 않으면</strong> 다음 날에도 불러올 수 있어 안전합니다 (자동화 실패 / 늦은 저녁 작성 / 주말 누적 등)</li>
-  </ul>
-</div>
-
-<div class="warn-box">
-  <strong>주의:</strong> 자동화 실행 + 그룹웨어 최종 신청까지 모두 완료된 후에 [처리 완료]를 누르세요. 그 전에 누르면 다시 불러오기 어려워질 수 있습니다.
+  <strong>처리 완료의 안전망:</strong> 자동화 끝까지 완료된 후에만 [처리 완료]를 누르세요. 누르지 않은 휴가증은 다음 날 다시 불러올 수 있어 안전합니다.
 </div>
 
 <h3>3.3 자동화 최초 설치 (한 번만)</h3>
-
-<h4>(1) Python 설치</h4>
-<ul class="bullet">
-  <li>https://www.python.org/downloads/ 에서 Python 3.10~3.12 다운로드</li>
-  <li>설치 화면에서 <strong>"Add Python to PATH"</strong> 옵션 반드시 체크</li>
-  <li>설치 완료 후 PC 재시작 권장</li>
-</ul>
-
-<h4>(2) 프로그램 폴더 배치</h4>
-<ul class="bullet">
-  <li>USB / 공유폴더에서 받은 자동화 폴더(또는 ZIP)를 적당한 위치에 복사</li>
-  <li>예: <span class="mono">D:\휴가증자동화\</span></li>
-  <li>ZIP 파일은 압축 풀기 전 우클릭 → 속성 → <strong>"차단 해제"</strong> 체크 → 확인</li>
-</ul>
-
-<h4>(3) setup.bat 실행</h4>
 <ol class="steps">
-  <li>폴더 안의 <strong>setup.bat</strong> 더블클릭</li>
-  <li>Playwright + Edge 드라이버가 자동 설치 (1~3분)</li>
-  <li>"Setup Complete" 메시지가 뜨면 성공</li>
+  <li><strong>Python 3.10~3.12</strong> 설치 — <span class="mono">python.org/downloads</span> ("Add Python to PATH" 체크)</li>
+  <li>자동화 폴더(또는 ZIP) 적당한 위치에 배치 (예: <span class="mono">D:\휴가증자동화\</span>) — ZIP은 풀기 전 우클릭 → 속성 → "차단 해제"</li>
+  <li><strong>setup.bat</strong> 더블클릭 → 자동 설치 완료 대기</li>
+  <li>첫 <strong>run.bat</strong> 실행 → 그룹웨어 로그인 → 이후 자동 유지</li>
 </ol>
 
-<h4>(4) 첫 실행 (로그인 등록)</h4>
-<ol class="steps">
-  <li><strong>run.bat</strong> 더블클릭</li>
-  <li>파일 선택 다이얼로그가 뜨면 취소 (또는 테스트 JSON 선택)</li>
-  <li>Edge가 자동으로 열리면서 그룹웨어 로그인 화면 표시</li>
-  <li>서무 사번/비밀번호로 직접 로그인</li>
-  <li>이후 실행부터는 자동 로그인 유지</li>
-</ol>
-
-<div class="info-box">
-  <strong>참고:</strong> 영구 프로필 폴더(<span class="mono">profile/</span>)에 쿠키가 저장되어 다음 실행부터 자동 로그인됩니다. 비밀번호 변경 시에는 다시 한 번 로그인이 필요합니다.
-</div>
-
-<h3>3.3 결과 해석</h3>
+<h3>3.4 결과 알림</h3>
 <table>
-  <thead>
-    <tr><th>알림 제목</th><th>의미</th><th>대응</th></tr>
-  </thead>
+  <thead><tr><th>알림</th><th>의미 / 대응</th></tr></thead>
   <tbody>
-    <tr>
-      <td><span class="badge green">완료</span></td>
-      <td>N건 모두 임시저장 성공</td>
-      <td>그룹웨어 검토 후 신청</td>
-    </tr>
-    <tr>
-      <td><span class="badge orange">완료 (누락자 있음)</span></td>
-      <td>임시저장은 성공했지만 일부 작업자가 그룹웨어 명단에 없어 빠짐</td>
-      <td>XLSX와 비교, 빠진 작업자는 별도 처리</td>
-    </tr>
-    <tr>
-      <td><span class="badge kr">일부 신청서 실패</span></td>
-      <td>잔여일수 부족, 중복 등 그룹웨어 검증 거부</td>
-      <td>알림에 표시된 실패 사유 확인 후 별도 처리</td>
-    </tr>
+    <tr><td><span class="badge green">완료</span></td><td>모두 임시저장 성공 → 그룹웨어 검토 후 신청</td></tr>
+    <tr><td><span class="badge orange">완료 (누락자 있음)</span></td><td>일부 작업자가 그룹웨어 명단에 없음 → XLSX 확인 후 별도 처리</td></tr>
+    <tr><td><span class="badge kr">일부 신청서 실패</span></td><td>잔여일수 부족 등 → 알림 메시지 확인 후 수동 처리</td></tr>
   </tbody>
 </table>
 
-<h3>3.4 주요 시나리오 대응</h3>
-
-<h4>잔여일수 부족 (가장 흔한 케이스)</h4>
-<p>그룹웨어가 "잔여일수를 초과할 수 없습니다" 등의 메시지를 반환하면 해당 신청서가 실패 처리됩니다.</p>
-<ul class="bullet">
-  <li>해당 작업자의 실제 잔여일수 확인</li>
-  <li>잔여일수 내에서만 신청 가능한지 협의</li>
-  <li>또는 그룹웨어에서 수동으로 별도 처리</li>
-</ul>
-
-<h4>그룹웨어 명단에 없는 작업자</h4>
-<p>알림에 "그리드에서 찾지 못한 작업자" 섹션이 표시되면:</p>
-<ul class="bullet">
-  <li>해당 사번이 그룹웨어 인사 명단에 있는지 확인</li>
-  <li>휴가증 사이트의 작업자 명단이 오래된 경우 → 담당자에게 갱신 요청</li>
-</ul>
-
-<h4>그룹웨어 비밀번호 변경</h4>
-<ul class="bullet">
-  <li>run.bat 실행 시 자동 로그인 실패 → 로그인 화면 표시</li>
-  <li>새 비밀번호로 직접 로그인 → 이후 자동 유지</li>
-  <li>완전 초기화가 필요하면 <span class="mono">profile/</span> 폴더 삭제 후 첫 실행 절차 재진행</li>
-</ul>
-
-<h4>그룹웨어 화면이 변경됐을 때</h4>
-<p>자동화가 특정 단계에서 멈추면 셀렉터 조정이 필요할 수 있습니다.</p>
-<ul class="bullet">
-  <li>폴더의 <span class="mono">error_*.png</span>, <span class="mono">last_error.log</span>를 담당자에게 전달</li>
-  <li>GitHub 저장소에서 최신 버전 받기</li>
-</ul>
-
-<h3>3.5 트러블슈팅 (서무)</h3>
+<h3>3.5 자주 묻는 질문</h3>
 <table>
   <thead><tr><th style="width:40%">증상</th><th>해결</th></tr></thead>
   <tbody>
-    <tr><td><strong>[서버에서 불러오기]</strong> 버튼이 안 보임</td><td>일반 작업자 사번으로 로그인했을 가능성. 로그아웃 후 서무 사번(<span class="mono">122240096</span>)으로 다시 로그인</td></tr>
-    <tr><td>"서버에서 불러오기" 후 "미처리 휴가증이 없습니다" 표시</td><td>이미 모두 처리 완료됐거나 작성된 휴가증이 없음 — 정상</td></tr>
-    <tr><td>이미 등록된 휴가증이 또 보임</td><td>같은 휴가증은 중복 추가 안 됨 (자동 필터링). 새 휴가증만 추가됨</td></tr>
-    <tr><td>실수로 [처리 완료] 일찍 눌렀음</td><td>Firebase 콘솔에서 해당 휴가증의 <span class="mono">processed</span>를 <span class="mono">false</span>로 수정. 또는 작업자에게 다시 작성 요청</td></tr>
-    <tr><td>[처리 완료] 클릭 시 권한 오류</td><td>Firestore Rules에서 update 권한이 빠져있을 수 있음. 담당자에게 문의</td></tr>
-    <tr><td>setup.bat에서 Python 없음 에러</td><td>Python 설치 후 PC 재시작. PATH 옵션 체크</td></tr>
-    <tr><td>setup.bat에서 패키지 설치 실패</td><td>사내 네트워크 프록시 문제. IT팀 문의</td></tr>
-    <tr><td>run.bat에서 Edge가 안 열림</td><td>setup.bat 다시 실행</td></tr>
-    <tr><td>로그인 후에도 자동화가 멈춤</td><td>Edge 창 그대로 두고 run.bat 다시 실행</td></tr>
-    <tr><td>일부 신청서만 실패</td><td>실패 사유 확인 (잔여일수 부족 등) → 별도 처리</td></tr>
-    <tr><td>누락 작업자 알림 표시</td><td>휴가증 사이트 명단과 그룹웨어 명단 비교</td></tr>
-    <tr><td>자동화 진행 중 그룹웨어 멈춤·느림</td><td>네트워크 상황 확인 후 재시도</td></tr>
-    <tr><td>임시저장 결과 못 찾겠음</td><td>그룹웨어 좌측 메뉴 "근태/휴가신청" 클릭, 상단 신청 내역 표 확인</td></tr>
+    <tr><td>[서버에서 불러오기] 버튼이 없음</td><td>일반 작업자 사번으로 로그인됨 → 로그아웃 후 서무 사번으로 재로그인</td></tr>
+    <tr><td>"미처리 휴가증이 없습니다"</td><td>정상. 이미 모두 처리됐거나 작성된 휴가증 없음</td></tr>
+    <tr><td>setup.bat 또는 run.bat 에러</td><td>Python PATH 확인 / setup.bat 재실행</td></tr>
+    <tr><td>일부 신청서 실패</td><td>알림의 실패 사유 확인 → 그룹웨어에서 별도 처리</td></tr>
+    <tr><td>실수로 [처리 완료] 일찍 클릭</td><td>관리자(이동준)에게 Firebase 콘솔 수정 요청</td></tr>
+    <tr><td>자동화가 중간에 멈춤</td><td>폴더의 <span class="mono">error_*.png</span>, <span class="mono">last_error.log</span>를 관리자에게 전달</td></tr>
   </tbody>
 </table>
 
-<h3>3.6 유지보수</h3>
-
-<h4>디버그 파일 정리</h4>
-<p>매 실행 시 이전 디버그 파일(<span class="mono">error_*</span>, <span class="mono">after_save_*</span>)이 자동 정리됩니다. 수동 정리가 필요하면 PowerShell에서:</p>
-<pre>cd "본인_폴더_경로"
-Remove-Item error_*.png, error_*.html, after_save_*.png -ErrorAction SilentlyContinue</pre>
-
-<h4>최신 버전 받기</h4>
-<p>GitHub 저장소에서 최신 코드를 받아 적용할 수 있습니다.</p>
-<pre>https://github.com/djlee-cosmax/Vacation-Permit-Auto-System</pre>
-<ul class="bullet">
-  <li>Code → Download ZIP</li>
-  <li>압축 풀어 기존 <span class="mono">automate.py</span>, <span class="mono">README.md</span> 덮어쓰기</li>
-  <li><span class="mono">profile/</span>, <span class="mono">last_error.log</span> 등 자동 생성 파일은 그대로 유지</li>
-</ul>
-
-<h4>문의 / 셀렉터 수정 요청</h4>
-<ul class="bullet">
-  <li>담당자: <strong>이동준</strong> (생산3팀)</li>
-  <li>이메일: rohjh86@gmail.com</li>
-</ul>
-
 <div class="footer-note">
-  COSMAX 생산3팀 · 휴가증 자동 반영 프로그램 종합 매뉴얼 · 2026-05-21
+  COSMAX 생산3팀 · 휴가증 자동 반영 프로그램 종합 매뉴얼 · 2026-05-22 · 담당 이동준
 </div>
 
 </section>
