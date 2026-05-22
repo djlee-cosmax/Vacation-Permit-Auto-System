@@ -639,8 +639,8 @@ input, select, textarea { font-family: inherit; }
   background: #f8f9fa;
   color: #999;
   font-weight: 700;
-  padding: 8px 10px;
-  text-align: center;
+  padding: 8px 12px;
+  text-align: left;
   font-size: 12px;
   border-bottom: 1px solid #eee;
   position: sticky;
@@ -648,9 +648,9 @@ input, select, textarea { font-family: inherit; }
   z-index: 1;
 }
 .worker-table td {
-  padding: 6px 8px;
+  padding: 6px 12px;
   border-bottom: 1px solid #f5f5f5;
-  text-align: center;
+  text-align: left;
 }
 .worker-table input {
   width: 100%;
@@ -659,7 +659,7 @@ input, select, textarea { font-family: inherit; }
   border-radius: 4px;
   font-size: 13px;
   background: transparent;
-  text-align: center;
+  text-align: left;
 }
 .worker-table input:focus {
   outline: none;

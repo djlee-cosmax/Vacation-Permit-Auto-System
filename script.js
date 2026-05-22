@@ -765,7 +765,16 @@ function openWorkerModal() {
   workerModalState = workers.map(function(w) { return Object.assign({}, w); });
   workerSearchQuery = '';
   var searchInput = document.getElementById('workerSearch');
-  if (searchInput) searchInput.value = '';
+  if (searchInput) {
+    searchInput.value = '';
+    // role에 따라 placeholder 변경 (일반 작업자는 사번 빠짐)
+    var session = getSession();
+    if (session && session.role === 'worker') {
+      searchInput.placeholder = '이름·근무지·연락처로 검색';
+    } else {
+      searchInput.placeholder = '이름·사번·근무지·연락처로 검색';
+    }
+  }
   renderWorkerTable();
   document.getElementById('workerHint').textContent = '현재 ' + workers.length + '명 등록됨';
   document.getElementById('workerModal').style.display = 'flex';
