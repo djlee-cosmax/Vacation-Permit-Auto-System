@@ -259,7 +259,7 @@
       매뉴얼 (작업자용)
       <ul>
         <li>접속 &amp; 로그인</li>
-        <li>홈 화면에 추가 (모바일)</li>
+        <li>홈 화면에 추가</li>
         <li>휴가증 작성</li>
         <li>휴가 유형</li>
         <li>내 휴가증 조회</li>
@@ -315,19 +315,14 @@
 <p>주소: <span class="mono">https://djlee-cosmax.github.io/Vacation-Permit-Auto-System/</span></p>
 <ul class="bullet">
   <li><strong>사번</strong> + <strong>비밀번호 1234</strong> 입력 → [로그인]</li>
-  <li><strong>아이디 저장</strong> 체크 시 다음 접속 때 사번 자동 입력</li>
-  <li>한 번 로그인하면 <strong>30일간 유지</strong> (들어올 때마다 자동 연장 — 자주 쓰면 영구)</li>
-  <li>비밀번호 입력란 우측의 <strong>👁</strong> 클릭 시 입력 내용 확인 가능</li>
-  <li>이름·연락처는 자동 채워지며 수정 불가</li>
+  <li>로그인 유지(30일) / 아이디 저장 / 👁 보기 토글 지원</li>
 </ul>
 
 <div class="warn-box">
-  <strong>비밀번호 변경 (필수):</strong> 초기 비밀번호(1234) 사용 시 보안 안내가 뜹니다. 상단 [비밀번호 변경] 클릭 → 새 비밀번호(<strong>숫자 6자리 이상</strong>) + <strong>보안 질문/답변</strong> 입력. 보안 질문은 비밀번호 찾기에 필요합니다.
+  <strong>비밀번호 변경 (필수):</strong> 첫 로그인 후 상단 [비밀번호 변경] → 숫자 6자리 이상 + 보안 질문/답변. 보안 질문은 비밀번호 찾기에 사용됩니다.
 </div>
 
-<div class="info-box">
-  <strong>비밀번호 분실 시:</strong> 로그인 화면 하단 [비밀번호 찾기] → 사번 입력 → 등록한 보안 질문 답변 → 새 비밀번호 재설정. 보안 질문 미등록 시에는 관리자(이동준)에게 초기화 요청.
-</div>
+<p style="font-size:10pt;color:#666">※ 비밀번호 분실 시 로그인 화면의 [비밀번호 찾기] 사용 (보안 질문 미등록은 관리자에게 초기화 요청)</p>
 
 <h3>2.2 홈 화면에 추가 (모바일 권장)</h3>
 <p>휴대폰 홈 화면에 앱 아이콘으로 추가하면 한 번 탭으로 실행됩니다.</p>
@@ -361,25 +356,19 @@
 </table>
 
 <h3>2.5 내 휴가증 조회</h3>
-<ol class="steps">
-  <li>상단 <strong>[내 휴가증]</strong> 클릭</li>
-  <li>이름 + 휴대폰 마지막 4자리 입력 → [조회]</li>
-  <li><strong>서무가 그룹웨어에 등록 완료</strong>한 본인 휴가증만 표시 (최근 14일, ✓ 처리 완료 표시)</li>
-</ol>
+<p>상단 <strong>[내 휴가증]</strong> → 이름 + 휴대폰 마지막 4자리 → 처리 완료된 본인 휴가증 표시 (최근 14일)</p>
 <div class="warn-box">
-  <strong>잘못 작성한 휴가증 취소:</strong> 작성 직후 우측 [작성된 휴가증] 카드의 <strong>[삭제]</strong> 버튼으로 취소. 서무가 자동화 돌린 후엔 그룹웨어에 이미 등록되어 서무에게 별도 처리 요청 필요.
+  <strong>잘못 작성 시:</strong> 작성 직후 우측 카드의 [삭제]로 취소. 서무 처리 후엔 서무에게 별도 처리 요청.
 </div>
 
 <h3>2.6 자주 묻는 질문</h3>
 <table>
   <thead><tr><th style="width:40%">증상</th><th>해결</th></tr></thead>
   <tbody>
-    <tr><td>"등록되지 않은 사번" 표시</td><td>관리자(이동준)에게 명단 추가 요청</td></tr>
-    <tr><td>비밀번호 오류</td><td>기본 비밀번호 <span class="mono">1234</span> 다시 확인</td></tr>
-    <tr><td>다른 휴대폰에서 본인 휴가증 안 보임</td><td>[내 휴가증]에서 이름·휴대폰 4자리 입력 후 조회</td></tr>
-    <tr><td>휴대폰 바꾼 후 옛 휴가증 못 지움</td><td>관리자에게 요청</td></tr>
-    <tr><td>화면이 옛 디자인</td><td>시크릿/InPrivate 창으로 접속 또는 캐시 삭제</td></tr>
-    <tr><td>"⚠ 서버 저장 실패" 알림</td><td>인터넷 연결 확인 후 다시 작성. 작성된 휴가증은 서버에 전달되지 않은 상태</td></tr>
+    <tr><td>"등록되지 않은 사번"</td><td>관리자(이동준)에게 명단 추가 요청</td></tr>
+    <tr><td>비밀번호 분실</td><td>로그인 화면의 [비밀번호 찾기] 또는 관리자에게 초기화 요청</td></tr>
+    <tr><td>"⚠ 서버 저장 실패"</td><td>인터넷 확인 후 다시 작성 (실패한 휴가증은 서버에 전달 안 됨)</td></tr>
+    <tr><td>화면이 옛 디자인</td><td>시크릿 창으로 접속 또는 브라우저 캐시 삭제</td></tr>
   </tbody>
 </table>
 
@@ -433,12 +422,10 @@
 <table>
   <thead><tr><th style="width:40%">증상</th><th>해결</th></tr></thead>
   <tbody>
-    <tr><td>[서버에서 불러오기] 버튼이 없음</td><td>일반 작업자 사번으로 로그인됨 → 로그아웃 후 서무 사번으로 재로그인</td></tr>
-    <tr><td>"미처리 휴가증이 없습니다"</td><td>정상. 이미 모두 처리됐거나 작성된 휴가증 없음</td></tr>
-    <tr><td>setup.bat 또는 run.bat 에러</td><td>Python PATH 확인 / setup.bat 재실행</td></tr>
-    <tr><td>일부 신청서 실패</td><td>알림의 실패 사유 확인 → 그룹웨어에서 별도 처리</td></tr>
-    <tr><td>실수로 [처리 완료] 일찍 클릭</td><td>관리자(이동준)에게 Firebase 콘솔 수정 요청</td></tr>
-    <tr><td>자동화가 중간에 멈춤</td><td>폴더의 <span class="mono">error_*.png</span>, <span class="mono">last_error.log</span>를 관리자에게 전달</td></tr>
+    <tr><td>[서버에서 불러오기] 버튼이 안 보임</td><td>서무 사번(122240096)으로 다시 로그인</td></tr>
+    <tr><td>자동화 에러 (setup/run.bat)</td><td>Python PATH 확인 / setup.bat 재실행</td></tr>
+    <tr><td>실수로 [처리 완료] 일찍 클릭</td><td>관리자(이동준)에게 요청</td></tr>
+    <tr><td>자동화가 중간에 멈춤</td><td><span class="mono">error_*.png</span>, <span class="mono">last_error.log</span>를 관리자에게 전달</td></tr>
   </tbody>
 </table>
 
