@@ -62,6 +62,14 @@ function login() {
     else document.documentElement.classList.remove('leader-mode');
   }
 
+  // 아이디 저장 체크 상태에 따라 사번 저장 / 제거
+  var rememberEl = document.getElementById('loginRemember');
+  if (rememberEl && rememberEl.checked) {
+    localStorage.setItem('p5_remembered_id', empId);
+  } else {
+    localStorage.removeItem('p5_remembered_id');
+  }
+
   // 30일 세션
   var expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   var phone = worker ? (worker.phone || '') : '';
@@ -119,7 +127,10 @@ function logout() {
   ['role-admin', 'role-leader', 'role-worker'].forEach(function(c) {
     document.documentElement.classList.remove(c);
   });
-  document.getElementById('loginEmpId').value = '';
+  // 사번은 "아이디 저장"에 따라 유지 (체크박스 상태에 맞춰 복원)
+  var rememberedId = localStorage.getItem('p5_remembered_id');
+  document.getElementById('loginEmpId').value = rememberedId || '';
+  document.getElementById('loginRemember').checked = !!rememberedId;
   document.getElementById('loginPw').value = '';
   showToast('로그아웃되었습니다.', 'success');
 }
@@ -363,6 +374,13 @@ function countWorkdays(startStr, endStr) {
   renderLeaveList();
   // 작업자 로그인 상태면 본인 정보 자동 채움 + readonly
   applyWorkerProfileToForm();
+
+  // 로그인 화면에 저장된 사번 자동 채움 (체크박스 동기화)
+  var rememberedId = localStorage.getItem('p5_remembered_id');
+  var loginEmpInput = document.getElementById('loginEmpId');
+  var loginRememberEl = document.getElementById('loginRemember');
+  if (rememberedId && loginEmpInput) loginEmpInput.value = rememberedId;
+  if (loginRememberEl) loginRememberEl.checked = !!rememberedId;
 })();
 
 function refreshFormTotals() {
