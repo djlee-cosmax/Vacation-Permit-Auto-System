@@ -201,6 +201,35 @@ html.authenticated .login-overlay { display: none !important; }
 }
 .login-forgot-link:hover { color: #a30d24; }
 
+/* 새로고침 아이콘 버튼 */
+.btn-icon {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  padding: 0;
+  transition: background 0.15s, color 0.15s, transform 0.2s;
+}
+.btn-icon:hover {
+  background: #f5f5f5;
+  color: #c8102e;
+  transform: rotate(90deg);
+}
+@media (max-width: 600px) {
+  .btn-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+}
+
 /* 상단바 로그인 사용자 이름 */
 .user-name {
   display: inline-flex;
