@@ -1,0 +1,20 @@
+{
+  "name": "휴가증 자동 반영 프로그램",
+  "short_name": "휴가증",
+  "description": "COSMAX 생산3팀 파우더 성형실 휴가증 작성 시스템",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#c8102e",
+  "orientation": "portrait",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
