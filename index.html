@@ -128,10 +128,9 @@
 
       <div class="worker-search-row">
         <div class="worker-search-input-wrap">
-          <input type="text" id="workerSearch" placeholder="이름·사번·근무지·연락처로 검색" oninput="onWorkerSearch(this.value)" onkeydown="if(event.key==='Enter'){onWorkerSearch(this.value);}" autocomplete="off">
+          <input type="text" id="workerSearch" placeholder="이름·사번·근무지·연락처로 검색" oninput="onWorkerSearch(this.value)" autocomplete="off">
           <button class="worker-search-clear" type="button" onclick="document.getElementById('workerSearch').value=''; onWorkerSearch('');" title="검색 초기화">×</button>
         </div>
-        <button class="worker-search-btn" type="button" onclick="onWorkerSearch(document.getElementById('workerSearch').value)">조회</button>
       </div>
 
       <div class="worker-toolbar admin-only">
