@@ -67,6 +67,11 @@ function login() {
   var session = { empId: empId, name: name, team: team, role: role, expires: expires.toISOString() };
   localStorage.setItem('p5_session', JSON.stringify(session));
   document.documentElement.classList.add('authenticated');
+  // 기존 role 클래스 제거 후 새 role 추가 (재로그인 대응)
+  ['role-admin', 'role-leader', 'role-worker'].forEach(function(c) {
+    document.documentElement.classList.remove(c);
+  });
+  document.documentElement.classList.add('role-' + role);
   showToast(name + '님 환영합니다.', 'success');
 
   // 일반 작업자만: 본인 식별자 자동 채움 (휴가증 작성 시 phone4 자동 사용)
@@ -84,6 +89,9 @@ function logout() {
   document.documentElement.classList.remove('authenticated');
   document.documentElement.classList.remove('admin-mode');
   document.documentElement.classList.remove('leader-mode');
+  ['role-admin', 'role-leader', 'role-worker'].forEach(function(c) {
+    document.documentElement.classList.remove(c);
+  });
   document.getElementById('loginEmpId').value = '';
   document.getElementById('loginPw').value = '';
   showToast('로그아웃되었습니다.', 'success');

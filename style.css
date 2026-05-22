@@ -685,6 +685,10 @@ input, select, textarea { font-family: inherit; }
   flex: 0 0 auto;
 }
 
+/* ===== 일반 작업자 — 사번 컬럼 숨김 ===== */
+html.role-worker .worker-table th:nth-child(2),
+html.role-worker .worker-table td:nth-child(2) { display: none !important; }
+
 /* ===== 관리자 / 서무 권한 분리 ===== */
 /* admin 모드일 때만 보임 (기본: 비관리자) */
 html:not(.admin-mode) .admin-only { display: none !important; }
