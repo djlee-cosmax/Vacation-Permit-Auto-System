@@ -983,7 +983,7 @@ html:not(.leader-mode) .leader-only { display: none !important; }
   transform: translateY(20px);
   transition: opacity 0.2s, transform 0.2s;
   pointer-events: none;
-  z-index: 200;
+  z-index: 99999;
 }
 .toast.show {
   opacity: 1;
