@@ -859,6 +859,10 @@ function fetchMyLeaves() {
   var fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
   document.getElementById('myLeavesList').innerHTML = '<div class="my-leaves-empty">조회 중...</div>';
 
+  // 작업자 모드: 서무가 처리 완료한 휴가증만 표시
+  var sess = getSession();
+  var workerMode = (sess && sess.role === 'worker');
+
   FB_DB.collection('leaves')
     .where('name', '==', name)
     .get()
@@ -867,6 +871,7 @@ function fetchMyLeaves() {
       snapshot.forEach(function(doc) {
         var d = doc.data();
         if (d.submitterPhone4 !== phone4) return;
+        if (workerMode && d.processed !== true) return;
         var t = d.serverCreatedAt && d.serverCreatedAt.toDate ? d.serverCreatedAt.toDate() : null;
         if (t && t < fourteenDaysAgo) return;
         results.push({
@@ -879,6 +884,7 @@ function fetchMyLeaves() {
           end: d.end,
           reason: d.reason,
           submittedBy: d.submittedBy,
+          processed: d.processed === true,
           serverCreatedAt: t
         });
       });
@@ -902,12 +908,22 @@ function renderMyLeavesList(items) {
     return;
   }
   listEl.innerHTML = items.map(function(l, i) {
-    var canDelete = (l.submittedBy === FB_UID);
+    // 처리 완료된 휴가증은 그룹웨어에 이미 등록됨 → 취소 불가
+    // 같은 휴대폰 + 미처리 휴가증만 취소 가능
+    var canDelete = (l.submittedBy === FB_UID) && !l.processed;
     var typesText = (l.items || []).map(function(it) {
       return it.type + (it.count > 1 ? ' × ' + it.count : '');
     }).join(', ');
     var periodText = l.start === l.end ? l.start : (l.start + ' ~ ' + l.end);
     var createdText = l.serverCreatedAt ? l.serverCreatedAt.toLocaleString('ko-KR') : '';
+    var footerRight;
+    if (canDelete) {
+      footerRight = '<button class="my-leave-del" onclick="deleteMyLeave(\'' + l.docId + '\')">취소</button>';
+    } else if (l.processed) {
+      footerRight = '<span class="my-leave-processed">✓ 처리 완료</span>';
+    } else {
+      footerRight = '<span class="my-leave-locked" title="다른 휴대폰에서 작성된 휴가증입니다.">🔒 다른 휴대폰</span>';
+    }
     return '<div class="my-leave-card">' +
       '<div class="my-leave-card-head">' +
         '<div class="my-leave-card-type">' + escapeHtml(typesText) + '</div>' +
@@ -917,9 +933,7 @@ function renderMyLeavesList(items) {
       '<div class="my-leave-card-reason">' + escapeHtml(l.reason || '') + '</div>' +
       '<div class="my-leave-card-footer">' +
         '<span class="my-leave-card-created">' + escapeHtml(createdText) + ' 작성</span>' +
-        (canDelete
-          ? '<button class="my-leave-del" onclick="deleteMyLeave(\'' + l.docId + '\')">취소</button>'
-          : '<span class="my-leave-locked" title="이 휴가증은 다른 휴대폰에서 작성됐어요. 작성한 휴대폰 또는 서무에게 요청해 주세요.">🔒 다른 휴대폰 작성</span>') +
+        footerRight +
       '</div>' +
     '</div>';
   }).join('');

@@ -983,6 +983,14 @@ html:not(.leader-mode) .leader-only { display: none !important; }
   font-size: 11px;
   color: #999;
 }
+.my-leave-processed {
+  font-size: 11px;
+  color: #2e7d32;
+  font-weight: 700;
+  background: #e8f5e9;
+  padding: 3px 10px;
+  border-radius: 10px;
+}
 
 @media (max-width: 600px) {
   .my-auth-form { flex-direction: column; align-items: stretch; }
