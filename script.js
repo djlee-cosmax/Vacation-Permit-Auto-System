@@ -64,7 +64,8 @@ function login() {
 
   // 30일 세션
   var expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-  var session = { empId: empId, name: name, team: team, role: role, expires: expires.toISOString() };
+  var phone = worker ? (worker.phone || '') : '';
+  var session = { empId: empId, name: name, team: team, role: role, phone: phone, expires: expires.toISOString() };
   localStorage.setItem('p5_session', JSON.stringify(session));
   document.documentElement.classList.add('authenticated');
   // 기존 role 클래스 제거 후 새 role 추가 (재로그인 대응)
@@ -78,6 +79,32 @@ function login() {
   if (role === 'worker' && worker && !getMyInfo() && worker.phone) {
     var phone4 = getPhone4(worker.phone);
     if (phone4) setMyInfo(worker.name, phone4);
+  }
+  // 작성 폼의 이름·연락처 자동 채움 + readonly
+  applyWorkerProfileToForm();
+}
+
+// 작업자 로그인 시 휴가증 작성 폼의 이름·연락처를 자동 채우고 readonly 처리
+function applyWorkerProfileToForm() {
+  var nameInput = document.getElementById('leaveName');
+  var phoneInput = document.getElementById('leavePhone');
+  if (!nameInput || !phoneInput) return;
+  var session = getSession();
+  if (session && session.role === 'worker') {
+    if (session.name) nameInput.value = session.name;
+    nameInput.readOnly = true;
+    nameInput.classList.add('locked-input');
+    if (session.phone) phoneInput.value = session.phone;
+    phoneInput.readOnly = true;
+    phoneInput.classList.add('locked-input');
+    // 자동완성 드롭다운 숨김
+    var sg = document.getElementById('nameSuggestions');
+    if (sg) sg.style.display = 'none';
+  } else {
+    nameInput.readOnly = false;
+    nameInput.classList.remove('locked-input');
+    phoneInput.readOnly = false;
+    phoneInput.classList.remove('locked-input');
   }
 }
 
@@ -334,6 +361,8 @@ function countWorkdays(startStr, endStr) {
 
   refreshFormTotals();
   renderLeaveList();
+  // 작업자 로그인 상태면 본인 정보 자동 채움 + readonly
+  applyWorkerProfileToForm();
 })();
 
 function refreshFormTotals() {
@@ -476,7 +505,9 @@ function resetForm() {
   document.getElementById('leaveReason').value = '';
   document.getElementById('leavePhone').value = '';
   refreshFormTotals();
-  document.getElementById('leaveName').focus();
+  // 작업자 로그인 상태면 이름·연락처 다시 본인 정보로
+  applyWorkerProfileToForm();
+  document.getElementById('leaveReason').focus();
 }
 
 function removeLeave(id) {
