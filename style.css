@@ -114,6 +114,30 @@ html.authenticated .login-overlay { display: none !important; }
   color: #c8102e !important;
 }
 
+/* 비밀번호 변경 모달 */
+.change-pw-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.change-pw-field label {
+  display: block;
+  font-size: 12px;
+  color: #777;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.change-pw-field input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+.change-pw-field input:focus { border-color: #c8102e; }
+
 /* 상단바 로그인 사용자 이름 */
 .user-name {
   display: inline-flex;

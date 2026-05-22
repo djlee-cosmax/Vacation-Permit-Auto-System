@@ -24,7 +24,6 @@ function login() {
   var pw = document.getElementById('loginPw').value;
   if (!empId) { showToast('사번을 입력해 주세요.', 'error'); return; }
   if (!pw) { showToast('비밀번호를 입력해 주세요.', 'error'); return; }
-  if (pw !== DEFAULT_PASSWORD) { showToast('비밀번호가 일치하지 않습니다.', 'error'); return; }
 
   // 1) 관리자/서무 사번 우선 확인
   var staff = STAFF_ROLES[empId];
@@ -41,6 +40,28 @@ function login() {
     role = 'worker';
     team = worker.team || '';
   }
+
+  // 3) Firestore users/{empId} 문서에서 비밀번호 조회 (없으면 기본 1234)
+  // Firestore가 준비되지 않은 경우 기본 PW로 폴백
+  function finalizeLogin(storedPw) {
+    if (pw !== storedPw) { showToast('비밀번호가 일치하지 않습니다.', 'error'); return; }
+    doLoginSuccess(empId, name, role, team, worker);
+  }
+  if (FB_DB) {
+    FB_DB.collection('users').doc(empId).get()
+      .then(function(doc) {
+        var storedPw = (doc.exists && doc.data().password) ? doc.data().password : DEFAULT_PASSWORD;
+        finalizeLogin(storedPw);
+      })
+      .catch(function() {
+        finalizeLogin(DEFAULT_PASSWORD);
+      });
+  } else {
+    finalizeLogin(DEFAULT_PASSWORD);
+  }
+}
+
+function doLoginSuccess(empId, name, role, team, worker) {
 
   // 권한 localStorage 설정 (모바일에서는 권한 자체가 비활성되므로 PC에서만 효과 있음)
   if (role === 'admin') {
@@ -91,6 +112,56 @@ function login() {
   // 작성 폼의 이름·연락처 자동 채움 + readonly
   applyWorkerProfileToForm();
   refreshUserNameDisplay();
+}
+
+// 비밀번호 변경 모달
+function openChangePwModal() {
+  if (!getSession()) { showToast('먼저 로그인해 주세요.', 'error'); return; }
+  document.getElementById('currentPw').value = '';
+  document.getElementById('newPw').value = '';
+  document.getElementById('newPwConfirm').value = '';
+  document.getElementById('changePwModal').style.display = 'flex';
+  setTimeout(function() { document.getElementById('currentPw').focus(); }, 50);
+}
+
+function closeChangePwModal() {
+  document.getElementById('changePwModal').style.display = 'none';
+}
+
+function changePassword() {
+  var session = getSession();
+  if (!session) { showToast('로그인 정보가 없습니다.', 'error'); return; }
+  var empId = session.empId;
+  var cur = document.getElementById('currentPw').value;
+  var newPw = document.getElementById('newPw').value;
+  var confirmPw = document.getElementById('newPwConfirm').value;
+
+  if (!cur) { showToast('현재 비밀번호를 입력해 주세요.', 'error'); return; }
+  if (!newPw) { showToast('새 비밀번호를 입력해 주세요.', 'error'); return; }
+  if (newPw.length < 4) { showToast('새 비밀번호는 4자 이상이어야 합니다.', 'error'); return; }
+  if (newPw !== confirmPw) { showToast('새 비밀번호 확인이 일치하지 않습니다.', 'error'); return; }
+  if (cur === newPw) { showToast('새 비밀번호가 현재와 동일합니다.', 'error'); return; }
+  if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
+
+  // 현재 PW 확인 → 새 PW 저장
+  FB_DB.collection('users').doc(empId).get()
+    .then(function(doc) {
+      var storedPw = (doc.exists && doc.data().password) ? doc.data().password : DEFAULT_PASSWORD;
+      if (cur !== storedPw) { showToast('현재 비밀번호가 일치하지 않습니다.', 'error'); return; }
+      return FB_DB.collection('users').doc(empId).set({
+        password: newPw,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    })
+    .then(function(result) {
+      if (result === undefined) return; // 위에서 error로 return된 경우
+      closeChangePwModal();
+      showToast('비밀번호가 변경되었습니다.', 'success');
+    })
+    .catch(function(err) {
+      console.error('비밀번호 변경 실패:', err);
+      showToast('변경 실패: ' + (err.message || err), 'error');
+    });
 }
 
 // 상단바 우측에 로그인한 사용자 이름 표시
