@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="휴가증">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="style.css?v=20260522i">
+  <link rel="stylesheet" href="style.css?v=20260522j">
   <!-- 즉시 인증 상태 검사 (메인 콘텐츠 깜빡임 방지) -->
   <script>
     (function() {
@@ -56,6 +56,7 @@
       </div>
       <p class="login-hint">최초 비밀번호: <strong>1234</strong></p>
       <p class="login-hint-small">로그인이 안 될 경우 관리자(이동준)에게 문의해 주세요.</p>
+      <button class="login-forgot-link" onclick="openForgotPwModal()">비밀번호 찾기</button>
     </div>
   </div>
 
@@ -254,12 +255,67 @@
         </div>
         <div class="change-pw-field">
           <label>새 비밀번호 확인</label>
-          <input type="password" id="newPwConfirm" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" onkeydown="if(event.key==='Enter'){changePassword();}">
+          <input type="password" id="newPwConfirm" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*">
+        </div>
+        <div class="change-pw-divider">비밀번호 찾기용 (선택)</div>
+        <div class="change-pw-field">
+          <label>보안 질문</label>
+          <select id="securityQuestion">
+            <option value="">선택하지 않음</option>
+          </select>
+        </div>
+        <div class="change-pw-field">
+          <label>답변</label>
+          <input type="text" id="securityAnswer" placeholder="답변 입력" autocomplete="off" onkeydown="if(event.key==='Enter'){changePassword();}">
         </div>
       </div>
       <div class="modal-actions">
         <button class="btn-primary" onclick="changePassword()">변경</button>
         <button class="btn-secondary" onclick="closeChangePwModal()">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 비밀번호 찾기 모달 -->
+  <div class="modal-overlay" id="forgotPwModal" style="display:none" onclick="closeForgotPwModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeForgotPwModal()">×</button>
+      <h3>비밀번호 찾기</h3>
+
+      <!-- 1단계: 사번 입력 -->
+      <div id="forgotPwStep1" class="change-pw-form">
+        <div class="change-pw-field">
+          <label>사번</label>
+          <input type="text" id="forgotEmpId" placeholder="본인 사번" autocomplete="username" inputmode="numeric" onkeydown="if(event.key==='Enter'){forgotPwLookup();}">
+        </div>
+        <div class="modal-actions">
+          <button class="btn-primary" onclick="forgotPwLookup()">다음</button>
+          <button class="btn-secondary" onclick="closeForgotPwModal()">취소</button>
+        </div>
+      </div>
+
+      <!-- 2단계: 보안 질문 답변 + 새 비밀번호 -->
+      <div id="forgotPwStep2" class="change-pw-form" style="display:none">
+        <div class="change-pw-field">
+          <label>보안 질문</label>
+          <p id="forgotQuestion" class="forgot-question"></p>
+        </div>
+        <div class="change-pw-field">
+          <label>답변</label>
+          <input type="text" id="forgotAnswer" autocomplete="off">
+        </div>
+        <div class="change-pw-field">
+          <label>새 비밀번호 (숫자 6자리 이상)</label>
+          <input type="password" id="forgotNewPw" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*">
+        </div>
+        <div class="change-pw-field">
+          <label>새 비밀번호 확인</label>
+          <input type="password" id="forgotNewPwConfirm" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" onkeydown="if(event.key==='Enter'){forgotPwReset();}">
+        </div>
+        <div class="modal-actions">
+          <button class="btn-primary" onclick="forgotPwReset()">비밀번호 재설정</button>
+          <button class="btn-secondary" onclick="closeForgotPwModal()">취소</button>
+        </div>
       </div>
     </div>
   </div>
@@ -272,7 +328,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=20260522k"></script>
+  <script src="script.js?v=20260522l"></script>
   <!-- PWA Service Worker 등록 -->
   <script>
     if ('serviceWorker' in navigator) {
