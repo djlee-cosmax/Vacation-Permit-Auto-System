@@ -720,18 +720,26 @@ function addLeave() {
   if (!reason) { showToast('사유를 입력해 주세요.', 'error'); return; }
   if (!phone) { showToast('연락처를 입력해 주세요.', 'error'); return; }
 
-  // 중복 작성 차단 — 같은 이름·유형 + 기간이 겹치면 등록 막기
-  var dup = leaves.find(function(l) {
-    if (l.name !== name) return false;
-    var items = l.items || [];
-    if (!items.some(function(it) { return it.type === type; })) return false;
-    // 기간 겹침 검사 (startA <= endB && startB <= endA)
-    return l.start <= end && start <= l.end;
-  });
-  if (dup) {
-    var dupPeriod = dup.start === dup.end ? dup.start : (dup.start + ' ~ ' + dup.end);
-    showToast('이미 등록된 휴가증이 있습니다.\n[' + name + ' / ' + type + ' / ' + dupPeriod + ']\n기존 휴가증을 삭제한 후 다시 작성해 주세요.', 'error');
-    return;
+  // 중복 / 초과 차단 — 같은 날짜에 기존 휴가 + 신규 휴가 합산이 1일 초과하면 막기
+  function getDayWeight(t) {
+    return FULL_RANGE_TYPES.indexOf(t) !== -1 ? 1 : (TYPE_WEIGHT[t] || 0);
+  }
+  var newDayWeight = getDayWeight(type);
+  var checkDates = getWorkdaysList(start, end);
+  for (var di = 0; di < checkDates.length; di++) {
+    var dateStr = checkDates[di];
+    var dayTotal = newDayWeight;
+    leaves.forEach(function(l) {
+      if (l.name !== name) return;
+      if (dateStr < l.start || dateStr > l.end) return;
+      (l.items || []).forEach(function(it) {
+        dayTotal += getDayWeight(it.type);
+      });
+    });
+    if (dayTotal > 1.0) {
+      showToast('해당 날짜(' + dateStr + ')에 이미 등록된 휴가가 있어\n합계가 1일을 초과합니다.\n기존 휴가증을 삭제한 후 다시 작성해 주세요.', 'error');
+      return;
+    }
   }
 
   // 명단 매칭 (있으면 사번/근무지 자동 채움)
