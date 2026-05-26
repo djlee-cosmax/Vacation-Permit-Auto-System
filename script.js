@@ -720,17 +720,16 @@ function addLeave() {
   if (!reason) { showToast('사유를 입력해 주세요.', 'error'); return; }
   if (!phone) { showToast('연락처를 입력해 주세요.', 'error'); return; }
 
-  // 중복 작성 검증 — 같은 이름·기간·유형의 휴가증이 이미 있는지 (로컬 기준)
+  // 중복 작성 차단 — 같은 이름·유형·개수·기간의 휴가증이 이미 있으면 등록 막기
   var dup = leaves.find(function(l) {
     if (l.name !== name) return false;
     if (l.start !== start || l.end !== end) return false;
     var items = l.items || [];
-    return items.some(function(it) { return it.type === type; });
+    return items.some(function(it) { return it.type === type && parseInt(it.count, 10) === count; });
   });
   if (dup) {
-    if (!confirm('이미 동일한 휴가증이 있습니다.\n\n[' + name + ' / ' + type + ' / ' + (start === end ? start : start + ' ~ ' + end) + ']\n\n그래도 추가하시겠습니까?')) {
-      return;
-    }
+    showToast('이미 등록된 휴가증입니다.\n[' + name + ' / ' + type + ' ' + count + '개 / ' + (start === end ? start : start + ' ~ ' + end) + ']', 'error');
+    return;
   }
 
   // 명단 매칭 (있으면 사번/근무지 자동 채움)
