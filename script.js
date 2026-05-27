@@ -1009,14 +1009,13 @@ function fetchTodayLeavesFromCloud() {
     .get()
     .then(function(snapshot) {
       var fetched = [];
+      var docsToMark = [];  // 처리 완료로 마크할 문서 refs
       snapshot.forEach(function(doc) {
         var data = doc.data();
-        // 이미 처리 완료된 휴가증 제외
         if (data.processed === true) return;
-        // 7일 이상 지난 휴가증 제외 (안전망)
         var t = data.serverCreatedAt && data.serverCreatedAt.toDate ? data.serverCreatedAt.toDate() : null;
         if (t && t < sevenDaysAgo) return;
-        // 서버 전용 필드 제거
+        docsToMark.push(doc.ref);
         delete data.submittedBy;
         delete data.expiresAt;
         delete data.serverCreatedAt;
@@ -1037,12 +1036,26 @@ function fetchTodayLeavesFromCloud() {
       if (!confirm(
         '서버에서 미처리 휴가증 ' + fetched.length + '건을 발견했습니다.\n' +
         '그 중 ' + newOnes.length + '건이 현재 화면에 없는 새 휴가증입니다.\n\n' +
-        '추가하시겠습니까? (기존 휴가증은 유지)'
+        '추가하시겠습니까?'
       )) return;
       newOnes.forEach(function(l) { leaves.unshift(l); });
       saveLeaves();
       renderLeaveList();
-      showToast(newOnes.length + '건 추가됨 (총 ' + leaves.length + '건). 처리 완료 후 [처리 완료] 버튼을 눌러주세요.', 'success');
+
+      // 가져온 휴가증을 즉시 처리 완료로 자동 마크 (작업자 수정 방지)
+      var batch = FB_DB.batch();
+      var processedAt = firebase.firestore.FieldValue.serverTimestamp();
+      docsToMark.forEach(function(ref) {
+        batch.update(ref, { processed: true, processedAt: processedAt, processedBy: FB_UID });
+      });
+      batch.commit()
+        .then(function() {
+          showToast(newOnes.length + '건 추가 + 처리 완료 자동 마크됨.\n[파일로 내보내기] → run.bat 진행하세요.', 'success');
+        })
+        .catch(function(err) {
+          console.warn('처리 완료 자동 마크 실패:', err);
+          showToast(newOnes.length + '건 추가됨.\n⚠ 처리 완료 마크 실패 — 수동으로 [처리 완료] 필요', 'error');
+        });
     })
     .catch(function(err) {
       console.error('Firestore 조회 실패:', err);

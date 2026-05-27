@@ -159,8 +159,7 @@
         <h2>작성된 휴가증</h2>
         <div class="list-header-right">
           <span class="list-count" id="listCount">0건</span>
-          <button class="btn-secondary btn-small leader-only" onclick="fetchTodayLeavesFromCloud()" title="미처리 휴가증(최근 7일)을 서버에서 가져옵니다">서버에서 불러오기</button>
-          <button class="btn-secondary btn-small leader-only" onclick="markLeavesAsProcessed()" title="현재 화면의 휴가증을 처리 완료로 표시 (다음 불러오기에서 제외됨)">처리 완료</button>
+          <button class="btn-secondary btn-small leader-only" onclick="fetchTodayLeavesFromCloud()" title="미처리 휴가증을 가져오고 자동으로 처리 완료 마크합니다">서버에서 불러오기</button>
           <button class="btn-secondary btn-small" onclick="resetAllLeaves()">초기화</button>
         </div>
       </div>
@@ -347,7 +346,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=20260527c"></script>
+  <script src="script.js?v=20260527d"></script>
   <!-- PWA Service Worker 등록 -->
   <script>
     if ('serviceWorker' in navigator) {
