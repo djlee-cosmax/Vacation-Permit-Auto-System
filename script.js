@@ -115,8 +115,8 @@ function doLoginSuccess(empId, name, role, team, worker, isInitialPw) {
     localStorage.removeItem('p5_remembered_id');
   }
 
-  // 30일 세션
-  var expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  // 24시간 세션 (하루 후 자동 로그아웃)
+  var expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
   var phone = worker ? (worker.phone || '') : '';
   var session = { empId: empId, name: name, team: team, role: role, phone: phone, expires: expires.toISOString() };
   localStorage.setItem('p5_session', JSON.stringify(session));
@@ -662,8 +662,7 @@ function countWorkdays(startStr, endStr) {
   if (rememberedId && loginEmpInput) loginEmpInput.value = rememberedId;
   if (loginRememberEl) loginRememberEl.checked = !!rememberedId;
 
-  // 세션 자동 갱신 — 사이트 들어올 때마다 만료 시간 30일 연장
-  touchSession();
+  // 세션 자동 갱신 비활성 — 24시간 고정 만료 (하루 후 자동 로그아웃)
 })();
 
 function refreshFormTotals() {
