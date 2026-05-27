@@ -205,14 +205,16 @@ function changePassword() {
       }
       var question = document.getElementById('securityQuestion').value;
       var answer = document.getElementById('securityAnswer').value.trim();
+      if (!question || !answer) {
+        showToast('보안 질문과 답변을 입력해 주세요.\n(비밀번호 찾기에 필요합니다)', 'error');
+        throw new Error('SECURITY_QUESTION_REQUIRED');
+      }
       var dataToSave = {
         password: newPw,
+        securityQuestion: question,
+        securityAnswer: answer,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       };
-      if (question && answer) {
-        dataToSave.securityQuestion = question;
-        dataToSave.securityAnswer = answer;
-      }
       return FB_DB.collection('users').doc(empId).set(dataToSave, { merge: true });
     })
     .then(function() {
@@ -220,7 +222,7 @@ function changePassword() {
       showToast('비밀번호가 변경되었습니다.', 'success');
     })
     .catch(function(err) {
-      if (err && err.message === 'PW_MISMATCH') return; // 이미 토스트 표시됨
+      if (err && (err.message === 'PW_MISMATCH' || err.message === 'SECURITY_QUESTION_REQUIRED')) return;
       console.error('비밀번호 변경 실패:', err);
       showToast('변경 실패: ' + (err.message || err), 'error');
     });
@@ -716,7 +718,7 @@ function addLeave() {
   if (!count || count < 1) { showToast('개수를 1 이상으로 입력해 주세요.', 'error'); return; }
   if (!start) { showToast('시작일을 입력해 주세요.', 'error'); return; }
   if (!end) { showToast('종료일을 입력해 주세요.', 'error'); return; }
-  if (end < start) { showToast('종료일이 시작일보다 빠릅니다.', 'error'); return; }
+  if (end < start) { showToast('종료일이 시작일보다 이전입니다.\n기간을 다시 확인해 주세요.', 'error'); return; }
   if (!reason) { showToast('사유를 입력해 주세요.', 'error'); return; }
   if (!phone) { showToast('연락처를 입력해 주세요.', 'error'); return; }
 
