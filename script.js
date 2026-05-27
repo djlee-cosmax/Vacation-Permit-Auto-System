@@ -402,6 +402,18 @@ try {
         console.log('Firebase 익명 인증:', FB_UID);
         // 본인이 작성하고 서버에서 처리 완료된 휴가증은 우측 카드에서 자동 제거
         setTimeout(cleanupProcessedLeavesFromCloud, 200);
+        // 페이지 로드 시 보안 질문 미등록 체크 (이미 로그인된 상태에서도 안내)
+        var sess = getSession();
+        if (sess && sess.empId && FB_DB) {
+          FB_DB.collection('users').doc(sess.empId).get().then(function(doc) {
+            if (doc.exists && doc.data().password && !doc.data().securityQuestion) {
+              setTimeout(function() {
+                alert('보안 질문이 등록되지 않았습니다.\n비밀번호 찾기를 위해 등록해 주세요.');
+                openChangePwModal();
+              }, 800);
+            }
+          }).catch(function() {});
+        }
       })
       .catch(function(err) { console.warn('Firebase 익명 인증 실패:', err); });
   }
