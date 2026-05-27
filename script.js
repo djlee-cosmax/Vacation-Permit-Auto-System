@@ -143,6 +143,16 @@ function doLoginSuccess(empId, name, role, team, worker, isInitialPw) {
       alert('보안을 위해 비밀번호를 변경해 주세요.\n(초기 비밀번호 1234 사용 중)');
       openChangePwModal();
     }, 600);
+  } else if (FB_DB) {
+    // 비밀번호 변경했지만 보안 질문 미등록이면 등록 안내
+    FB_DB.collection('users').doc(empId).get().then(function(doc) {
+      if (doc.exists && doc.data().password && !doc.data().securityQuestion) {
+        setTimeout(function() {
+          alert('보안 질문이 등록되지 않았습니다.\n비밀번호 찾기를 위해 등록해 주세요.');
+          openChangePwModal();
+        }, 600);
+      }
+    }).catch(function() {});
   }
 }
 
@@ -192,7 +202,6 @@ function changePassword() {
   if (!/^[0-9]+$/.test(newPw)) { showToast('새 비밀번호는 숫자만 입력 가능합니다.', 'error'); return; }
   if (newPw.length < 6 || newPw.length > 10) { showToast('새 비밀번호는 숫자 6~10자리여야 합니다.', 'error'); return; }
   if (newPw !== confirmPw) { showToast('새 비밀번호 확인이 일치하지 않습니다.', 'error'); return; }
-  if (cur === newPw) { showToast('새 비밀번호가 현재와 동일합니다.', 'error'); return; }
   if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
 
   // 현재 PW 확인 → 새 PW 저장
