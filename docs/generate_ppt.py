@@ -149,7 +149,7 @@ def main():
     # 안내
     add_rounded_rect(s, Inches(1.0), Inches(5.7), Inches(11.3), Inches(1.1), LIGHT_GRAY)
     add_text(s, Inches(1.3), Inches(5.85), Inches(10.8), Inches(0.8),
-             "⚠️ 첫 로그인 후 상단 [비밀번호 변경] → 새 비밀번호(숫자 6자리 이상) + 보안 질문 등록",
+             "⚠️ 첫 로그인 후 [내 정보] → [비밀번호 변경] → 새 비밀번호(숫자 6~10자리) + 보안 질문 등록",
              size=14, bold=True, color=DARK_RED, anchor=MSO_ANCHOR.MIDDLE)
     page_footer(s, 3, TOTAL)
 
@@ -218,7 +218,7 @@ def main():
     # 안내
     add_rounded_rect(s, Inches(0.8), Inches(5.3), Inches(6.0), Inches(1.5), LIGHT_RED)
     add_text(s, Inches(1.0), Inches(5.45), Inches(5.6), Inches(1.2),
-             "• 이름·연락처는 자동 채움 (수정 불가)\n• 여러 유형은 휴가증 따로 작성\n  (예: 연차+반차 = 2건)",
+             "• 이름·연락처는 자동 채움 (수정 불가)\n• 여러 유형은 휴가증 따로 작성\n  (예: 연차+반차 = 2건)\n• 같은 날짜 합계 1일 초과 시 등록 차단",
              size=12, color=DARK)
 
     # 우측 - 휴가 유형 표
@@ -260,8 +260,7 @@ def main():
     add_rounded_rect(s, Inches(0.8), Inches(2.0), Inches(6.0), Inches(2.4), LIGHT_RED)
     add_text(s, Inches(1.0), Inches(2.15), Inches(5.6), Inches(2.2),
              "① 상단 [내 휴가증] 클릭\n\n"
-             "② 이름 + 휴대폰 마지막 4자리 입력\n\n"
-             "③ 서무가 등록 완료한 본인 휴가증 표시\n   (✓ 처리 완료 표시, 최근 14일)",
+             "② 서무가 등록 완료한 본인 휴가증이\n   바로 표시됩니다.\n   (✓ 처리 완료 표시, 최근 14일)",
              size=13, color=DARK)
     add_rounded_rect(s, Inches(0.8), Inches(4.6), Inches(6.0), Inches(2.0), LIGHT_GRAY)
     add_text(s, Inches(1.0), Inches(4.75), Inches(5.6), Inches(1.8),
