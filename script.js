@@ -15,8 +15,8 @@ var SECURITY_QUESTIONS = [
 ];
 // 관리자 / 서무 사번 (workers.json 외 별도 권한 부여)
 var STAFF_ROLES = {
-  '122210202': { role: 'admin', name: '이동준' },
-  '122240096': { role: 'leader', name: '김가영' }
+  '122210202': { role: 'admin', name: '이동준', department: '생산3팀' },
+  '122240096': { role: 'leader', name: '김가영', department: '생산3팀' }
 };
 
 function getSession() {
@@ -163,8 +163,10 @@ function openMyProfileModal() {
   if (!sess) { showToast('먼저 로그인해 주세요.', 'error'); return; }
   // workers.json에서 추가 정보 가져오기 (관리자/서무는 workers에 없을 수 있음)
   var worker = workers.find(function(w) { return String(w.employeeId || '') === sess.empId; });
+  var staff = STAFF_ROLES[sess.empId];
   document.getElementById('profileName').textContent = sess.name || '-';
   document.getElementById('profileEmpId').textContent = sess.empId || '-';
+  document.getElementById('profileDept').textContent = (worker ? worker.department : (staff ? staff.department : '')) || '-';
   document.getElementById('profileTeam').textContent = (worker ? worker.team : sess.team) || '-';
   document.getElementById('profilePhone').textContent = (worker ? worker.phone : sess.phone) || '-';
   document.getElementById('myProfileModal').style.display = 'flex';
