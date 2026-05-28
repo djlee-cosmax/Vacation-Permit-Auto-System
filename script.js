@@ -157,6 +157,23 @@ function doLoginSuccess(empId, name, role, team, worker, isInitialPw) {
   }
 }
 
+// 내 정보 모달
+function openMyProfileModal() {
+  var sess = getSession();
+  if (!sess) { showToast('먼저 로그인해 주세요.', 'error'); return; }
+  // workers.json에서 추가 정보 가져오기 (관리자/서무는 workers에 없을 수 있음)
+  var worker = workers.find(function(w) { return String(w.employeeId || '') === sess.empId; });
+  document.getElementById('profileName').textContent = sess.name || '-';
+  document.getElementById('profileEmpId').textContent = sess.empId || '-';
+  document.getElementById('profileTeam').textContent = (worker ? worker.team : sess.team) || '-';
+  document.getElementById('profilePhone').textContent = (worker ? worker.phone : sess.phone) || '-';
+  document.getElementById('myProfileModal').style.display = 'flex';
+}
+
+function closeMyProfileModal() {
+  document.getElementById('myProfileModal').style.display = 'none';
+}
+
 // 비밀번호 변경 모달
 function openChangePwModal() {
   if (!getSession()) { showToast('먼저 로그인해 주세요.', 'error'); return; }
