@@ -114,6 +114,30 @@ html.authenticated .login-overlay { display: none !important; }
   color: #c8102e !important;
 }
 
+/* 내 정보 모달 */
+.my-profile-info {
+  margin: 16px 0;
+}
+.my-profile-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.my-profile-row:last-child { border-bottom: none; }
+.my-profile-label {
+  width: 60px;
+  font-size: 12px;
+  color: #999;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.my-profile-row span:last-child {
+  font-size: 15px;
+  color: #1a1a1a;
+  font-weight: 500;
+}
+
 /* 비밀번호 보기 토글 — input wrapper */
 .pw-input-wrap {
   position: relative;
