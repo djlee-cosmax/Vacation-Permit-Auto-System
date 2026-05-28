@@ -3,378 +3,441 @@
     "name": "고창숙",
     "employeeId": "122040006",
     "team": "화성",
-    "phone": "010-8756-2463"
+    "phone": "010-8756-2463",
+    "department": "생산3팀"
   },
   {
     "name": "김영이",
     "employeeId": "121970003",
     "team": "화성",
-    "phone": "010-4661-6584"
+    "phone": "010-4661-6584",
+    "department": "생산3팀"
   },
   {
     "name": "김혜진",
     "employeeId": "121970029",
     "team": "화성",
-    "phone": "010-7231-5597"
+    "phone": "010-7231-5597",
+    "department": "생산3팀"
   },
   {
     "name": "홍영남",
     "employeeId": "121990002",
     "team": "화성",
-    "phone": "010-7124-3895"
+    "phone": "010-7124-3895",
+    "department": "생산3팀"
   },
   {
     "name": "윤은숙",
     "employeeId": "122000083",
     "team": "화성",
-    "phone": "010-6217-5824"
+    "phone": "010-6217-5824",
+    "department": "생산3팀"
   },
   {
     "name": "이영숙",
     "employeeId": "122010041",
     "team": "화성",
-    "phone": "010-9172-8376"
+    "phone": "010-9172-8376",
+    "department": "생산3팀"
   },
   {
     "name": "우윤경",
     "employeeId": "122010045",
     "team": "화성",
-    "phone": "010-8831-2658"
+    "phone": "010-8831-2658",
+    "department": "생산3팀"
   },
   {
     "name": "문정화",
     "employeeId": "122020023",
     "team": "화성",
-    "phone": "010-8567-4081"
+    "phone": "010-8567-4081",
+    "department": "생산3팀"
   },
   {
     "name": "김성애",
     "employeeId": "122020049",
     "team": "화성",
-    "phone": "010-2441-3341"
+    "phone": "010-2441-3341",
+    "department": "생산3팀"
   },
   {
     "name": "김연옥",
     "employeeId": "122030029",
     "team": "화성",
-    "phone": "010-8956-6301"
+    "phone": "010-8956-6301",
+    "department": "생산3팀"
   },
   {
     "name": "김순미",
     "employeeId": "122140126",
     "team": "화성",
-    "phone": "010-4660-5287"
+    "phone": "010-4660-5287",
+    "department": "생산3팀"
   },
   {
     "name": "박용숙",
     "employeeId": "122170156",
     "team": "화성",
-    "phone": "010-8620-7413"
+    "phone": "010-8620-7413",
+    "department": "생산3팀"
   },
   {
     "name": "성춘화",
     "employeeId": "122170157",
     "team": "화성",
-    "phone": "010-2079-5638"
+    "phone": "010-2079-5638",
+    "department": "생산3팀"
   },
   {
     "name": "박영숙",
     "employeeId": "122180243",
     "team": "화성",
-    "phone": "010-3707-2508"
+    "phone": "010-3707-2508",
+    "department": "생산3팀"
   },
   {
     "name": "안유현",
     "employeeId": "122210096",
     "team": "화성",
-    "phone": "010-3313-7865"
+    "phone": "010-3313-7865",
+    "department": "생산3팀"
   },
   {
     "name": "이다운",
     "employeeId": "122220062",
     "team": "화성",
-    "phone": "010-6816-8192"
+    "phone": "010-6816-8192",
+    "department": "생산3팀"
   },
   {
     "name": "박진영",
     "employeeId": "122220134",
     "team": "화성",
-    "phone": "010-2394-0946"
+    "phone": "010-2394-0946",
+    "department": "생산3팀"
   },
   {
     "name": "여경은",
     "employeeId": "122230243",
     "team": "화성",
-    "phone": "010-8235-9909"
+    "phone": "010-8235-9909",
+    "department": "생산3팀"
   },
   {
     "name": "박이서",
     "employeeId": "122230302",
     "team": "화성",
-    "phone": "010-9814-7899"
+    "phone": "010-9814-7899",
+    "department": "생산3팀"
   },
   {
     "name": "양연금",
     "employeeId": "122230390",
     "team": "화성",
-    "phone": "010-3632-7917"
+    "phone": "010-3632-7917",
+    "department": "생산3팀"
   },
   {
     "name": "박혜정",
     "employeeId": "122240022",
     "team": "화성",
-    "phone": "010-8877-7754"
+    "phone": "010-8877-7754",
+    "department": "생산3팀"
   },
   {
     "name": "김수은",
     "employeeId": "122240023",
     "team": "화성",
-    "phone": "010-8115-7253"
+    "phone": "010-8115-7253",
+    "department": "생산3팀"
   },
   {
     "name": "이혜진",
     "employeeId": "122240025",
     "team": "화성",
-    "phone": "010-7401-7785"
+    "phone": "010-7401-7785",
+    "department": "생산3팀"
   },
   {
     "name": "이승연",
     "employeeId": "122240043",
     "team": "화성",
-    "phone": "010-8280-6360"
+    "phone": "010-8280-6360",
+    "department": "생산3팀"
   },
   {
     "name": "이유리",
     "employeeId": "122240061",
     "team": "화성",
-    "phone": "010-8221-7669"
+    "phone": "010-8221-7669",
+    "department": "생산3팀"
   },
   {
     "name": "김명회",
     "employeeId": "122240169",
     "team": "화성",
-    "phone": "010-4045-9346"
+    "phone": "010-4045-9346",
+    "department": "생산3팀"
   },
   {
     "name": "이보영",
     "employeeId": "122240245",
     "team": "화성",
-    "phone": "010-5745-9027"
+    "phone": "010-5745-9027",
+    "department": "생산3팀"
   },
   {
     "name": "최단영",
     "employeeId": "122240261",
     "team": "화성",
-    "phone": "010-5279-2427"
+    "phone": "010-5279-2427",
+    "department": "생산3팀"
   },
   {
     "name": "조미영",
     "employeeId": "122240275",
     "team": "화성",
-    "phone": "010-6852-1346"
+    "phone": "010-6852-1346",
+    "department": "생산3팀"
   },
   {
     "name": "한유희",
     "employeeId": "122240297",
     "team": "화성",
-    "phone": "010-2396-0234"
+    "phone": "010-2396-0234",
+    "department": "생산3팀"
   },
   {
     "name": "김서영",
     "employeeId": "122240363",
     "team": "화성",
-    "phone": "010-5830-0354"
+    "phone": "010-5830-0354",
+    "department": "생산3팀"
   },
   {
     "name": "정유주",
     "employeeId": "122240411",
     "team": "화성",
-    "phone": "010-3387-2854"
+    "phone": "010-3387-2854",
+    "department": "생산3팀"
   },
   {
     "name": "이선아",
     "employeeId": "122130120",
     "team": "평택",
-    "phone": "010-9152-1190"
+    "phone": "010-9152-1190",
+    "department": "생산3팀"
   },
   {
     "name": "윤광심",
     "employeeId": "122110038",
     "team": "평택",
-    "phone": "010-6380-7667"
+    "phone": "010-6380-7667",
+    "department": "생산3팀"
   },
   {
     "name": "이현숙",
     "employeeId": "122120087",
     "team": "평택",
-    "phone": "010-3798-5143"
+    "phone": "010-3798-5143",
+    "department": "생산3팀"
   },
   {
     "name": "박순례",
     "employeeId": "122140124",
     "team": "평택",
-    "phone": "010-6424-3617"
+    "phone": "010-6424-3617",
+    "department": "생산3팀"
   },
   {
     "name": "황진희",
     "employeeId": "122160031",
     "team": "평택",
-    "phone": "010-7682-8230"
+    "phone": "010-7682-8230",
+    "department": "생산3팀"
   },
   {
     "name": "김원희",
     "employeeId": "122160156",
     "team": "평택",
-    "phone": "010-2506-9904"
+    "phone": "010-2506-9904",
+    "department": "생산3팀"
   },
   {
     "name": "지아름",
     "employeeId": "122190097",
     "team": "평택",
-    "phone": "010-8299-8784"
+    "phone": "010-8299-8784",
+    "department": "생산3팀"
   },
   {
     "name": "김지윤",
     "employeeId": "122200047",
     "team": "평택",
-    "phone": "010-9141-4162"
+    "phone": "010-9141-4162",
+    "department": "생산3팀"
   },
   {
     "name": "정연지",
     "employeeId": "122210080",
     "team": "평택",
-    "phone": "010-5668-9502"
+    "phone": "010-5668-9502",
+    "department": "생산3팀"
   },
   {
     "name": "김영옥",
     "employeeId": "122230105",
     "team": "평택",
-    "phone": "010-8398-0751"
+    "phone": "010-8398-0751",
+    "department": "생산3팀"
   },
   {
     "name": "김향수",
     "employeeId": "122230237",
     "team": "평택",
-    "phone": "010-8729-7655"
+    "phone": "010-8729-7655",
+    "department": "생산3팀"
   },
   {
     "name": "박수민",
     "employeeId": "122230238",
     "team": "평택",
-    "phone": "010-3776-2597"
+    "phone": "010-3776-2597",
+    "department": "생산3팀"
   },
   {
     "name": "전미영",
     "employeeId": "122230254",
     "team": "평택",
-    "phone": "010-4628-9333"
+    "phone": "010-4628-9333",
+    "department": "생산3팀"
   },
   {
     "name": "이미희",
     "employeeId": "122230272",
     "team": "평택",
-    "phone": "010-2914-6471"
+    "phone": "010-2914-6471",
+    "department": "생산3팀"
   },
   {
     "name": "김수미",
     "employeeId": "122230271",
     "team": "평택",
-    "phone": "010-6247-8706"
+    "phone": "010-6247-8706",
+    "department": "생산3팀"
   },
   {
     "name": "이연진",
     "employeeId": "122240081",
     "team": "평택",
-    "phone": "010-9344-5925"
+    "phone": "010-9344-5925",
+    "department": "생산3팀"
   },
   {
     "name": "김효은",
     "employeeId": "122240105",
     "team": "평택",
-    "phone": "010-9341-6547"
+    "phone": "010-9341-6547",
+    "department": "생산3팀"
   },
   {
     "name": "만감포로웨나토비세",
     "employeeId": "122240103",
     "team": "평택",
-    "phone": "010-7105-3239"
+    "phone": "010-7105-3239",
+    "department": "생산3팀"
   },
   {
     "name": "윤혜선",
     "employeeId": "122240110",
     "team": "평택",
-    "phone": "010-3490-6157"
+    "phone": "010-3490-6157",
+    "department": "생산3팀"
   },
   {
     "name": "방민진",
     "employeeId": "122240116",
     "team": "평택",
-    "phone": "010-5830-5692"
+    "phone": "010-5830-5692",
+    "department": "생산3팀"
   },
   {
     "name": "김정윤",
     "employeeId": "122240141",
     "team": "평택",
-    "phone": "010-6354-8936"
+    "phone": "010-6354-8936",
+    "department": "생산3팀"
   },
   {
     "name": "양희경",
     "employeeId": "122240146",
     "team": "평택",
-    "phone": "010-9067-6494"
+    "phone": "010-9067-6494",
+    "department": "생산3팀"
   },
   {
     "name": "황은선",
     "employeeId": "122240147",
     "team": "평택",
-    "phone": "010-2029-7275"
+    "phone": "010-2029-7275",
+    "department": "생산3팀"
   },
   {
     "name": "이수영",
     "employeeId": "122240168",
     "team": "평택",
-    "phone": "010-3658-0292"
+    "phone": "010-3658-0292",
+    "department": "생산3팀"
   },
   {
     "name": "정민희",
     "employeeId": "122240192",
     "team": "평택",
-    "phone": "010-5597-9603"
+    "phone": "010-5597-9603",
+    "department": "생산3팀"
   },
   {
     "name": "이소영",
     "employeeId": "122240194",
     "team": "평택",
-    "phone": "010-6455-1696"
+    "phone": "010-6455-1696",
+    "department": "생산3팀"
   },
   {
     "name": "박미경",
     "employeeId": "122240209",
     "team": "평택",
-    "phone": "010-3747-5025"
+    "phone": "010-3747-5025",
+    "department": "생산3팀"
   },
   {
     "name": "정하람",
     "employeeId": "122240364",
     "team": "평택",
-    "phone": "010-9902-3750"
+    "phone": "010-9902-3750",
+    "department": "생산3팀"
   },
   {
     "name": "김소라",
     "employeeId": "122240428",
     "team": "평택",
-    "phone": "010-4656-4583"
+    "phone": "010-4656-4583",
+    "department": "생산3팀"
   },
   {
     "name": "서유라",
     "employeeId": "122240435",
     "team": "평택",
-    "phone": "010-9272-0831"
+    "phone": "010-9272-0831",
+    "department": "생산3팀"
   },
   {
     "name": "조시은",
     "employeeId": "122240439",
     "team": "평택",
-    "phone": "010-9228-2938"
+    "phone": "010-9228-2938",
+    "department": "생산3팀"
   }
 ]
