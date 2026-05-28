@@ -891,21 +891,29 @@ var myLeavesCache = [];
 
 function openMyLeavesModal() {
   var sess = getSession();
-  var isAdmin = sess && sess.role === 'admin';
+  var isStaff = sess && (sess.role === 'admin' || sess.role === 'leader');
+  var isWorker = sess && sess.role === 'worker';
   var me = getMyInfo();
-
-  // 관리자: 이름만 입력 (phone4 숨김), 작업자: 이름+phone4
+  var authForm = document.getElementById('myAuthForm');
   var phone4Row = document.getElementById('myAuthPhone4Row');
-  if (phone4Row) phone4Row.style.display = isAdmin ? 'none' : '';
 
-  document.getElementById('myAuthName').value = isAdmin ? '' : (me ? me.name : '');
-  document.getElementById('myAuthPhone4').value = me ? me.phone4 : '';
-  document.getElementById('myLeavesList').innerHTML = '<div class="my-leaves-empty">' +
-    (isAdmin ? '작업자 이름을 입력하고 조회 버튼을 눌러 주세요.' : '조회 정보를 입력하고 조회 버튼을 눌러 주세요.') + '</div>';
   document.getElementById('myLeavesModal').style.display = 'flex';
 
-  // 작업자만 자동 조회 (관리자는 이름 검색 후 수동)
-  if (!isAdmin && me && me.name && me.phone4) fetchMyLeaves();
+  if (isWorker) {
+    // 작업자: 입력 폼 숨기고 바로 본인 휴가증 조회
+    if (authForm) authForm.style.display = 'none';
+    document.getElementById('myAuthName').value = sess.name || '';
+    document.getElementById('myAuthPhone4').value = me ? me.phone4 : getPhone4(sess.phone || '');
+    document.getElementById('myLeavesList').innerHTML = '<div class="my-leaves-empty">조회 중...</div>';
+    fetchMyLeaves();
+  } else if (isStaff) {
+    // 관리자/서무: 이름만 입력 (phone4 숨김)
+    if (authForm) authForm.style.display = '';
+    if (phone4Row) phone4Row.style.display = 'none';
+    document.getElementById('myAuthName').value = '';
+    document.getElementById('myAuthPhone4').value = '';
+    document.getElementById('myLeavesList').innerHTML = '<div class="my-leaves-empty">작업자 이름을 입력하고 조회 버튼을 눌러 주세요.</div>';
+  }
 }
 
 function closeMyLeavesModal() {
@@ -917,16 +925,16 @@ function fetchMyLeaves() {
   var name = document.getElementById('myAuthName').value.trim();
   var phone4 = document.getElementById('myAuthPhone4').value.trim();
   var sess = getSession();
-  var isAdmin = sess && sess.role === 'admin';
+  var isStaff = sess && (sess.role === 'admin' || sess.role === 'leader');
 
   if (!name) { showToast('이름을 입력해 주세요.', 'error'); return; }
-  // 관리자: phone4 불필요, 작업자: phone4 필수
-  if (!isAdmin && !/^[0-9]{4}$/.test(phone4)) { showToast('휴대폰 마지막 4자리를 숫자로 정확히 입력해 주세요.', 'error'); return; }
+  // 관리자/서무: phone4 불필요, 작업자: phone4 필수
+  if (!isStaff && !/^[0-9]{4}$/.test(phone4)) { showToast('휴대폰 마지막 4자리를 숫자로 정확히 입력해 주세요.', 'error'); return; }
   if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
   if (!FB_UID) { showToast('인증 진행 중입니다. 잠시 후 다시 시도해 주세요.', 'error'); return; }
 
   // 작업자만 localStorage 본인 정보 갱신
-  if (!isAdmin) setMyInfo(name, phone4);
+  if (!isStaff) setMyInfo(name, phone4);
 
   var fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
   document.getElementById('myLeavesList').innerHTML = '<div class="my-leaves-empty">조회 중...</div>';
@@ -942,8 +950,8 @@ function fetchMyLeaves() {
       var results = [];
       snapshot.forEach(function(doc) {
         var d = doc.data();
-        // 관리자: phone4 무관, 작업자: phone4 일치 필수
-        if (!isAdmin && d.submitterPhone4 !== phone4) return;
+        // 관리자/서무: phone4 무관, 작업자: phone4 일치 필수
+        if (!isStaff && d.submitterPhone4 !== phone4) return;
         if (workerMode && d.processed !== true) return;
         var t = d.serverCreatedAt && d.serverCreatedAt.toDate ? d.serverCreatedAt.toDate() : null;
         if (t && t < fourteenDaysAgo) return;
