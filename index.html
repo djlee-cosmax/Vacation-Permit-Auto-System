@@ -73,7 +73,7 @@
     </div>
     <div class="topbar-actions">
       <span class="user-name" id="userNameDisplay"></span>
-      <button class="btn-secondary" onclick="openMyLeavesModal()" title="내가 작성한 휴가증 조회·취소">내 휴가증</button>
+      <button class="btn-secondary" id="myLeavesBtn" onclick="openMyLeavesModal()" title="휴가증 조회">내 휴가증</button>
       <button class="btn-secondary staff-only" onclick="openWorkerModal()">작업자 명단</button>
       <button class="btn-secondary admin-only" onclick="backupData()" title="작업자 명단 + 작성된 휴가증을 백업 JSON으로 저장">백업</button>
       <button class="btn-secondary admin-only" onclick="document.getElementById('restoreFile').click()" title="이전에 백업한 JSON 파일로 데이터 복원">복원</button>
@@ -213,7 +213,7 @@
   <div class="modal-overlay" id="myLeavesModal" style="display:none" onclick="closeMyLeavesModal()">
     <div class="modal large" onclick="event.stopPropagation()">
       <button class="modal-close" onclick="closeMyLeavesModal()">×</button>
-      <h3>내 휴가증 조회 (최근 14일)</h3>
+      <h3 id="myLeavesTitle">내 휴가증 조회 (최근 14일)</h3>
       <div class="my-leaves-notice">
         <div>※ 서무가 그룹웨어에 등록한 본인 휴가증을 조회할 수 있습니다.</div>
         <div>※ 잘못 작성한 휴가증은 작성 직후(처리 완료 전)에 작성 화면에서 [삭제]로 취소해 주세요.</div>
@@ -345,7 +345,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=20260528b"></script>
+  <script src="script.js?v=20260528c"></script>
   <!-- PWA Service Worker 등록 -->
   <script>
     if ('serviceWorker' in navigator) {

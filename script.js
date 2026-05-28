@@ -136,6 +136,7 @@ function doLoginSuccess(empId, name, role, team, worker, isInitialPw) {
   // 작성 폼의 이름·연락처 자동 채움 + readonly
   applyWorkerProfileToForm();
   refreshUserNameDisplay();
+  refreshMyLeavesLabel();
 
   // 초기 비밀번호(1234) 사용 중이면 변경 권장 안내 + 모달 자동 오픈
   if (isInitialPw) {
@@ -322,6 +323,16 @@ function forgotPwReset() {
       console.error('비밀번호 재설정 실패:', err);
       showToast('재설정 실패: ' + (err.message || err), 'error');
     });
+}
+
+// 역할에 따라 [내 휴가증] / [휴가증 조회] 버튼·모달 텍스트 변경
+function refreshMyLeavesLabel() {
+  var sess = getSession();
+  var isStaff = sess && (sess.role === 'admin' || sess.role === 'leader');
+  var btn = document.getElementById('myLeavesBtn');
+  var title = document.getElementById('myLeavesTitle');
+  if (btn) btn.textContent = isStaff ? '휴가증 조회' : '내 휴가증';
+  if (title) title.textContent = isStaff ? '휴가증 조회 (최근 14일)' : '내 휴가증 조회 (최근 14일)';
 }
 
 // 상단바 우측에 로그인한 사용자 이름 표시
@@ -653,8 +664,9 @@ function countWorkdays(startStr, endStr) {
   renderLeaveList();
   // 작업자 로그인 상태면 본인 정보 자동 채움 + readonly
   applyWorkerProfileToForm();
-  // 상단바 사용자 이름 표시
+  // 상단바 사용자 이름 표시 + 역할별 버튼 텍스트
   refreshUserNameDisplay();
+  refreshMyLeavesLabel();
 
   // 로그인 화면에 저장된 사번 자동 채움 (체크박스 동기화)
   var rememberedId = localStorage.getItem('p5_remembered_id');
