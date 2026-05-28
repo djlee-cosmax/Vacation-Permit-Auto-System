@@ -890,14 +890,22 @@ function resetAllLeaves() {
 var myLeavesCache = [];
 
 function openMyLeavesModal() {
-  // localStorage에 본인 정보 있으면 자동 채움 (수정 가능)
+  var sess = getSession();
+  var isAdmin = sess && sess.role === 'admin';
   var me = getMyInfo();
-  document.getElementById('myAuthName').value = me ? me.name : '';
+
+  // 관리자: 이름만 입력 (phone4 숨김), 작업자: 이름+phone4
+  var phone4Row = document.getElementById('myAuthPhone4Row');
+  if (phone4Row) phone4Row.style.display = isAdmin ? 'none' : '';
+
+  document.getElementById('myAuthName').value = isAdmin ? '' : (me ? me.name : '');
   document.getElementById('myAuthPhone4').value = me ? me.phone4 : '';
-  document.getElementById('myLeavesList').innerHTML = '<div class="my-leaves-empty">조회 정보를 입력하고 조회 버튼을 눌러 주세요.</div>';
+  document.getElementById('myLeavesList').innerHTML = '<div class="my-leaves-empty">' +
+    (isAdmin ? '작업자 이름을 입력하고 조회 버튼을 눌러 주세요.' : '조회 정보를 입력하고 조회 버튼을 눌러 주세요.') + '</div>';
   document.getElementById('myLeavesModal').style.display = 'flex';
-  // 본인 정보 있으면 자동 조회
-  if (me && me.name && me.phone4) fetchMyLeaves();
+
+  // 작업자만 자동 조회 (관리자는 이름 검색 후 수동)
+  if (!isAdmin && me && me.name && me.phone4) fetchMyLeaves();
 }
 
 function closeMyLeavesModal() {
@@ -908,13 +916,17 @@ function closeMyLeavesModal() {
 function fetchMyLeaves() {
   var name = document.getElementById('myAuthName').value.trim();
   var phone4 = document.getElementById('myAuthPhone4').value.trim();
+  var sess = getSession();
+  var isAdmin = sess && sess.role === 'admin';
+
   if (!name) { showToast('이름을 입력해 주세요.', 'error'); return; }
-  if (!/^[0-9]{4}$/.test(phone4)) { showToast('휴대폰 마지막 4자리를 숫자로 정확히 입력해 주세요.', 'error'); return; }
+  // 관리자: phone4 불필요, 작업자: phone4 필수
+  if (!isAdmin && !/^[0-9]{4}$/.test(phone4)) { showToast('휴대폰 마지막 4자리를 숫자로 정확히 입력해 주세요.', 'error'); return; }
   if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
   if (!FB_UID) { showToast('인증 진행 중입니다. 잠시 후 다시 시도해 주세요.', 'error'); return; }
 
-  // localStorage 본인 정보 갱신 (조회 성공 시 작성도 본인으로 인식)
-  setMyInfo(name, phone4);
+  // 작업자만 localStorage 본인 정보 갱신
+  if (!isAdmin) setMyInfo(name, phone4);
 
   var fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
   document.getElementById('myLeavesList').innerHTML = '<div class="my-leaves-empty">조회 중...</div>';
@@ -930,7 +942,8 @@ function fetchMyLeaves() {
       var results = [];
       snapshot.forEach(function(doc) {
         var d = doc.data();
-        if (d.submitterPhone4 !== phone4) return;
+        // 관리자: phone4 무관, 작업자: phone4 일치 필수
+        if (!isAdmin && d.submitterPhone4 !== phone4) return;
         if (workerMode && d.processed !== true) return;
         var t = d.serverCreatedAt && d.serverCreatedAt.toDate ? d.serverCreatedAt.toDate() : null;
         if (t && t < fourteenDaysAgo) return;
