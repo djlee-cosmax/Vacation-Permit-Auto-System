@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="휴가증">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="style.css?v=20260528d">
+  <link rel="stylesheet" href="style.css?v=20260529b">
   <!-- 즉시 인증 상태 검사 (메인 콘텐츠 깜빡임 방지) -->
   <script>
     (function() {
@@ -78,7 +78,6 @@
       <button class="btn-secondary admin-only" onclick="backupData()" title="작업자 명단 + 작성된 휴가증을 백업 JSON으로 저장">백업</button>
       <button class="btn-secondary admin-only" onclick="document.getElementById('restoreFile').click()" title="이전에 백업한 JSON 파일로 데이터 복원">복원</button>
       <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="onRestoreFileSelected(event)">
-      <button class="btn-secondary leader-only" onclick="exportLeaves()">파일로 내보내기</button>
       <button class="btn-secondary" onclick="openMyProfileModal()" title="내 정보">내 정보</button>
       <button class="btn-secondary btn-logout" onclick="logout()" title="로그아웃">로그아웃</button>
     </div>
@@ -160,6 +159,7 @@
         <div class="list-header-right">
           <span class="list-count" id="listCount">0건</span>
           <button class="btn-secondary btn-small leader-only" onclick="fetchTodayLeavesFromCloud()" title="미처리 휴가증을 가져오고 자동으로 처리 완료 마크합니다">서버에서 불러오기</button>
+          <button class="btn-secondary btn-small leader-only" onclick="exportLeaves()" title="현재 화면의 휴가증을 JSON+XLSX로 다운로드">파일로 내보내기</button>
           <button class="btn-secondary btn-small leader-only" onclick="runAutomationProgram()" title="서무 PC의 자동화 프로그램을 실행합니다 (다운로드 폴더 최신 휴가증 JSON 자동 사용)">프로그램 실행</button>
           <button class="btn-secondary btn-small" onclick="resetAllLeaves()">초기화</button>
         </div>
