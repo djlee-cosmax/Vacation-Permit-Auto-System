@@ -1072,6 +1072,16 @@ function deleteMyLeave(docId) {
     });
 }
 
+// ----- 서무: PC의 자동화 프로그램 실행 (vacation-auto:// 프로토콜) -----
+function runAutomationProgram() {
+  if (!confirm('자동화 프로그램을 실행하시겠습니까?\n\n다운로드 폴더의 가장 최근 휴가증_*.json 파일이 사용됩니다.\n(setup.bat을 먼저 실행하여 프로토콜 등록이 완료된 PC에서만 동작)')) return;
+  // custom protocol 호출 → 등록된 run.bat이 --auto 모드로 실행됨
+  window.location.href = 'vacation-auto://run';
+  setTimeout(function() {
+    showToast('자동화 프로그램이 실행됐다면 별도 창에서 진행 중입니다.\n실행 안 됐다면 setup.bat을 다시 실행해 프로토콜을 등록해 주세요.', '');
+  }, 1500);
+}
+
 // ----- 서무: 미처리 휴가증(최근 7일)을 서버에서 가져오기 -----
 function fetchTodayLeavesFromCloud() {
   if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
