@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="휴가증">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="style.css?v=20260529d">
+  <link rel="stylesheet" href="style.css?v=20260529e">
   <!-- 즉시 인증 상태 검사 (메인 콘텐츠 깜빡임 방지) -->
   <script>
     (function() {
@@ -156,9 +156,9 @@
         <h2>작성된 휴가증</h2>
         <div class="list-header-right">
           <span class="list-count" id="listCount">0건</span>
-          <button class="btn-secondary btn-small leader-only" onclick="fetchTodayLeavesFromCloud()" title="미처리 휴가증을 가져오고 자동으로 처리 완료 마크합니다">서버에서 불러오기</button>
-          <button class="btn-secondary btn-small leader-only" onclick="exportLeaves()" title="현재 화면의 휴가증을 JSON+XLSX로 다운로드">파일로 내보내기</button>
-          <button class="btn-secondary btn-small leader-only" onclick="runAutomationProgram()" title="서무 PC의 자동화 프로그램을 실행합니다 (다운로드 폴더 최신 휴가증 JSON 자동 사용)">프로그램 실행</button>
+          <button class="btn-secondary btn-small leader-only" data-step="1" onclick="fetchTodayLeavesFromCloud()" title="미처리 휴가증을 가져오고 자동으로 처리 완료 마크합니다">서버에서 불러오기</button>
+          <button class="btn-secondary btn-small leader-only" data-step="2" onclick="exportLeaves()" title="현재 화면의 휴가증을 JSON+XLSX로 다운로드">파일로 내보내기</button>
+          <button class="btn-secondary btn-small leader-only" data-step="3" onclick="runAutomationProgram()" title="서무 PC의 자동화 프로그램을 실행합니다 (다운로드 폴더 최신 휴가증 JSON 자동 사용)">프로그램 실행</button>
           <button class="btn-secondary btn-small" onclick="resetAllLeaves()">초기화</button>
         </div>
       </div>
