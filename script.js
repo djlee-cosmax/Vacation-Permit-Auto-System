@@ -118,7 +118,7 @@ function doLoginSuccess(empId, name, role, team, worker, isInitialPw) {
   // 24시간 세션 (하루 후 자동 로그아웃)
   var expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
   var phone = worker ? (worker.phone || '') : '';
-  var session = { empId: empId, name: name, team: team, role: role, phone: phone, expires: expires.toISOString() };
+  var session = { empId: empId, name: name, team: team, role: role, phone: phone, expires: expires.toISOString(), isInitialPw: !!isInitialPw };
   localStorage.setItem('p5_session', JSON.stringify(session));
   document.documentElement.classList.add('authenticated');
   // 기존 role 클래스 제거 후 새 role 추가 (재로그인 대응)
@@ -137,6 +137,9 @@ function doLoginSuccess(empId, name, role, team, worker, isInitialPw) {
   applyWorkerProfileToForm();
   refreshUserNameDisplay();
   refreshMyLeavesLabel();
+
+  // 새 세션의 만료 경고 예약 (만료 10분 전 자동 안내)
+  scheduleSessionExpiryWarning();
 
   // 초기 비밀번호(1234) 사용 중이면 변경 권장 안내 + 모달 자동 오픈
   if (isInitialPw) {
@@ -206,6 +209,12 @@ function openChangePwModal() {
 }
 
 function closeChangePwModal() {
+  // 초기 비밀번호(1234) 상태에서는 변경 완료 전까지 닫기 차단
+  var sess = getSession();
+  if (sess && sess.isInitialPw) {
+    showToast('보안을 위해 비밀번호를 먼저 변경해 주세요.\n(닫기는 변경 완료 후 가능합니다)', 'error');
+    return;
+  }
   document.getElementById('changePwModal').style.display = 'none';
 }
 
@@ -248,7 +257,12 @@ function changePassword() {
       return FB_DB.collection('users').doc(empId).set(dataToSave, { merge: true });
     })
     .then(function() {
-      closeChangePwModal();
+      // 초기 PW 플래그 해제
+      try {
+        var s = JSON.parse(localStorage.getItem('p5_session') || 'null');
+        if (s) { s.isInitialPw = false; localStorage.setItem('p5_session', JSON.stringify(s)); }
+      } catch (e) {}
+      document.getElementById('changePwModal').style.display = 'none';
       showToast('비밀번호가 변경되었습니다.', 'success');
     })
     .catch(function(err) {
@@ -430,7 +444,6 @@ try {
     firebase.auth().signInAnonymously()
       .then(function(cred) {
         FB_UID = cred.user.uid;
-        console.log('Firebase 익명 인증:', FB_UID);
         // 본인이 작성하고 서버에서 처리 완료된 휴가증은 우측 카드에서 자동 제거
         setTimeout(cleanupProcessedLeavesFromCloud, 200);
         // 페이지 로드 시 보안 질문 미등록 체크 (이미 로그인된 상태에서도 안내)
@@ -501,7 +514,10 @@ var workers = JSON.parse(localStorage.getItem('p5_workers') || '[]');
 // workers.json (코드 내장 기본 명단) — 페이지 로드 시 fetch
 var DEFAULT_WORKERS = [];
 fetch('workers.json', { cache: 'no-cache' })
-  .then(function(r) { return r.ok ? r.json() : []; })
+  .then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
   .then(function(data) {
     DEFAULT_WORKERS = Array.isArray(data) ? data : [];
     // localStorage 명단이 비어있으면 기본 명단으로 자동 채움
@@ -510,7 +526,14 @@ fetch('workers.json', { cache: 'no-cache' })
       localStorage.setItem('p5_workers', JSON.stringify(workers));
     }
   })
-  .catch(function() {}); // workers.json 없거나 실패해도 무시
+  .catch(function(err) {
+    // 로컬 명단이라도 있으면 조용히 진행, 둘 다 없으면 사용자에게 안내
+    if (workers.length === 0) {
+      setTimeout(function() {
+        showToast('⚠ 작업자 명단을 불러오지 못했습니다.\n네트워크 확인 후 새로고침해 주세요.', 'error');
+      }, 1500);
+    }
+  });
 
 var leaves = JSON.parse(localStorage.getItem('p5_leaves') || '[]');
 // leave: { id, name, employeeId, team, type, start, end, reason, phone, createdAt }
@@ -695,7 +718,44 @@ function countWorkdays(startStr, endStr) {
   if (loginRememberEl) loginRememberEl.checked = !!rememberedId;
 
   // 세션 자동 갱신 비활성 — 24시간 고정 만료 (하루 후 자동 로그아웃)
+  // 로그인 상태에서 만료 10분 전 사전 경고 예약
+  scheduleSessionExpiryWarning();
 })();
+
+// ===== 세션 만료 사전 경고 =====
+var _sessionWarnTimer = null;
+function scheduleSessionExpiryWarning() {
+  if (_sessionWarnTimer) { clearTimeout(_sessionWarnTimer); _sessionWarnTimer = null; }
+  var sess = getSession();
+  if (!sess || !sess.expires) return;
+  var msLeft = new Date(sess.expires).getTime() - Date.now();
+  var WARN_BEFORE = 10 * 60 * 1000; // 만료 10분 전
+  var delay = msLeft - WARN_BEFORE;
+  if (delay <= 0) {
+    if (msLeft > 0) showSessionExpiryWarning();
+    return;
+  }
+  // setTimeout 최대치 (~24.8일) 안에 들어가도록 24시간 이내일 때만 예약
+  if (delay > 25 * 60 * 60 * 1000) return;
+  _sessionWarnTimer = setTimeout(showSessionExpiryWarning, delay);
+}
+function showSessionExpiryWarning() {
+  if (!getSession()) return;
+  if (confirm('자동 로그아웃까지 약 10분 남았습니다.\n로그인 상태를 24시간 더 유지하시겠습니까?')) {
+    extendSession24h();
+  }
+}
+function extendSession24h() {
+  try {
+    var raw = localStorage.getItem('p5_session');
+    if (!raw) return;
+    var s = JSON.parse(raw);
+    s.expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    localStorage.setItem('p5_session', JSON.stringify(s));
+    showToast('로그인 상태가 24시간 연장되었습니다.', 'success');
+    scheduleSessionExpiryWarning();
+  } catch (e) {}
+}
 
 function refreshFormTotals() {
   var type = document.getElementById('leaveType').value;
@@ -757,6 +817,13 @@ function hideNameSuggestions() {
 
 // ----- 휴가증 추가 -----
 function addLeave() {
+  // 초기 비밀번호(1234) 사용 중이면 휴가증 작성 차단
+  var __sess = getSession();
+  if (__sess && __sess.isInitialPw) {
+    showToast('초기 비밀번호 변경 후 휴가증을 작성할 수 있습니다.\n[내 정보] → [비밀번호 변경]을 먼저 진행해 주세요.', 'error');
+    openChangePwModal();
+    return;
+  }
   var name = document.getElementById('leaveName').value.trim();
   var type = document.getElementById('leaveType').value;
   var count = parseInt(document.getElementById('leaveCount').value, 10) || 1;
@@ -786,11 +853,13 @@ function addLeave() {
     leaves.forEach(function(l) {
       if (l.name !== name) return;
       if (dateStr < l.start || dateStr > l.end) return;
-      (l.items || []).forEach(function(it) {
+      // 구포맷(items 없음, l.type만 존재) 대응 — normalizeLeaveItems로 정규화
+      normalizeLeaveItems(l).forEach(function(it) {
         dayTotal += getDayWeight(it.type);
       });
     });
-    if (dayTotal > 1.0) {
+    // 부동소수 오차 보정 (반차+반차=1.0 같은 경계는 통과시킴)
+    if (dayTotal > 1.0 + 0.0001) {
       showToast('해당 날짜(' + dateStr + ')에 이미 등록된 휴가가 있어\n합계가 1일을 초과합니다.\n기존 휴가증을 삭제한 후 다시 작성해 주세요.', 'error');
       return;
     }
@@ -827,26 +896,48 @@ function addLeave() {
 }
 
 // ----- Firestore 업로드/삭제 -----
+function markLeaveSyncStatus(id, status) {
+  var changed = false;
+  leaves.forEach(function(l) { if (l.id === id) { l.syncStatus = status; changed = true; } });
+  if (changed) { saveLeaves(); renderLeaveList(); }
+}
+
 function uploadLeaveToCloud(leave) {
   if (!FB_DB || !FB_UID) {
+    markLeaveSyncStatus(leave.id, 'failed');
     setTimeout(function() {
-      showToast('⚠ 서버 연결 안 됨\n휴가증이 서무에게 전달되지 않을 수 있습니다.', 'error');
+      showToast('⚠ 서버 연결 안 됨\n카드의 [재전송]을 눌러 다시 시도해 주세요.', 'error');
     }, 800);
     return;
   }
+  markLeaveSyncStatus(leave.id, 'pending');
   var doc = Object.assign({}, leave);
   doc.submittedBy = FB_UID;
   doc.processed = false;  // 서무가 [처리 완료] 시 true로 변경
   doc.serverCreatedAt = firebase.firestore.FieldValue.serverTimestamp();
   // 14일 후 자동 삭제용 TTL 필드
   doc.expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  // syncStatus는 클라우드에 안 올림
+  delete doc.syncStatus;
   FB_DB.collection('leaves').doc(leave.id).set(doc)
+    .then(function() {
+      markLeaveSyncStatus(leave.id, 'ok');
+    })
     .catch(function(err) {
       console.warn('Firestore 저장 실패:', err);
+      markLeaveSyncStatus(leave.id, 'failed');
       setTimeout(function() {
-        showToast('⚠ 서버 저장 실패\n인터넷 연결 확인 후 다시 작성해 주세요.', 'error');
+        showToast('⚠ 서버 저장 실패\n카드의 [재전송]을 눌러 다시 시도해 주세요.', 'error');
       }, 800);
     });
+}
+
+// 카드에서 호출 — 실패한 휴가증 재전송
+function retryUploadLeave(id) {
+  var leave = leaves.find(function(l) { return l.id === id; });
+  if (!leave) return;
+  showToast('재전송 시도 중...', '');
+  uploadLeaveToCloud(leave);
 }
 
 function deleteLeaveFromCloud(id) {
@@ -1184,16 +1275,41 @@ function markLeavesAsProcessed() {
     });
 }
 
+// 서무/관리자 모드 휴가증 검색 (이름·사번·근무지)
+var leaveSearchQuery = '';
+function onLeaveListSearch(value) {
+  leaveSearchQuery = (value || '').trim().toLowerCase();
+  renderLeaveList();
+}
+function clearLeaveSearch() {
+  var input = document.getElementById('leaveSearchInput');
+  if (input) input.value = '';
+  leaveSearchQuery = '';
+  renderLeaveList();
+}
+
 function renderLeaveList() {
   var list = document.getElementById('leaveList');
-  document.getElementById('listCount').textContent = leaves.length + '건';
+  var allCount = leaves.length;
+  var filtered = leaves;
+  if (leaveSearchQuery) {
+    filtered = leaves.filter(function(l) {
+      var hay = ((l.name || '') + ' ' + (l.employeeId || '') + ' ' + (l.team || '')).toLowerCase();
+      return hay.indexOf(leaveSearchQuery) !== -1;
+    });
+  }
+  document.getElementById('listCount').textContent = (leaveSearchQuery && filtered.length !== allCount)
+    ? filtered.length + '건 / 전체 ' + allCount + '건'
+    : allCount + '건';
 
-  if (leaves.length === 0) {
-    list.innerHTML = '<div class="empty-state">아직 작성된 휴가증이 없습니다.</div>';
+  if (filtered.length === 0) {
+    list.innerHTML = leaveSearchQuery
+      ? '<div class="empty-state">검색 결과가 없습니다.</div>'
+      : '<div class="empty-state">아직 작성된 휴가증이 없습니다.</div>';
     return;
   }
 
-  list.innerHTML = leaves.map(function(l) {
+  list.innerHTML = filtered.map(function(l) {
     var items = normalizeLeaveItems(l);
     var days = (l.days != null) ? l.days : calcTotalDays(items);
     var periodText = l.start === l.end ? l.start : (l.start + ' ~ ' + l.end);
@@ -1207,7 +1323,19 @@ function renderLeaveList() {
     }).join(' ');
 
     var sub = [l.employeeId, l.team].filter(Boolean).join(' / ');
-    return '<div class="leave-item">' +
+    // 동기화 상태 — 실패 시 경고 + 재전송 버튼
+    var syncBanner = '';
+    var retryBtn = '';
+    var cardClass = 'leave-item';
+    if (l.syncStatus === 'failed') {
+      cardClass += ' sync-failed';
+      syncBanner = '<div class="sync-banner sync-failed-banner">⚠ 서버에 저장되지 않았습니다. [재전송] 또는 인터넷 확인 후 다시 시도하세요.</div>';
+      retryBtn = '<button class="btn-mini retry" onclick="retryUploadLeave(\'' + l.id + '\')">재전송</button>';
+    } else if (l.syncStatus === 'pending') {
+      syncBanner = '<div class="sync-banner sync-pending-banner">⏳ 서버 저장 중...</div>';
+    }
+    return '<div class="' + cardClass + '">' +
+      syncBanner +
       '<div class="leave-item-head">' +
         '<div><span class="leave-item-name">' + escapeHtml(l.name) + '</span>' +
           (sub ? '<span class="leave-item-sub">' + escapeHtml(sub) + '</span>' : '') +
@@ -1220,6 +1348,7 @@ function renderLeaveList() {
         '<div><span class="label">연락처</span> ' + escapeHtml(l.phone) + '</div>' +
       '</div>' +
       '<div class="leave-item-actions">' +
+        retryBtn +
         '<button class="btn-mini danger" onclick="removeLeave(\'' + l.id + '\')">삭제</button>' +
       '</div>' +
     '</div>';

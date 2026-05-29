@@ -567,6 +567,27 @@ input, select, textarea { font-family: inherit; }
   padding: 6px 16px;
   border-radius: 16px;
 }
+.leave-list-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.leave-list-toolbar input {
+  flex: 1;
+  padding: 9px 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fafafa;
+}
+.leave-list-toolbar input:focus {
+  outline: none;
+  border-color: #c8102e;
+  background: #fff;
+}
+.leave-list-toolbar .btn-mini { padding: 8px 14px; font-size: 16px; line-height: 1; }
+
 .leave-list {
   flex: 1 1 0;
   display: flex;
@@ -683,6 +704,24 @@ input, select, textarea { font-family: inherit; }
 .btn-mini:hover { background: #f5f5f7; }
 .btn-mini.danger { color: #c8102e; }
 .btn-mini.danger:hover { background: #fff5f5; }
+.btn-mini.retry {
+  color: #fff;
+  background: #c8102e;
+  border-color: #c8102e;
+}
+.btn-mini.retry:hover { background: #a30d24; }
+
+/* 업로드 실패 카드 시각화 */
+.leave-item.sync-failed { border-left-color: #e65100; background: #fffaf5; }
+.sync-banner {
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+.sync-failed-banner { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+.sync-pending-banner { background: #f0f5ff; color: #2962ff; border: 1px solid #bbd2ff; }
 
 /* ===== 모달 ===== */
 .modal-overlay {
@@ -1305,10 +1344,10 @@ html:not(.leader-mode) .leader-only { display: none !important; }
   }
   .leave-item-name { font-size: 16px; }
   .leave-item-sub {
-    font-size: 11px;
+    font-size: 13px;
     margin-left: 0;
-    margin-top: 2px;
-    color: #aaa;
+    margin-top: 3px;
+    color: #777;
     font-weight: 500;
   }
   .leave-item-types {

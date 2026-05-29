@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="휴가증">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="style.css?v=20260529e">
+  <link rel="stylesheet" href="style.css?v=20260529f">
   <!-- 즉시 인증 상태 검사 (메인 콘텐츠 깜빡임 방지) -->
   <script>
     (function() {
@@ -161,6 +161,10 @@
           <button class="btn-secondary btn-small leader-only" data-step="3" onclick="runAutomationProgram()" title="서무 PC의 자동화 프로그램을 실행합니다 (다운로드 폴더 최신 휴가증 JSON 자동 사용)">프로그램 실행</button>
           <button class="btn-secondary btn-small" onclick="resetAllLeaves()">초기화</button>
         </div>
+      </div>
+      <div class="leave-list-toolbar leader-only">
+        <input type="text" id="leaveSearchInput" placeholder="이름·사번·근무지로 검색..." oninput="onLeaveListSearch(this.value)" autocomplete="off">
+        <button class="btn-mini" onclick="clearLeaveSearch()" title="검색 지우기">×</button>
       </div>
       <div class="leave-list" id="leaveList">
         <div class="empty-state">아직 작성된 휴가증이 없습니다.</div>
@@ -365,7 +369,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=20260529a"></script>
+  <script src="script.js?v=20260529b"></script>
   <!-- PWA Service Worker 등록 -->
   <script>
     if ('serviceWorker' in navigator) {
