@@ -15,7 +15,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
-python automate.py
+REM Web에서 vacation-auto://run 호출되면 인자에 protocol URL이 전달됨 → --auto 모드
+set "AUTO_MODE="
+for %%a in (%*) do (
+    echo %%a | findstr /i "vacation-auto" > nul && set "AUTO_MODE=--auto"
+    if /i "%%a"=="--auto" set "AUTO_MODE=--auto"
+)
+
+python automate.py %AUTO_MODE%
 
 if errorlevel 1 (
     echo.

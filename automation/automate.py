@@ -46,6 +46,23 @@ def select_json_file() -> str | None:
     return path or None
 
 
+def find_latest_json_in_downloads() -> str | None:
+    """다운로드 폴더에서 가장 최근의 휴가증 JSON 파일 찾기 (--auto 모드용)"""
+    downloads = Path.home() / "Downloads"
+    if not downloads.exists():
+        return None
+    candidates = list(downloads.glob("휴가증_*.json"))
+    if not candidates:
+        return None
+    # 가장 최근 수정된 파일
+    latest = max(candidates, key=lambda p: p.stat().st_mtime)
+    # 너무 오래된 파일은 건너뜀 (24시간 이상)
+    import time
+    if time.time() - latest.stat().st_mtime > 86400:
+        return None
+    return str(latest)
+
+
 def show_info(title: str, msg: str):
     root = tk.Tk()
     root.withdraw()
@@ -420,11 +437,22 @@ def main():
     # 이전 실행의 디버그 자료 정리
     cleanup_debug_files()
 
-    # JSON 파일 선택
-    json_path = select_json_file()
-    if not json_path:
-        print("취소됨.")
-        return
+    # JSON 파일 선택 — --auto 모드는 다운로드 폴더 최신 JSON 자동 검색
+    auto_mode = "--auto" in sys.argv
+    if auto_mode:
+        json_path = find_latest_json_in_downloads()
+        if not json_path:
+            show_error("자동 검색 실패",
+                       "다운로드 폴더에서 휴가증 JSON 파일을 찾을 수 없습니다.\n\n"
+                       "사이트에서 [파일로 내보내기]를 먼저 누른 후 다시 시도해 주세요.\n"
+                       "(최근 24시간 이내 다운로드한 휴가증_*.json 파일만 인식)")
+            return
+        print(f"[자동 검색] 최신 JSON: {json_path}")
+    else:
+        json_path = select_json_file()
+        if not json_path:
+            print("취소됨.")
+            return
 
     # JSON 파싱
     try:

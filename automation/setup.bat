@@ -35,11 +35,27 @@ if errorlevel 1 (
 )
 
 echo.
+echo [3/3] Registering vacation-auto:// URL protocol...
+set "RUN_PATH=%~dp0run.bat"
+set "RUN_PATH=%RUN_PATH:\=\\%"
+reg add "HKCU\Software\Classes\vacation-auto" /ve /t REG_SZ /d "URL:Vacation Auto Run" /f > nul
+reg add "HKCU\Software\Classes\vacation-auto" /v "URL Protocol" /t REG_SZ /d "" /f > nul
+reg add "HKCU\Software\Classes\vacation-auto\DefaultIcon" /ve /t REG_SZ /d "%~dp0run.bat,0" /f > nul
+reg add "HKCU\Software\Classes\vacation-auto\shell\open\command" /ve /t REG_SZ /d "\"%~dp0run.bat\" --auto" /f > nul
+if errorlevel 1 (
+    echo [WARN] Protocol registration failed. Web auto-run button will not work.
+) else (
+    echo Protocol registered. Web auto-run button is enabled.
+)
+
+echo.
 echo ============================================================
 echo  Setup Complete
 echo ============================================================
 echo.
 echo You can now run "run.bat" to use the automation.
 echo On first run, please login to the groupware in Edge. (one-time only)
+echo.
+echo Web auto-run: Click [프로그램 실행] button on the website.
 echo.
 pause
