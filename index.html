@@ -75,8 +75,6 @@
       <span class="user-name" id="userNameDisplay"></span>
       <button class="btn-secondary" id="myLeavesBtn" onclick="openMyLeavesModal()" title="휴가증 조회">내 휴가증</button>
       <button class="btn-secondary staff-only" onclick="openWorkerModal()">작업자 명단</button>
-      <button class="btn-secondary admin-only" onclick="backupData()" title="작업자 명단 + 작성된 휴가증을 백업 JSON으로 저장">백업</button>
-      <button class="btn-secondary admin-only" onclick="document.getElementById('restoreFile').click()" title="이전에 백업한 JSON 파일로 데이터 복원">복원</button>
       <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="onRestoreFileSelected(event)">
       <button class="btn-secondary" onclick="openMyProfileModal()" title="내 정보">내 정보</button>
       <button class="btn-secondary btn-logout" onclick="logout()" title="로그아웃">로그아웃</button>
@@ -255,6 +253,8 @@
         <div class="my-profile-row"><span class="my-profile-label">연락처</span><span id="profilePhone">-</span></div>
       </div>
       <div class="modal-actions">
+        <button class="btn-secondary admin-only" onclick="backupData()" title="작업자 명단 + 작성된 휴가증을 백업 JSON으로 저장">백업</button>
+        <button class="btn-secondary admin-only" onclick="document.getElementById('restoreFile').click()" title="이전에 백업한 JSON 파일로 데이터 복원">복원</button>
         <button class="btn-primary" onclick="closeMyProfileModal(); openChangePwModal();">비밀번호 변경</button>
         <button class="btn-secondary" onclick="closeMyProfileModal()">닫기</button>
       </div>
