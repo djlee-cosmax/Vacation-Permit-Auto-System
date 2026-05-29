@@ -881,6 +881,10 @@ input, select, textarea { font-family: inherit; }
   box-shadow: none !important;
 }
 
+/* ===== 서무 모드 — 휴가증 작성 카드 숨김 + 리스트 풀폭 (관리자 제외) ===== */
+html.role-leader .form-card { display: none !important; }
+html.role-leader .container { grid-template-columns: 1fr !important; max-width: 1100px; }
+
 /* ===== 일반 작업자 — 사번 컬럼 숨김 ===== */
 html.role-worker .worker-table th:nth-child(2),
 html.role-worker .worker-table td:nth-child(2) { display: none !important; }
