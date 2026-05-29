@@ -36,16 +36,9 @@ if errorlevel 1 (
 
 echo.
 echo [3/3] Registering vacation-auto:// URL protocol...
-set "RUN_PATH=%~dp0run.bat"
-set "RUN_PATH=%RUN_PATH:\=\\%"
-reg add "HKCU\Software\Classes\vacation-auto" /ve /t REG_SZ /d "URL:Vacation Auto Run" /f > nul
-reg add "HKCU\Software\Classes\vacation-auto" /v "URL Protocol" /t REG_SZ /d "" /f > nul
-reg add "HKCU\Software\Classes\vacation-auto\DefaultIcon" /ve /t REG_SZ /d "%~dp0run.bat,0" /f > nul
-reg add "HKCU\Software\Classes\vacation-auto\shell\open\command" /ve /t REG_SZ /d "\"%~dp0run.bat\" --auto" /f > nul
+powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0register_protocol.ps1"
 if errorlevel 1 (
     echo [WARN] Protocol registration failed. Web auto-run button will not work.
-) else (
-    echo Protocol registered. Web auto-run button is enabled.
 )
 
 echo.
