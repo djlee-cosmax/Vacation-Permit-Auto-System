@@ -545,7 +545,9 @@ input, select, textarea { font-family: inherit; }
 .list-card {
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 140px);
+  /* height 명시 — flex:1 leave-list가 안정적으로 늘어나도록
+     (max-height만 두면 flex column 자식들이 늘어나지 못해 grid 자식 height=0 됨) */
+  height: calc(100vh - 140px);
   overflow: hidden;
 }
 .list-header {
