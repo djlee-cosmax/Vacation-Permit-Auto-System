@@ -1393,15 +1393,25 @@ function closeWorkerModal() {
   document.getElementById('workerModal').style.display = 'none';
 }
 
+function isAdminWorker(w) {
+  if (!w || !w.employeeId) return false;
+  var staff = STAFF_ROLES[String(w.employeeId).trim()];
+  return !!(staff && staff.role === 'admin');
+}
+
 function renderWorkerTable() {
   var tbody = document.getElementById('workerTableBody');
   if (workerModalState.length === 0) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#ccc;padding:24px">명단이 비어있습니다.</td></tr>';
     return;
   }
-  // 이름 가나다순 정렬 + 검색 필터 (원본 인덱스 보존)
+  // 관리자 최상단 고정 + 이름 가나다순 정렬 + 검색 필터 (원본 인덱스 보존)
   var view = workerModalState.map(function(w, idx) { return { w: w, idx: idx }; });
   view.sort(function(a, b) {
+    var aAdmin = isAdminWorker(a.w);
+    var bAdmin = isAdminWorker(b.w);
+    if (aAdmin && !bAdmin) return -1;
+    if (!aAdmin && bAdmin) return 1;
     return (a.w.name || '').localeCompare(b.w.name || '', 'ko');
   });
   if (workerSearchQuery) {
@@ -1419,9 +1429,11 @@ function renderWorkerTable() {
   tbody.innerHTML = view.map(function(item) {
     var w = item.w;
     var i = item.idx;  // 원본 workerModalState 인덱스 (편집·삭제 시 사용)
+    var adminBadge = isAdminWorker(w) ? '<span class="worker-admin-badge">관리자</span>' : '';
+    var trCls = isAdminWorker(w) ? ' class="worker-row-admin"' : '';
     if (ADMIN_MODE) {
-      return '<tr>' +
-        '<td><input type="text" value="' + escapeHtml(w.name || '') + '" oninput="updateWorker(' + i + ',\'name\',this.value)"></td>' +
+      return '<tr' + trCls + '>' +
+        '<td><input type="text" value="' + escapeHtml(w.name || '') + '" oninput="updateWorker(' + i + ',\'name\',this.value)">' + adminBadge + '</td>' +
         '<td><input type="text" value="' + escapeHtml(w.employeeId || '') + '" oninput="updateWorker(' + i + ',\'employeeId\',this.value)"></td>' +
         '<td><input type="text" value="' + escapeHtml(w.team || '') + '" oninput="updateWorker(' + i + ',\'team\',this.value)"></td>' +
         '<td><input type="text" value="' + escapeHtml(w.phone || '') + '" oninput="updateWorker(' + i + ',\'phone\',this.value)"></td>' +
@@ -1429,8 +1441,8 @@ function renderWorkerTable() {
       '</tr>';
     } else {
       // 비관리자: 텍스트만 표시 (편집 불가)
-      return '<tr>' +
-        '<td class="worker-readonly-cell">' + escapeHtml(w.name || '') + '</td>' +
+      return '<tr' + trCls + '>' +
+        '<td class="worker-readonly-cell">' + escapeHtml(w.name || '') + adminBadge + '</td>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.employeeId || '') + '</td>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.team || '') + '</td>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.phone || '') + '</td>' +
