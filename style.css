@@ -1037,32 +1037,6 @@ html:not(.leader-mode) .leader-only { display: none !important; }
 .worker-row-leader > td { background: #fff7f0; }
 .worker-row-leader > td:first-child { border-left: 3px solid #ff7043; padding-left: 9px !important; }
 
-/* 로그인 모드 라디오 */
-.login-mode-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.login-mode-opt {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  background: #fafafa;
-  transition: all 0.15s;
-}
-.login-mode-opt input { margin: 0; cursor: pointer; }
-.login-mode-opt:has(input:checked) {
-  border-color: #c8102e;
-  background: #fff5f5;
-  color: #c8102e;
-  font-weight: 600;
-}
 
 /* ===== 내 휴가증 모달 ===== */
 .my-leaves-notice {
