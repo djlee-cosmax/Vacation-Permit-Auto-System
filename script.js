@@ -1502,12 +1502,16 @@ function renderWorkerTable() {
     var roleBadge = adminBadge + leaderBadge;
     var trCls = isAdminWorker(w) ? ' class="worker-row-admin"' : (isLeaderWorker(w) ? ' class="worker-row-leader"' : '');
     if (ADMIN_MODE) {
+      var empIdSafe = String(w.employeeId || '').trim();
+      var pwBtn = empIdSafe
+        ? '<button class="worker-row-pw" onclick="resetWorkerPassword(\'' + empIdSafe + '\')" title="비밀번호를 1234로 초기화">PW</button>'
+        : '';
       return '<tr' + trCls + '>' +
         '<td><input type="text" value="' + escapeHtml(w.name || '') + '" oninput="updateWorker(' + i + ',\'name\',this.value)">' + roleBadge + '</td>' +
         '<td><input type="text" value="' + escapeHtml(w.employeeId || '') + '" oninput="updateWorker(' + i + ',\'employeeId\',this.value)"></td>' +
         '<td><input type="text" value="' + escapeHtml(w.team || '') + '" oninput="updateWorker(' + i + ',\'team\',this.value)"></td>' +
         '<td><input type="text" value="' + escapeHtml(w.phone || '') + '" oninput="updateWorker(' + i + ',\'phone\',this.value)"></td>' +
-        '<td><button class="worker-row-del" onclick="deleteWorkerRow(' + i + ')">×</button></td>' +
+        '<td class="worker-row-actions">' + pwBtn + '<button class="worker-row-del" onclick="deleteWorkerRow(' + i + ')" title="명단에서 삭제">×</button></td>' +
       '</tr>';
     } else {
       // 비관리자: 텍스트만 표시 (편집 불가)
@@ -1524,6 +1528,49 @@ function renderWorkerTable() {
 
 function updateWorker(idx, key, val) {
   if (workerModalState[idx]) workerModalState[idx][key] = val;
+}
+
+// 관리자: 특정 작업자 비밀번호를 초기 상태(1234)로 리셋
+function resetWorkerPassword(empId) {
+  empId = String(empId || '').trim();
+  if (!empId) return;
+  var session = getSession();
+  if (!session) return;
+  if (empId === session.empId) {
+    showToast('본인 비밀번호는 [내 정보] → [비밀번호 변경]에서 변경하세요.', 'error');
+    return;
+  }
+  if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
+  var worker = workers.find(function(w) { return String(w.employeeId || '').trim() === empId; });
+  var name = worker ? worker.name : empId;
+
+  if (!confirm(
+    '[' + name + ' / ' + empId + ']의 비밀번호를 초기 비밀번호(1234)로 초기화하시겠습니까?\n\n' +
+    '※ 보안 질문도 함께 삭제됩니다.\n' +
+    '※ 작업자가 다음 로그인 시 새 비밀번호와 보안 질문을 다시 등록해야 합니다.'
+  )) return;
+
+  FB_DB.collection('users').doc(empId).get()
+    .then(function(doc) {
+      if (!doc.exists) {
+        showToast(name + '님은 이미 초기 비밀번호(1234) 상태입니다.', '');
+        return null;
+      }
+      return FB_DB.collection('users').doc(empId).update({
+        password: firebase.firestore.FieldValue.delete(),
+        securityQuestion: firebase.firestore.FieldValue.delete(),
+        securityAnswer: firebase.firestore.FieldValue.delete()
+      });
+    })
+    .then(function(result) {
+      if (result !== undefined && result !== null) {
+        showToast(name + '님의 비밀번호가 초기화됐습니다. (1234)', 'success');
+      }
+    })
+    .catch(function(err) {
+      console.error('비밀번호 초기화 실패:', err);
+      showToast('비밀번호 초기화 실패: ' + (err.message || err), 'error');
+    });
 }
 
 function addWorkerRow() {
