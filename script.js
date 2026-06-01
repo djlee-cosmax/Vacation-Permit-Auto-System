@@ -1224,7 +1224,8 @@ function fetchTodayLeavesFromCloud() {
   if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
   if (!FB_UID) { showToast('인증 진행 중입니다. 잠시 후 다시 시도해 주세요.', 'error'); return; }
 
-  var sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  // 작성일이 30일 이전인 휴가증은 제외 (너무 오래된 잊혀진 휴가증 차단)
+  var cutoffOld = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   // 휴가 시작일이 "오늘 + 7일" 이후인 것은 제외 (너무 미래에 잡힌 휴가는 변경 가능성 ↑)
   var weekLaterStr = dateToStr(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
 
@@ -1239,7 +1240,7 @@ function fetchTodayLeavesFromCloud() {
         var data = doc.data();
         if (data.processed === true) return;
         var t = data.serverCreatedAt && data.serverCreatedAt.toDate ? data.serverCreatedAt.toDate() : null;
-        if (t && t < sevenDaysAgo) return;
+        if (t && t < cutoffOld) return;
         // 휴가 시작일이 (오늘 + 7일)보다 미래면 제외
         if (data.start && data.start > weekLaterStr) {
           skippedFuture++;
