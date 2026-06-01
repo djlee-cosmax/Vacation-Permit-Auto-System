@@ -892,6 +892,11 @@ input, select, textarea { font-family: inherit; }
   border-color: #c8102e;
   background: #fff;
 }
+.worker-row-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+.worker-row-actions > * { vertical-align: middle; }
 .worker-row-del {
   background: transparent;
   border: none;
@@ -902,6 +907,19 @@ input, select, textarea { font-family: inherit; }
   border-radius: 4px;
 }
 .worker-row-del:hover { background: #fff5f5; }
+.worker-row-pw {
+  background: #fff;
+  border: 1px solid #c8102e;
+  color: #c8102e;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 12px;
+  margin-right: 6px;
+  letter-spacing: 0.5px;
+}
+.worker-row-pw:hover { background: #c8102e; color: #fff; }
 
 /* PC 서무/관리자 모드 — 작업자 명단 모달 크게·가독성 ↑ */
 @media (min-width: 1024px) {
@@ -963,7 +981,12 @@ input, select, textarea { font-family: inherit; }
   html.role-leader #workerModal .worker-table th:nth-child(5),
   html.role-leader #workerModal .worker-table td:nth-child(5),
   html.role-admin #workerModal .worker-table th:nth-child(5),
-  html.role-admin #workerModal .worker-table td:nth-child(5) { width: 8%; }
+  html.role-admin #workerModal .worker-table td:nth-child(5) { width: 14%; }
+  /* 액션 컬럼 폭 늘림에 맞춰 다른 컬럼 미세 조정 */
+  html.role-admin #workerModal .worker-table th:nth-child(4),
+  html.role-admin #workerModal .worker-table td:nth-child(4) { width: 22%; }
+  html.role-admin #workerModal .worker-table th:nth-child(1),
+  html.role-admin #workerModal .worker-table td:nth-child(1) { width: 25%; }
   html.role-leader #workerModal .worker-readonly-cell,
   html.role-admin #workerModal .worker-readonly-cell { font-size: 15px !important; padding: 12px 16px !important; }
   html.role-leader #workerModal .worker-table input,
