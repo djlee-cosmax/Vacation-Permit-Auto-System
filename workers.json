@@ -7,6 +7,13 @@
     "department": "생산3팀"
   },
   {
+    "name": "김가영",
+    "employeeId": "122240096",
+    "team": "평택",
+    "phone": "010-9414-0109",
+    "department": "생산3팀"
+  },
+  {
     "name": "고창숙",
     "employeeId": "122040006",
     "team": "화성",

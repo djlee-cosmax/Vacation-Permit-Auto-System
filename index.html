@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="휴가증">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="style.css?v=20260601b">
+  <link rel="stylesheet" href="style.css?v=20260601c">
   <!-- 즉시 인증 상태 검사 (메인 콘텐츠 깜빡임 방지) -->
   <script>
     (function() {
@@ -40,6 +40,14 @@
       <h2>휴가증 자동 반영 프로그램</h2>
       <p class="login-subtitle">생산3팀 파우더 성형실</p>
       <div class="login-form">
+        <div class="login-field">
+          <label>로그인 모드</label>
+          <div class="login-mode-row">
+            <label class="login-mode-opt"><input type="radio" name="loginMode" value="worker" checked> 작업자</label>
+            <label class="login-mode-opt"><input type="radio" name="loginMode" value="leader"> 서무</label>
+            <label class="login-mode-opt"><input type="radio" name="loginMode" value="admin"> 관리자</label>
+          </div>
+        </div>
         <div class="login-field">
           <label>사번</label>
           <input type="text" id="loginEmpId" placeholder="예: 122130120" autocomplete="username" inputmode="numeric">
@@ -369,7 +377,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=20260601b"></script>
+  <script src="script.js?v=20260601c"></script>
   <!-- PWA Service Worker 등록 -->
   <script>
     if ('serviceWorker' in navigator) {

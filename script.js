@@ -45,24 +45,37 @@ function touchSession() {
 function login() {
   var empId = document.getElementById('loginEmpId').value.trim();
   var pw = document.getElementById('loginPw').value;
+  // 선택한 로그인 모드 (worker/leader/admin) — 사용자가 의도한 권한 수준
+  var selectedModeEl = document.querySelector('input[name="loginMode"]:checked');
+  var selectedMode = selectedModeEl ? selectedModeEl.value : 'worker';
   if (!empId) { showToast('사번을 입력해 주세요.', 'error'); return; }
   if (!pw) { showToast('비밀번호를 입력해 주세요.', 'error'); return; }
 
-  // 1) 관리자/서무 사번 우선 확인
+  // 모드 자격 검증 (서무 모드: leader/admin만 / 관리자 모드: admin만)
   var staff = STAFF_ROLES[empId];
+  var actualRole = staff ? staff.role : 'worker';
+  if (selectedMode === 'admin' && actualRole !== 'admin') {
+    showToast('관리자 모드는 관리자 사번만 로그인할 수 있습니다.', 'error');
+    return;
+  }
+  if (selectedMode === 'leader' && actualRole !== 'admin' && actualRole !== 'leader') {
+    showToast('서무 모드는 서무 또는 관리자 사번만 로그인할 수 있습니다.', 'error');
+    return;
+  }
+
+  // 사용자 정보 결정 (사번이 staff여도 worker 명단에 있으면 명단 정보 사용)
   var name, role, team, worker;
+  worker = workers.find(function(w) { return String(w.employeeId || '').trim() === empId; });
   if (staff) {
-    name = staff.name;
-    role = staff.role;
-    team = '';
+    name = (worker && worker.name) || staff.name;
+    team = (worker && worker.team) || '';
   } else {
-    // 2) 작업자 명단에서 매칭
-    worker = workers.find(function(w) { return String(w.employeeId || '').trim() === empId; });
     if (!worker) { showToast('등록되지 않은 사번입니다.', 'error'); return; }
     name = worker.name;
-    role = 'worker';
     team = worker.team || '';
   }
+  // role은 "선택한 모드" 기준 — 관리자도 작업자 모드 선택 시 worker로 동작
+  role = selectedMode;
 
   // 3) Firestore users/{empId} 문서에서 비밀번호 조회 (없으면 기본 1234)
   // Firestore가 준비되지 않은 경우 기본 PW로 폴백
@@ -1411,6 +1424,11 @@ function isAdminWorker(w) {
   var staff = STAFF_ROLES[String(w.employeeId).trim()];
   return !!(staff && staff.role === 'admin');
 }
+function isLeaderWorker(w) {
+  if (!w || !w.employeeId) return false;
+  var staff = STAFF_ROLES[String(w.employeeId).trim()];
+  return !!(staff && staff.role === 'leader');
+}
 
 function renderWorkerTable() {
   var tbody = document.getElementById('workerTableBody');
@@ -1418,13 +1436,17 @@ function renderWorkerTable() {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#ccc;padding:24px">명단이 비어있습니다.</td></tr>';
     return;
   }
-  // 관리자 최상단 고정 + 이름 가나다순 정렬 + 검색 필터 (원본 인덱스 보존)
+  // 관리자 → 서무 → 가나다순 정렬 + 검색 필터 (원본 인덱스 보존)
   var view = workerModalState.map(function(w, idx) { return { w: w, idx: idx }; });
   view.sort(function(a, b) {
     var aAdmin = isAdminWorker(a.w);
     var bAdmin = isAdminWorker(b.w);
     if (aAdmin && !bAdmin) return -1;
     if (!aAdmin && bAdmin) return 1;
+    var aLeader = isLeaderWorker(a.w);
+    var bLeader = isLeaderWorker(b.w);
+    if (aLeader && !bLeader) return -1;
+    if (!aLeader && bLeader) return 1;
     return (a.w.name || '').localeCompare(b.w.name || '', 'ko');
   });
   if (workerSearchQuery) {
@@ -1443,10 +1465,12 @@ function renderWorkerTable() {
     var w = item.w;
     var i = item.idx;  // 원본 workerModalState 인덱스 (편집·삭제 시 사용)
     var adminBadge = isAdminWorker(w) ? '<span class="worker-admin-badge">관리자</span>' : '';
-    var trCls = isAdminWorker(w) ? ' class="worker-row-admin"' : '';
+    var leaderBadge = (!isAdminWorker(w) && isLeaderWorker(w)) ? '<span class="worker-leader-badge">서무</span>' : '';
+    var roleBadge = adminBadge + leaderBadge;
+    var trCls = isAdminWorker(w) ? ' class="worker-row-admin"' : (isLeaderWorker(w) ? ' class="worker-row-leader"' : '');
     if (ADMIN_MODE) {
       return '<tr' + trCls + '>' +
-        '<td><input type="text" value="' + escapeHtml(w.name || '') + '" oninput="updateWorker(' + i + ',\'name\',this.value)">' + adminBadge + '</td>' +
+        '<td><input type="text" value="' + escapeHtml(w.name || '') + '" oninput="updateWorker(' + i + ',\'name\',this.value)">' + roleBadge + '</td>' +
         '<td><input type="text" value="' + escapeHtml(w.employeeId || '') + '" oninput="updateWorker(' + i + ',\'employeeId\',this.value)"></td>' +
         '<td><input type="text" value="' + escapeHtml(w.team || '') + '" oninput="updateWorker(' + i + ',\'team\',this.value)"></td>' +
         '<td><input type="text" value="' + escapeHtml(w.phone || '') + '" oninput="updateWorker(' + i + ',\'phone\',this.value)"></td>' +
@@ -1455,7 +1479,7 @@ function renderWorkerTable() {
     } else {
       // 비관리자: 텍스트만 표시 (편집 불가)
       return '<tr' + trCls + '>' +
-        '<td class="worker-readonly-cell">' + escapeHtml(w.name || '') + adminBadge + '</td>' +
+        '<td class="worker-readonly-cell">' + escapeHtml(w.name || '') + roleBadge + '</td>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.employeeId || '') + '</td>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.team || '') + '</td>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.phone || '') + '</td>' +
