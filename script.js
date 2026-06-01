@@ -42,24 +42,32 @@ function touchSession() {
   } catch (e) {}
 }
 
+// URL 쿼리 파라미터로 로그인 모드 결정
+// 기본 링크 → worker / ?leader=1 → 서무 / ?admin=1 → 관리자
+function getUrlMode() {
+  var search = window.location.search || '';
+  if (/[?&]admin=1\b/.test(search)) return 'admin';
+  if (/[?&]leader=1\b/.test(search)) return 'leader';
+  return 'worker';
+}
+
 function login() {
   var empId = document.getElementById('loginEmpId').value.trim();
   var pw = document.getElementById('loginPw').value;
-  // 선택한 로그인 모드 (worker/leader/admin) — 사용자가 의도한 권한 수준
-  var selectedModeEl = document.querySelector('input[name="loginMode"]:checked');
-  var selectedMode = selectedModeEl ? selectedModeEl.value : 'worker';
+  // URL 파라미터로 결정되는 모드 — 사용자에게 노출되는 화면 권한
+  var selectedMode = getUrlMode();
   if (!empId) { showToast('사번을 입력해 주세요.', 'error'); return; }
   if (!pw) { showToast('비밀번호를 입력해 주세요.', 'error'); return; }
 
-  // 모드 자격 검증 (서무 모드: leader/admin만 / 관리자 모드: admin만)
+  // 모드 자격 검증 (서무 URL: leader/admin만 / 관리자 URL: admin만)
   var staff = STAFF_ROLES[empId];
   var actualRole = staff ? staff.role : 'worker';
   if (selectedMode === 'admin' && actualRole !== 'admin') {
-    showToast('관리자 모드는 관리자 사번만 로그인할 수 있습니다.', 'error');
+    showToast('관리자 전용 링크입니다. 일반 링크로 접속해 주세요.', 'error');
     return;
   }
   if (selectedMode === 'leader' && actualRole !== 'admin' && actualRole !== 'leader') {
-    showToast('서무 모드는 서무 또는 관리자 사번만 로그인할 수 있습니다.', 'error');
+    showToast('서무 전용 링크입니다. 일반 링크로 접속해 주세요.', 'error');
     return;
   }
 
