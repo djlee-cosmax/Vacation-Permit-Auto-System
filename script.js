@@ -520,9 +520,22 @@ fetch('workers.json', { cache: 'no-cache' })
   })
   .then(function(data) {
     DEFAULT_WORKERS = Array.isArray(data) ? data : [];
+    if (DEFAULT_WORKERS.length === 0) return;
     // localStorage 명단이 비어있으면 기본 명단으로 자동 채움
-    if (workers.length === 0 && DEFAULT_WORKERS.length > 0) {
+    if (workers.length === 0) {
       workers = DEFAULT_WORKERS.slice();
+      localStorage.setItem('p5_workers', JSON.stringify(workers));
+      return;
+    }
+    // 신규 사번 자동 병합 — workers.json에 추가된 사람이 자동 반영되도록
+    var existingIds = {};
+    workers.forEach(function(w) { existingIds[String(w.employeeId || '').trim()] = true; });
+    var added = DEFAULT_WORKERS.filter(function(w) {
+      var id = String(w.employeeId || '').trim();
+      return id && !existingIds[id];
+    });
+    if (added.length > 0) {
+      workers = added.concat(workers);
       localStorage.setItem('p5_workers', JSON.stringify(workers));
     }
   })
