@@ -548,17 +548,29 @@ fetch('workers.json', { cache: 'no-cache' })
       localStorage.setItem('p5_workers', JSON.stringify(workers));
       return;
     }
-    // 신규 사번 자동 병합 — workers.json에 추가된 사람이 자동 반영되도록
-    var existingIds = {};
-    workers.forEach(function(w) { existingIds[String(w.employeeId || '').trim()] = true; });
-    var added = DEFAULT_WORKERS.filter(function(w) {
+    // 신규 사번 자동 병합 + 관리자/서무 정보는 항상 workers.json 기준으로 동기화
+    var byId = {};
+    workers.forEach(function(w, idx) { byId[String(w.employeeId || '').trim()] = idx; });
+    var added = [];
+    var changed = false;
+    DEFAULT_WORKERS.forEach(function(w) {
       var id = String(w.employeeId || '').trim();
-      return id && !existingIds[id];
+      if (!id) return;
+      if (byId[id] === undefined) {
+        added.push(w);
+      } else if (STAFF_ROLES[id]) {
+        // 관리자/서무는 workers.json이 항상 우선 (정보 변경 자동 반영)
+        var local = workers[byId[id]];
+        ['name', 'team', 'phone', 'department'].forEach(function(k) {
+          if (local[k] !== w[k]) { local[k] = w[k]; changed = true; }
+        });
+      }
     });
     if (added.length > 0) {
       workers = added.concat(workers);
-      localStorage.setItem('p5_workers', JSON.stringify(workers));
+      changed = true;
     }
+    if (changed) localStorage.setItem('p5_workers', JSON.stringify(workers));
   })
   .catch(function(err) {
     // 로컬 명단이라도 있으면 조용히 진행, 둘 다 없으면 사용자에게 안내
