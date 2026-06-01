@@ -1,5 +1,12 @@
 [
   {
+    "name": "이동준",
+    "employeeId": "122210202",
+    "team": "",
+    "phone": "010-3598-2684",
+    "department": "생산3팀"
+  },
+  {
     "name": "고창숙",
     "employeeId": "122040006",
     "team": "화성",
