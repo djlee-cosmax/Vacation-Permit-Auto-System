@@ -1225,6 +1225,8 @@ function fetchTodayLeavesFromCloud() {
   if (!FB_UID) { showToast('인증 진행 중입니다. 잠시 후 다시 시도해 주세요.', 'error'); return; }
 
   var sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  // 휴가 시작일이 "오늘 + 7일" 이후인 것은 제외 (너무 미래에 잡힌 휴가는 변경 가능성 ↑)
+  var weekLaterStr = dateToStr(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
 
   showToast('서버에서 휴가증을 가져오는 중...', '');
   FB_DB.collection('leaves')
@@ -1232,11 +1234,17 @@ function fetchTodayLeavesFromCloud() {
     .then(function(snapshot) {
       var fetched = [];
       var docsToMark = [];  // 처리 완료로 마크할 문서 refs
+      var skippedFuture = 0;  // 미래(7일 초과) 휴가로 제외된 건수
       snapshot.forEach(function(doc) {
         var data = doc.data();
         if (data.processed === true) return;
         var t = data.serverCreatedAt && data.serverCreatedAt.toDate ? data.serverCreatedAt.toDate() : null;
         if (t && t < sevenDaysAgo) return;
+        // 휴가 시작일이 (오늘 + 7일)보다 미래면 제외
+        if (data.start && data.start > weekLaterStr) {
+          skippedFuture++;
+          return;
+        }
         docsToMark.push(doc.ref);
         delete data.submittedBy;
         delete data.expiresAt;
@@ -1245,7 +1253,11 @@ function fetchTodayLeavesFromCloud() {
         fetched.push(data);
       });
       if (fetched.length === 0) {
-        showToast('미처리 휴가증이 없습니다.', 'error');
+        if (skippedFuture > 0) {
+          showToast('이번 주에 사용 예정인 미처리 휴가증이 없습니다.\n(' + skippedFuture + '건은 7일 이후 사용 예정이라 제외)', 'error');
+        } else {
+          showToast('미처리 휴가증이 없습니다.', 'error');
+        }
         return;
       }
       var existingIds = {};
@@ -1255,8 +1267,9 @@ function fetchTodayLeavesFromCloud() {
         showToast('이미 모두 가져온 상태입니다. (서버 ' + fetched.length + '건 = 로컬과 동일)', '');
         return;
       }
+      var skipNote = skippedFuture > 0 ? '\n(7일 이후 사용 예정 ' + skippedFuture + '건은 제외됨)' : '';
       if (!confirm(
-        '서버에서 미처리 휴가증 ' + fetched.length + '건을 발견했습니다.\n' +
+        '서버에서 미처리 휴가증 ' + fetched.length + '건을 발견했습니다. (오늘부터 7일 이내 사용 예정)' + skipNote + '\n' +
         '그 중 ' + newOnes.length + '건이 현재 화면에 없는 새 휴가증입니다.\n\n' +
         '추가하시겠습니까?'
       )) return;
