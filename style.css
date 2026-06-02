@@ -1201,9 +1201,15 @@ html:not(.leader-mode) .leader-only { display: none !important; }
   font-weight: 600;
 }
 .my-balance-value {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
   color: #1a1a1a;
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .my-balance-value { font-size: 15px; }
+  .my-balance-label { font-size: 11px; }
+  .my-balance-item { padding: 8px 6px; }
 }
 .my-balance-tag {
   margin-top: 4px;
