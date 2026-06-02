@@ -1241,6 +1241,24 @@ html:not(.leader-mode) .leader-only { display: none !important; }
   text-decoration: line-through;
   text-decoration-color: #ccc;
 }
+/* 올해 누적 사용량 한 줄 */
+.my-usage-row {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.6);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 12px;
+  color: #555;
+  align-items: center;
+}
+.my-usage-label { font-weight: 700; color: #c8102e; }
+.my-usage-item strong { color: #1a1a1a; }
+@media (max-width: 600px) {
+  .my-usage-row { font-size: 11px; gap: 6px 10px; padding: 6px 10px; }
+}
 
 /* ===== 내 휴가증 모달 ===== */
 .my-leaves-notice {

@@ -469,6 +469,8 @@ try {
         setTimeout(cleanupProcessedLeavesFromCloud, 200);
         // 외부에서 삭제된 휴가증의 차감 자동 환원 (서무·관리자 모드만)
         startLeaveDeletionWatcher();
+        // 매월 1일 (또는 그 후 첫 진입 시) 생휴 자동 리셋
+        setTimeout(maybeMonthlyBirthLeaveReset, 300);
         // 페이지 로드 시 보안 질문 미등록 체크 (이미 로그인된 상태에서도 안내)
         var sess = getSession();
         if (sess && sess.empId && FB_DB) {
@@ -1207,11 +1209,45 @@ function showMyBalance(empId) {
         summerItem.appendChild(tag);
       }
       box.style.display = '';
+      // 올해 누적 사용량 (balanceLogs 기반)
+      loadMyYearUsage(empId, isMale);
     })
     .catch(function(err) {
       console.warn('잔여 조회 실패:', err);
       box.style.display = 'none';
     });
+}
+
+// 올해 누적 사용량 — balanceLogs에서 type=deduct 합산 (음수)
+function loadMyYearUsage(empId, isMale) {
+  if (!FB_DB || !empId) return;
+  var jan1 = new Date(new Date().getFullYear(), 0, 1);
+  FB_DB.collection('balanceLogs')
+    .where('empId', '==', empId)
+    .where('type', '==', 'deduct')
+    .get()
+    .then(function(snap) {
+      var ann = 0, brt = 0, sum = 0;
+      snap.forEach(function(doc) {
+        var d = doc.data();
+        var at = d.at && d.at.toDate ? d.at.toDate() : null;
+        if (at && at < jan1) return;
+        var c = d.changes || {};
+        if (c.annual) ann += Math.abs(c.annual);
+        if (c.birth) brt += Math.abs(c.birth);
+        if (c.summer) sum += Math.abs(c.summer);
+      });
+      var aEl = document.getElementById('myUsageAnnual');
+      var bEl = document.getElementById('myUsageBirth');
+      var sEl = document.getElementById('myUsageSummer');
+      if (aEl) aEl.textContent = ann;
+      if (bEl) bEl.textContent = brt;
+      if (sEl) sEl.textContent = sum;
+      // 남자는 생휴 항목 숨김
+      var birthSpan = document.querySelector('.my-usage-birth');
+      if (birthSpan) birthSpan.style.display = isMale ? 'none' : '';
+    })
+    .catch(function() { /* silent — 처음에는 데이터 없을 수 있음 */ });
 }
 
 function fetchMyLeaves() {
@@ -1384,6 +1420,26 @@ function calculateDeductions(leavesList) {
   return byEmp;
 }
 
+// 잔여 변경 이력 — Firestore balanceLogs 컬렉션에 한 줄 기록
+// type: 'deduct' / 'revert' / 'reset' / 'upload' / 'manual'
+function logBalanceChange(empId, type, changes, meta) {
+  if (!FB_DB || !empId) return;
+  try {
+    var session = getSession();
+    var doc = {
+      empId: empId,
+      type: type,
+      changes: changes || {},   // { annual: -1, birth: 0, summer: 0 }
+      meta: meta || {},          // { leaveId, name 등 }
+      byEmpId: (session && session.empId) || null,
+      byName: (session && session.name) || null,
+      byUid: FB_UID || null,
+      at: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    FB_DB.collection('balanceLogs').add(doc).catch(function() {/* silent */});
+  } catch (e) {}
+}
+
 // 휴가증 1건의 차감을 환원 (잔여 +)
 function revertDeductionForLeave(leave) {
   return new Promise(function(resolve, reject) {
@@ -1417,9 +1473,57 @@ function revertDeductionForLeave(leave) {
         }
         return FB_DB.collection('users').doc(empId).set(update, { merge: true });
       })
-      .then(function() { resolve({ empId: empId, name: leave.name, ded: ded }); })
+      .then(function() {
+        logBalanceChange(empId, 'revert', {
+          annual: ded.annual || 0,
+          birth: ded.birth || 0,
+          summer: ded.summer || 0
+        }, { leaveId: leave.id, name: leave.name });
+        resolve({ empId: empId, name: leave.name, ded: ded });
+      })
       .catch(reject);
   });
+}
+
+// 매월 첫 사이트 진입 시 — 여자 작업자 전원의 생휴 잔여를 1로 자동 리셋
+// (생휴는 매월 1개씩 새로 발생, 안 쓰면 다음 달 시작과 함께 사라짐)
+function maybeMonthlyBirthLeaveReset() {
+  if (!FB_DB || !LEADER_MODE) return; // 서무·관리자가 사이트 들어왔을 때만
+  var now = new Date();
+  var currentYM = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
+  FB_DB.collection('system').doc('balanceReset').get()
+    .then(function(doc) {
+      var last = doc.exists ? (doc.data().lastBirthResetYearMonth || '') : '';
+      if (last === currentYM) return null; // 이미 이번 달 리셋됨
+      // 여자 작업자 사번 목록
+      var femaleIds = workers
+        .filter(function(w) { return w.gender !== 'M' && w.employeeId; })
+        .map(function(w) { return String(w.employeeId).trim(); });
+      if (femaleIds.length === 0) {
+        return FB_DB.collection('system').doc('balanceReset').set({ lastBirthResetYearMonth: currentYM }, { merge: true });
+      }
+      // 일괄 batch — 모든 여자 사번 balanceBirth = 1
+      var batch = FB_DB.batch();
+      femaleIds.forEach(function(id) {
+        batch.set(FB_DB.collection('users').doc(id), { balanceBirth: 1 }, { merge: true });
+      });
+      batch.set(FB_DB.collection('system').doc('balanceReset'), {
+        lastBirthResetYearMonth: currentYM,
+        lastBirthResetAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastBirthResetBy: FB_UID || null,
+        lastBirthResetCount: femaleIds.length
+      }, { merge: true });
+      return batch.commit().then(function() {
+        // 리셋 로그 (각 사번)
+        femaleIds.forEach(function(id) {
+          logBalanceChange(id, 'reset', { birth: 1 }, { reason: 'monthly-reset', month: currentYM });
+        });
+        setTimeout(function() {
+          showToast(currentYM + ' 생휴 자동 리셋 완료 (여자 작업자 ' + femaleIds.length + '명 → 각 1개)', 'success');
+        }, 1500);
+      });
+    })
+    .catch(function(err) { console.warn('생휴 자동 리셋 실패:', err); });
 }
 
 // Firestore leaves 컬렉션 감시 — 외부 삭제 자동 처리
@@ -1519,6 +1623,15 @@ function applyDeductions(leavesList) {
       });
       return batch.commit();
     }).then(function() {
+      // 차감 로그 기록 (작업자별)
+      empIds.forEach(function(id) {
+        var d = byEmp[id];
+        logBalanceChange(id, 'deduct', {
+          annual: -(d.annual || 0),
+          birth: -(d.birth || 0),
+          summer: -(d.summer || 0)
+        }, { name: d.name });
+      });
       // 2) 휴가증에 deductedAt 마크 (Firestore + 로컬)
       var nowIso = new Date().toISOString();
       var leavesBatch = FB_DB.batch();
@@ -1540,54 +1653,93 @@ function applyDeductions(leavesList) {
 }
 
 function runAutomationProgram() {
-  // 차감 대상 미리 산출 → 안내
+  // 차감 대상 미리 산출
   var preview = calculateDeductions(leaves);
   var previewIds = Object.keys(preview).filter(function(id) {
     var d = preview[id];
     return d.annual > 0 || d.birth > 0 || d.summer > 0;
   });
-  var msg = '자동화 프로그램을 실행하시겠습니까?\n\n';
-  if (previewIds.length > 0) {
-    msg += '※ 다음 작업자의 잔여 휴가가 자동 차감됩니다 (' + previewIds.length + '명):\n';
-    msg += previewIds.slice(0, 8).map(function(id) {
-      var d = preview[id];
-      var parts = [];
-      if (d.annual > 0) parts.push('연차 -' + d.annual);
-      if (d.birth > 0) parts.push('생휴 -' + d.birth);
-      if (d.summer > 0) parts.push('하기 -' + d.summer);
-      return '· ' + (d.name || id) + ': ' + parts.join(', ');
-    }).join('\n');
-    if (previewIds.length > 8) msg += '\n· 외 ' + (previewIds.length - 8) + '명...';
-    msg += '\n\n';
-  } else {
-    msg += '※ 차감할 휴가증이 없습니다 (이미 차감됐거나 차감 대상 휴가 유형 없음)\n\n';
-  }
-  msg += '다운로드 폴더의 가장 최근 휴가증_*.json 파일이 사용됩니다.\n(setup.bat을 먼저 실행하여 프로토콜 등록이 완료된 PC에서만 동작)';
-  if (!confirm(msg)) return;
 
-  // 차감 처리 → 자동화 프로그램 실행
+  // 차감 없음 → 자동화만 실행
   if (previewIds.length === 0) {
+    if (!confirm('자동화 프로그램을 실행하시겠습니까?\n\n※ 차감할 휴가증이 없습니다 (이미 차감됐거나 차감 대상 휴가 유형 없음)\n\n다운로드 폴더의 가장 최근 휴가증_*.json 파일이 사용됩니다.')) return;
     window.location.href = 'vacation-auto://run';
     setTimeout(function() {
       showToast('자동화 프로그램이 실행됐다면 별도 창에서 진행 중입니다.', '');
     }, 1500);
     return;
   }
-  showToast('잔여 차감 중...', '');
-  applyDeductions(leaves)
-    .then(function(result) {
-      showToast(result.totalEmp + '명 잔여 차감 완료. 자동화 프로그램 실행 중...', 'success');
-      window.location.href = 'vacation-auto://run';
-      setTimeout(function() {
-        showToast('자동화 프로그램이 실행됐다면 별도 창에서 진행 중입니다.\n실행 안 됐다면 setup.bat을 다시 실행해 프로토콜을 등록해 주세요.', '');
-      }, 1500);
-    })
-    .catch(function(err) {
-      console.error('차감 실패:', err);
-      if (confirm('잔여 차감 실패: ' + (err.message || err) + '\n\n그래도 자동화 프로그램을 실행하시겠습니까?')) {
-        window.location.href = 'vacation-auto://run';
-      }
+
+  // 부족분 확인 위해 현재 잔여 페치
+  if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
+  showToast('잔여 확인 중...', '');
+  var balanceFetches = previewIds.map(function(empId) {
+    return FB_DB.collection('users').doc(empId).get().then(function(doc) {
+      return { empId: empId, current: doc.exists ? (doc.data() || {}) : {} };
     });
+  });
+  Promise.all(balanceFetches).then(function(currents) {
+    var shortages = [];
+    var rows = currents.map(function(c) {
+      var d = preview[c.empId];
+      var cur = c.current;
+      var lines = [];
+      var shortageLines = [];
+      if (d.annual > 0) {
+        var avA = (typeof cur.balanceAnnual === 'number') ? cur.balanceAnnual : 0;
+        lines.push('연차 ' + avA + ' → ' + Math.round((avA - d.annual) * 100) / 100);
+        if (avA < d.annual) shortageLines.push('연차 ' + (d.annual - avA) + '개 부족');
+      }
+      if (d.birth > 0) {
+        var avB = (typeof cur.balanceBirth === 'number') ? cur.balanceBirth : 0;
+        lines.push('생휴 ' + avB + ' → ' + (avB - d.birth));
+        if (avB < d.birth) shortageLines.push('생휴 ' + (d.birth - avB) + '개 부족');
+      }
+      if (d.summer > 0) {
+        var avS = (typeof cur.balanceSummer === 'number') ? cur.balanceSummer : 0;
+        lines.push('하기 ' + avS + ' → ' + (avS - d.summer));
+        if (avS < d.summer) shortageLines.push('하기 ' + (d.summer - avS) + '개 부족');
+      }
+      if (shortageLines.length > 0) {
+        shortages.push('· ' + (d.name || c.empId) + ': ' + shortageLines.join(', '));
+      }
+      return '· ' + (d.name || c.empId) + ': ' + lines.join(', ');
+    });
+
+    var msg = '자동화 프로그램을 실행하시겠습니까?\n\n';
+    msg += '※ 다음 작업자의 잔여 휴가가 자동 차감됩니다 (' + previewIds.length + '명):\n';
+    msg += rows.slice(0, 8).join('\n');
+    if (rows.length > 8) msg += '\n· 외 ' + (rows.length - 8) + '명...';
+
+    if (shortages.length > 0) {
+      msg += '\n\n⚠️ 잔여 부족 경고 (마이너스로 차감됨):\n';
+      msg += shortages.slice(0, 8).join('\n');
+      if (shortages.length > 8) msg += '\n· 외 ' + (shortages.length - 8) + '명...';
+      msg += '\n\n잔여가 부족한 작업자가 있습니다. 그래도 진행하시겠습니까?';
+    }
+
+    msg += '\n\n다운로드 폴더의 가장 최근 휴가증_*.json 파일이 사용됩니다.';
+
+    if (!confirm(msg)) return;
+
+    showToast('잔여 차감 중...', '');
+    applyDeductions(leaves)
+      .then(function(result) {
+        showToast(result.totalEmp + '명 잔여 차감 완료. 자동화 프로그램 실행 중...', 'success');
+        window.location.href = 'vacation-auto://run';
+        setTimeout(function() {
+          showToast('자동화 프로그램이 실행됐다면 별도 창에서 진행 중입니다.\n실행 안 됐다면 setup.bat을 다시 실행해 프로토콜을 등록해 주세요.', '');
+        }, 1500);
+      })
+      .catch(function(err) {
+        console.error('차감 실패:', err);
+        if (confirm('잔여 차감 실패: ' + (err.message || err) + '\n\n그래도 자동화 프로그램을 실행하시겠습니까?')) {
+          window.location.href = 'vacation-auto://run';
+        }
+      });
+  }).catch(function(err) {
+    showToast('잔여 확인 실패: ' + (err.message || err), 'error');
+  });
 }
 
 // ----- 서무: 미처리 휴가증(최근 7일)을 서버에서 가져오기 -----
@@ -1878,6 +2030,10 @@ function updateWorkerBalance(idx, key, val) {
         if (!balanceCache[empId]) balanceCache[empId] = {};
         var shortKey = key === 'balanceAnnual' ? 'annual' : (key === 'balanceBirth' ? 'birth' : 'summer');
         balanceCache[empId][shortKey] = (trimmed === '') ? undefined : parseFloat(trimmed);
+        // 수동 입력 로그
+        var changes = {};
+        changes[shortKey] = (trimmed === '') ? 'cleared' : parseFloat(trimmed);
+        logBalanceChange(empId, 'manual', changes, { name: w.name });
       })
       .catch(function(err) {
         console.error('잔여 저장 실패:', err);
@@ -2262,6 +2418,16 @@ function onLeaveBalanceFileSelected(e) {
       }
       batch.commit()
         .then(function() {
+          // 업로드 로그
+          entries.forEach(function(en) {
+            var worker = workers.find(function(w) { return String(w.employeeId || '').trim() === en.empId; });
+            var isMale = worker && worker.gender === 'M';
+            logBalanceChange(en.empId, 'upload', {
+              annual: en.annual,
+              birth: isMale ? null : en.birth,
+              summer: en.summer
+            }, {});
+          });
           showToast(validCount + '명의 잔여 휴가가 저장됐습니다.', 'success');
           // 캐시·테이블 갱신
           fetchAllBalances().then(function() { renderWorkerTable(); });
