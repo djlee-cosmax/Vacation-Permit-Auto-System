@@ -386,7 +386,7 @@ function refreshMyLeavesLabel() {
   var btn = document.getElementById('myLeavesBtn');
   var title = document.getElementById('myLeavesTitle');
   if (btn) btn.textContent = isStaff ? '휴가증 조회' : '내 휴가증';
-  if (title) title.textContent = isStaff ? '휴가증 조회 (최근 14일)' : '내 휴가증 조회 (최근 14일)';
+  if (title) title.textContent = isStaff ? '휴가증 조회 (최근 30일)' : '내 휴가증 조회 (최근 30일)';
 }
 
 // 상단바 우측에 로그인한 사용자 이름 표시
@@ -1022,7 +1022,7 @@ function uploadLeaveToCloud(leave) {
   doc.processed = false;  // 서무가 [처리 완료] 시 true로 변경
   doc.serverCreatedAt = firebase.firestore.FieldValue.serverTimestamp();
   // 14일 후 자동 삭제용 TTL 필드
-  doc.expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  doc.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   // syncStatus는 클라우드에 안 올림
   delete doc.syncStatus;
   FB_DB.collection('leaves').doc(leave.id).set(doc)
@@ -1229,7 +1229,7 @@ function fetchMyLeaves() {
   // 작업자만 localStorage 본인 정보 갱신
   if (!isStaff) setMyInfo(name, phone4);
 
-  var fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+  var thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   document.getElementById('myLeavesList').innerHTML = '<div class="my-leaves-empty">조회 중...</div>';
 
   // 작업자 모드: 서무가 처리 완료한 휴가증만 표시
@@ -1249,7 +1249,7 @@ function fetchMyLeaves() {
         if (!isStaff && d.submitterPhone4 !== phone4) return;
         if (workerMode && d.processed !== true) return;
         var t = d.serverCreatedAt && d.serverCreatedAt.toDate ? d.serverCreatedAt.toDate() : null;
-        if (t && t < fourteenDaysAgo) return;
+        if (t && t < thirtyDaysAgo) return;
         results.push({
           docId: doc.id,
           id: d.id,
@@ -1282,7 +1282,7 @@ function fetchMyLeaves() {
 function renderMyLeavesList(items) {
   var listEl = document.getElementById('myLeavesList');
   if (items.length === 0) {
-    listEl.innerHTML = '<div class="my-leaves-empty">최근 14일 내 작성된 휴가증이 없습니다.</div>';
+    listEl.innerHTML = '<div class="my-leaves-empty">최근 30일 내 작성된 휴가증이 없습니다.</div>';
     return;
   }
   listEl.innerHTML = items.map(function(l, i) {
