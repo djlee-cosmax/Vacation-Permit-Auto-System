@@ -186,10 +186,12 @@
       </div>
 
       <div class="worker-toolbar admin-only">
-        <button class="btn-secondary btn-small" onclick="document.getElementById('workerFile').click()">파일 업로드</button>
+        <button class="btn-secondary btn-small" onclick="document.getElementById('workerFile').click()">명단 업로드</button>
         <input type="file" id="workerFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="onWorkerFileSelected(event)">
+        <button class="btn-secondary btn-small" onclick="document.getElementById('leaveBalanceFile').click()" title="엑셀 양식: 사번 | 이름 | 연차 잔여 | 생휴 잔여 | 하기 잔여">잔여 휴가 업로드</button>
+        <input type="file" id="leaveBalanceFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="onLeaveBalanceFileSelected(event)">
         <button class="btn-secondary btn-small" onclick="addWorkerRow()">+ 직접 추가</button>
-        <span class="worker-toolbar-hint">엑셀 양식: 이름 | 사번 | 근무지 | 연락처 (헤더 행 자동 인식)</span>
+        <span class="worker-toolbar-hint">잔여 휴가 양식: 사번 | 이름 | 연차 잔여 | 생휴 잔여 | 하기 잔여</span>
       </div>
       <div class="worker-readonly-notice not-admin-only">
         <div>※ 작업자 명단은 조회만 가능합니다.</div>
@@ -388,7 +390,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=20260601j"></script>
+  <script src="script.js?v=20260601k"></script>
   <!-- PWA Service Worker 등록 -->
   <script>
     if ('serviceWorker' in navigator) {

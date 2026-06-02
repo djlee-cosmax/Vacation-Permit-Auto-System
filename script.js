@@ -1835,6 +1835,126 @@ function onWorkerFileSelected(e) {
   e.target.value = '';
 }
 
+// ----- 잔여 휴가 일괄 업로드 (관리자 전용) -----
+// 양식: 사번 | 이름 | 연차 잔여 | 생휴 잔여 | 하기 잔여
+function onLeaveBalanceFileSelected(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); e.target.value = ''; return; }
+
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      var data = new Uint8Array(ev.target.result);
+      var wb = XLSX.read(data, { type: 'array' });
+      var sheetName = wb.SheetNames[0];
+      var ws = wb.Sheets[sheetName];
+      var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+      // 헤더 행 자동 감지
+      var headerRow = -1, idCol = -1, nameCol = -1, annualCol = -1, birthCol = -1, summerCol = -1;
+      for (var i = 0; i < Math.min(rows.length, 5); i++) {
+        for (var c = 0; c < rows[i].length; c++) {
+          var h = String(rows[i][c] || '').trim();
+          if (h === '사번' || h === '사원번호' || h.indexOf('사번') !== -1) { idCol = c; headerRow = i; }
+          if (h === '이름' || h === '성명') nameCol = c;
+          if (h.indexOf('연차') !== -1) annualCol = c;
+          if (h.indexOf('생휴') !== -1 || h.indexOf('생리') !== -1) birthCol = c;
+          if (h.indexOf('하기') !== -1 || h.indexOf('여름') !== -1) summerCol = c;
+        }
+        if (headerRow !== -1) break;
+      }
+      if (headerRow === -1 || idCol === -1) {
+        showToast('사번 컬럼을 찾을 수 없습니다. 헤더에 "사번"이 있어야 합니다.', 'error');
+        return;
+      }
+      if (annualCol === -1 && birthCol === -1 && summerCol === -1) {
+        showToast('잔여 컬럼을 찾을 수 없습니다.\n(연차 / 생휴 / 하기 중 1개 이상 필요)', 'error');
+        return;
+      }
+
+      // 행 파싱
+      var entries = [];
+      var nameMismatches = [];
+      for (var r = headerRow + 1; r < rows.length; r++) {
+        var row = rows[r];
+        var id = String(row[idCol] || '').trim();
+        if (!id) continue;
+        var entry = { empId: id };
+        if (annualCol !== -1) {
+          var av = String(row[annualCol]).trim();
+          if (av !== '') entry.annual = parseFloat(av);
+        }
+        if (birthCol !== -1) {
+          var bv = String(row[birthCol]).trim();
+          if (bv !== '') entry.birth = parseFloat(bv);
+        }
+        if (summerCol !== -1) {
+          var sv = String(row[summerCol]).trim();
+          if (sv !== '') entry.summer = parseFloat(sv);
+        }
+        // 이름 일치 검증 (있으면)
+        if (nameCol !== -1) {
+          var xlsName = String(row[nameCol] || '').trim();
+          if (xlsName) {
+            var matched = workers.find(function(w) { return String(w.employeeId || '').trim() === id; });
+            if (matched && matched.name && matched.name !== xlsName) {
+              nameMismatches.push(id + ': 명단=' + matched.name + ' / 엑셀=' + xlsName);
+            }
+          }
+        }
+        entries.push(entry);
+      }
+
+      if (entries.length === 0) {
+        showToast('데이터가 없습니다.', 'error');
+        return;
+      }
+
+      // 확인 메시지
+      var msg = entries.length + '명의 잔여 휴가를 일괄 업로드하시겠습니까?';
+      if (nameMismatches.length > 0) {
+        msg += '\n\n⚠ 이름 불일치 ' + nameMismatches.length + '건 (그대로 진행하면 사번 기준으로 저장됩니다):\n' +
+               nameMismatches.slice(0, 5).join('\n') + (nameMismatches.length > 5 ? '\n...' : '');
+      }
+      if (!confirm(msg)) return;
+
+      // Firestore batch (500개 이하 안전)
+      showToast('업로드 중...', '');
+      var batch = FB_DB.batch();
+      var validCount = 0;
+      entries.forEach(function(en) {
+        var update = {};
+        if (en.annual != null && !isNaN(en.annual)) update.balanceAnnual = en.annual;
+        if (en.birth != null && !isNaN(en.birth)) update.balanceBirth = en.birth;
+        if (en.summer != null && !isNaN(en.summer)) update.balanceSummer = en.summer;
+        if (Object.keys(update).length === 0) return;
+        batch.set(FB_DB.collection('users').doc(en.empId), update, { merge: true });
+        validCount++;
+      });
+      if (validCount === 0) {
+        showToast('업로드할 유효한 데이터가 없습니다.', 'error');
+        return;
+      }
+      batch.commit()
+        .then(function() {
+          showToast(validCount + '명의 잔여 휴가가 저장됐습니다.', 'success');
+          // 캐시·테이블 갱신
+          fetchAllBalances().then(function() { renderWorkerTable(); });
+        })
+        .catch(function(err) {
+          console.error('잔여 업로드 실패:', err);
+          showToast('업로드 실패: ' + (err.message || err), 'error');
+        });
+    } catch (err) {
+      console.error(err);
+      showToast('파일 처리 오류: ' + (err.message || err), 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  e.target.value = '';
+}
+
 // ----- 영업일 리스트 (start~end 사이 주말/공휴일 제외) -----
 function getWorkdaysList(start, end) {
   if (!start || !end) return [];
