@@ -1121,7 +1121,7 @@ function showMyBalance(empId) {
       var aEl = document.getElementById('myBalanceAnnual');
       var bEl = document.getElementById('myBalanceBirth');
       var sEl = document.getElementById('myBalanceSummer');
-      if (aEl) aEl.textContent = fmt(d.balanceAnnual, '일');
+      if (aEl) aEl.textContent = fmt(d.balanceAnnual, '개');
       if (bEl) bEl.textContent = fmt(d.balanceBirth, '개');
       if (sEl) sEl.textContent = fmt(d.balanceSummer, '개');
       // 생휴 카드 표시·숨김 (성별 기반)
