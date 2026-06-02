@@ -1319,13 +1319,157 @@ function deleteMyLeave(docId) {
 }
 
 // ----- 서무: PC의 자동화 프로그램 실행 (vacation-auto:// 프로토콜) -----
+// 휴가증 목록에서 작업자별 차감량 계산
+// 반환: { empId: { annual, birth, summer, name, lines[] } }
+function calculateDeductions(leavesList) {
+  var byEmp = {};
+  leavesList.forEach(function(l) {
+    if (l.deductedAt) return; // 이미 차감된 휴가증은 제외
+    var empId = String(l.employeeId || '').trim();
+    if (!empId) return;
+    if (!byEmp[empId]) {
+      byEmp[empId] = { annual: 0, birth: 0, summer: 0, name: l.name || '', lines: [] };
+    }
+    var items = normalizeLeaveItems(l);
+    items.forEach(function(it) {
+      var type = it.type;
+      var count = parseFloat(it.count) || 0;
+      var w = TYPE_WEIGHT[type] || 0;
+      var days = w * count;
+      // 연차/반차/반반차 → 연차에서 차감
+      if (type === '연차' || type.indexOf('반차') === 0 || type.indexOf('반반차') === 0) {
+        if (days > 0) {
+          byEmp[empId].annual += days;
+          byEmp[empId].lines.push(type + ' ' + count + '개 (-' + days + ')');
+        }
+      } else if (type === '생휴') {
+        if (count > 0) {
+          byEmp[empId].birth += count;
+          byEmp[empId].lines.push('생휴 ' + count + '개');
+        }
+      } else if (type === '하기휴가') {
+        if (count > 0) {
+          byEmp[empId].summer += count;
+          byEmp[empId].lines.push('하기휴가 ' + count + '개');
+        }
+      }
+      // 경조, 결근(전/오전/오후) → 차감 안 함
+    });
+  });
+  return byEmp;
+}
+
+// 작업자별 차감을 Firestore에 적용 + 휴가증에 deductedAt 마크
+// 반환: Promise<{ byEmp, totalEmp, totalLines }>
+function applyDeductions(leavesList) {
+  return new Promise(function(resolve, reject) {
+    if (!FB_DB) { reject(new Error('서버 연결 안 됨')); return; }
+    var byEmp = calculateDeductions(leavesList);
+    var empIds = Object.keys(byEmp).filter(function(id) {
+      var d = byEmp[id];
+      return d.annual > 0 || d.birth > 0 || d.summer > 0;
+    });
+    if (empIds.length === 0) {
+      resolve({ byEmp: {}, totalEmp: 0 });
+      return;
+    }
+    // 1) 각 사번의 현재 잔여를 읽고 차감한 새 값 계산 → batch set
+    var fetches = empIds.map(function(empId) {
+      return FB_DB.collection('users').doc(empId).get().then(function(doc) {
+        var d = doc.exists ? (doc.data() || {}) : {};
+        return { empId: empId, current: d };
+      });
+    });
+    Promise.all(fetches).then(function(currents) {
+      var batch = FB_DB.batch();
+      currents.forEach(function(c) {
+        var ded = byEmp[c.empId];
+        var update = {};
+        if (ded.annual > 0) {
+          var cur = (typeof c.current.balanceAnnual === 'number') ? c.current.balanceAnnual : 0;
+          update.balanceAnnual = Math.round((cur - ded.annual) * 100) / 100;
+        }
+        if (ded.birth > 0) {
+          var curB = (typeof c.current.balanceBirth === 'number') ? c.current.balanceBirth : 0;
+          update.balanceBirth = curB - ded.birth;
+        }
+        if (ded.summer > 0) {
+          var curS = (typeof c.current.balanceSummer === 'number') ? c.current.balanceSummer : 0;
+          update.balanceSummer = curS - ded.summer;
+        }
+        batch.set(FB_DB.collection('users').doc(c.empId), update, { merge: true });
+      });
+      return batch.commit();
+    }).then(function() {
+      // 2) 휴가증에 deductedAt 마크 (Firestore + 로컬)
+      var nowIso = new Date().toISOString();
+      var leavesBatch = FB_DB.batch();
+      leavesList.forEach(function(l) {
+        if (l.deductedAt) return;
+        var hasDeduction = byEmp[String(l.employeeId || '').trim()];
+        if (!hasDeduction) return;
+        l.deductedAt = nowIso;
+        leavesBatch.update(FB_DB.collection('leaves').doc(l.id), {
+          deductedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      saveLeaves();
+      return leavesBatch.commit().catch(function() {/* leaves doc 없을 수도 — 무시 */});
+    }).then(function() {
+      resolve({ byEmp: byEmp, totalEmp: empIds.length });
+    }).catch(reject);
+  });
+}
+
 function runAutomationProgram() {
-  if (!confirm('자동화 프로그램을 실행하시겠습니까?\n\n다운로드 폴더의 가장 최근 휴가증_*.json 파일이 사용됩니다.\n(setup.bat을 먼저 실행하여 프로토콜 등록이 완료된 PC에서만 동작)')) return;
-  // custom protocol 호출 → 등록된 run.bat이 --auto 모드로 실행됨
-  window.location.href = 'vacation-auto://run';
-  setTimeout(function() {
-    showToast('자동화 프로그램이 실행됐다면 별도 창에서 진행 중입니다.\n실행 안 됐다면 setup.bat을 다시 실행해 프로토콜을 등록해 주세요.', '');
-  }, 1500);
+  // 차감 대상 미리 산출 → 안내
+  var preview = calculateDeductions(leaves);
+  var previewIds = Object.keys(preview).filter(function(id) {
+    var d = preview[id];
+    return d.annual > 0 || d.birth > 0 || d.summer > 0;
+  });
+  var msg = '자동화 프로그램을 실행하시겠습니까?\n\n';
+  if (previewIds.length > 0) {
+    msg += '※ 다음 작업자의 잔여 휴가가 자동 차감됩니다 (' + previewIds.length + '명):\n';
+    msg += previewIds.slice(0, 8).map(function(id) {
+      var d = preview[id];
+      var parts = [];
+      if (d.annual > 0) parts.push('연차 -' + d.annual);
+      if (d.birth > 0) parts.push('생휴 -' + d.birth);
+      if (d.summer > 0) parts.push('하기 -' + d.summer);
+      return '· ' + (d.name || id) + ': ' + parts.join(', ');
+    }).join('\n');
+    if (previewIds.length > 8) msg += '\n· 외 ' + (previewIds.length - 8) + '명...';
+    msg += '\n\n';
+  } else {
+    msg += '※ 차감할 휴가증이 없습니다 (이미 차감됐거나 차감 대상 휴가 유형 없음)\n\n';
+  }
+  msg += '다운로드 폴더의 가장 최근 휴가증_*.json 파일이 사용됩니다.\n(setup.bat을 먼저 실행하여 프로토콜 등록이 완료된 PC에서만 동작)';
+  if (!confirm(msg)) return;
+
+  // 차감 처리 → 자동화 프로그램 실행
+  if (previewIds.length === 0) {
+    window.location.href = 'vacation-auto://run';
+    setTimeout(function() {
+      showToast('자동화 프로그램이 실행됐다면 별도 창에서 진행 중입니다.', '');
+    }, 1500);
+    return;
+  }
+  showToast('잔여 차감 중...', '');
+  applyDeductions(leaves)
+    .then(function(result) {
+      showToast(result.totalEmp + '명 잔여 차감 완료. 자동화 프로그램 실행 중...', 'success');
+      window.location.href = 'vacation-auto://run';
+      setTimeout(function() {
+        showToast('자동화 프로그램이 실행됐다면 별도 창에서 진행 중입니다.\n실행 안 됐다면 setup.bat을 다시 실행해 프로토콜을 등록해 주세요.', '');
+      }, 1500);
+    })
+    .catch(function(err) {
+      console.error('차감 실패:', err);
+      if (confirm('잔여 차감 실패: ' + (err.message || err) + '\n\n그래도 자동화 프로그램을 실행하시겠습니까?')) {
+        window.location.href = 'vacation-auto://run';
+      }
+    });
 }
 
 // ----- 서무: 미처리 휴가증(최근 7일)을 서버에서 가져오기 -----
