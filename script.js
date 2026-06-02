@@ -1179,9 +1179,20 @@ function showMyBalance(empId) {
       if (aEl) aEl.textContent = fmt(d.balanceAnnual, '개');
       if (bEl) bEl.textContent = fmt(d.balanceBirth, '개');
       if (sEl) sEl.textContent = fmt(d.balanceSummer, '개');
-      // 생휴 카드 표시·숨김 (성별 기반)
+      // 생휴 카드 — 표시·숨김 (성별) + 월 기준 태그
       var birthItem = bEl ? bEl.parentElement : null;
-      if (birthItem) birthItem.style.display = isMale ? 'none' : '';
+      if (birthItem) {
+        birthItem.style.display = isMale ? 'none' : '';
+        var existingBirthTag = birthItem.querySelector('.my-balance-tag');
+        if (existingBirthTag) existingBirthTag.remove();
+        if (!isMale) {
+          var nowB = new Date();
+          var birthTag = document.createElement('span');
+          birthTag.className = 'my-balance-tag in-season';
+          birthTag.textContent = (nowB.getFullYear() % 100) + '년 ' + (nowB.getMonth() + 1) + '월 기준';
+          birthItem.appendChild(birthTag);
+        }
+      }
       // 하기휴가 시즌 표시 (5~10월만 사용 가능)
       var month = (new Date()).getMonth() + 1;
       var summerSeason = (month >= 5 && month <= 10);
