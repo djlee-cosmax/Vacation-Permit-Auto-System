@@ -467,6 +467,8 @@ try {
         FB_UID = cred.user.uid;
         // 본인이 작성하고 서버에서 처리 완료된 휴가증은 우측 카드에서 자동 제거
         setTimeout(cleanupProcessedLeavesFromCloud, 200);
+        // 외부에서 삭제된 휴가증의 차감 자동 환원 (서무·관리자 모드만)
+        startLeaveDeletionWatcher();
         // 페이지 로드 시 보안 질문 미등록 체크 (이미 로그인된 상태에서도 안내)
         var sess = getSession();
         if (sess && sess.empId && FB_DB) {
@@ -1093,7 +1095,12 @@ function resetForm() {
 }
 
 function removeLeave(id) {
-  if (!confirm('이 휴가증을 삭제하시겠습니까?')) return;
+  var leave = leaves.find(function(l) { return l.id === id; });
+  var msg = '이 휴가증을 삭제하시겠습니까?';
+  if (leave && leave.deductedAt) {
+    msg = '이 휴가증은 이미 잔여에서 차감됐습니다.\n삭제하면 차감된 잔여가 자동으로 환원됩니다.\n계속하시겠습니까?';
+  }
+  if (!confirm(msg)) return;
   leaves = leaves.filter(function(l) { return l.id !== id; });
   saveLeaves();
   renderLeaveList();
@@ -1236,6 +1243,7 @@ function fetchMyLeaves() {
           docId: doc.id,
           id: d.id,
           name: d.name,
+          employeeId: d.employeeId,
           items: d.items || [],
           days: d.days,
           start: d.start,
@@ -1243,6 +1251,7 @@ function fetchMyLeaves() {
           reason: d.reason,
           submittedBy: d.submittedBy,
           processed: d.processed === true,
+          deductedAt: d.deductedAt || null,
           serverCreatedAt: t
         });
       });
@@ -1298,7 +1307,12 @@ function renderMyLeavesList(items) {
 }
 
 function deleteMyLeave(docId) {
-  if (!confirm('이 휴가증을 취소(삭제)하시겠습니까?\n취소 후엔 되돌릴 수 없습니다.')) return;
+  var cached = myLeavesCache.find(function(l) { return l.docId === docId; });
+  var msg = '이 휴가증을 취소(삭제)하시겠습니까?\n취소 후엔 되돌릴 수 없습니다.';
+  if (cached && cached.deductedAt) {
+    msg = '이 휴가증은 이미 잔여에서 차감됐습니다.\n취소(삭제) 시 차감된 잔여가 자동으로 환원됩니다.\n계속하시겠습니까?';
+  }
+  if (!confirm(msg)) return;
   if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
   FB_DB.collection('leaves').doc(docId).delete()
     .then(function() {
@@ -1357,6 +1371,78 @@ function calculateDeductions(leavesList) {
     });
   });
   return byEmp;
+}
+
+// 휴가증 1건의 차감을 환원 (잔여 +)
+function revertDeductionForLeave(leave) {
+  return new Promise(function(resolve, reject) {
+    if (!FB_DB) { reject(new Error('서버 연결 안 됨')); return; }
+    if (!leave) { resolve(null); return; }
+    var empId = String(leave.employeeId || '').trim();
+    if (!empId) { resolve(null); return; }
+    // 차감량 계산 (deductedAt를 일시 제거해서 정상 계산되게)
+    var probe = Object.assign({}, leave, { deductedAt: null });
+    var calc = calculateDeductions([probe]);
+    var ded = calc[empId];
+    if (!ded || (ded.annual === 0 && ded.birth === 0 && ded.summer === 0)) {
+      resolve(null);
+      return;
+    }
+    FB_DB.collection('users').doc(empId).get()
+      .then(function(doc) {
+        var d = doc.exists ? (doc.data() || {}) : {};
+        var update = {};
+        if (ded.annual > 0) {
+          var cur = (typeof d.balanceAnnual === 'number') ? d.balanceAnnual : 0;
+          update.balanceAnnual = Math.round((cur + ded.annual) * 100) / 100;
+        }
+        if (ded.birth > 0) {
+          var curB = (typeof d.balanceBirth === 'number') ? d.balanceBirth : 0;
+          update.balanceBirth = curB + ded.birth;
+        }
+        if (ded.summer > 0) {
+          var curS = (typeof d.balanceSummer === 'number') ? d.balanceSummer : 0;
+          update.balanceSummer = curS + ded.summer;
+        }
+        return FB_DB.collection('users').doc(empId).set(update, { merge: true });
+      })
+      .then(function() { resolve({ empId: empId, name: leave.name, ded: ded }); })
+      .catch(reject);
+  });
+}
+
+// Firestore leaves 컬렉션 감시 — 외부에서 삭제된 휴가증의 차감 자동 환원
+// (Firebase Console에서 직접 삭제하거나 다른 PC에서 삭제한 경우 대응)
+var _leaveWatcher = null;
+function startLeaveDeletionWatcher() {
+  if (_leaveWatcher) return;
+  if (!FB_DB || !LEADER_MODE) return;
+  _leaveWatcher = FB_DB.collection('leaves').onSnapshot(function(snapshot) {
+    snapshot.docChanges().forEach(function(change) {
+      if (change.type !== 'removed') return;
+      var data = change.doc.data();
+      if (!data || !data.deductedAt) return; // 차감 안 된 doc은 환원 불필요
+      var pseudoLeave = {
+        id: change.doc.id,
+        name: data.name,
+        employeeId: data.employeeId,
+        items: data.items || (data.type ? [{ type: data.type, count: 1 }] : [])
+      };
+      revertDeductionForLeave(pseudoLeave).then(function(result) {
+        if (!result) return;
+        var ded = result.ded;
+        var parts = [];
+        if (ded.annual > 0) parts.push('연차 +' + ded.annual);
+        if (ded.birth > 0) parts.push('생휴 +' + ded.birth);
+        if (ded.summer > 0) parts.push('하기 +' + ded.summer);
+        if (parts.length > 0) {
+          showToast('휴가증 삭제됨 — ' + (data.name || '') + ' 잔여 환원: ' + parts.join(', '), 'success');
+        }
+      }).catch(function(err) {
+        console.warn('자동 환원 실패:', err);
+      });
+    });
+  }, function(err) { console.warn('leave watcher 오류:', err); });
 }
 
 // 작업자별 차감을 Firestore에 적용 + 휴가증에 deductedAt 마크
