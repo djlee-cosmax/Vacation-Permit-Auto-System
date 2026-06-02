@@ -921,6 +921,16 @@ input, select, textarea { font-family: inherit; }
 }
 .worker-row-pw:hover { background: #c8102e; color: #fff; }
 
+/* 잔여 입력 셀 */
+.worker-balance-cell { text-align: center; }
+.worker-balance-cell input[type="number"] {
+  width: 70px;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+.worker-balance-cell input::-webkit-outer-spin-button,
+.worker-balance-cell input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
 /* PC 서무/관리자 모드 — 작업자 명단 모달 크게·가독성 ↑ */
 @media (min-width: 1024px) {
   html.role-leader #workerModal .modal,
@@ -961,32 +971,39 @@ input, select, textarea { font-family: inherit; }
     width: auto;
     white-space: normal;
   }
-  /* 컬럼 폭 비율: 이름 / 사번 / 근무지 / 연락처 / 액션 */
+  /* 컬럼 폭 비율 (8컬럼): 이름 / 사번 / 근무지 / 연락처 / 잔여연차 / 잔여생휴 / 잔여하기 / 액션 */
   html.role-leader #workerModal .worker-table th:nth-child(1),
   html.role-leader #workerModal .worker-table td:nth-child(1),
   html.role-admin #workerModal .worker-table th:nth-child(1),
-  html.role-admin #workerModal .worker-table td:nth-child(1) { width: 28%; }
+  html.role-admin #workerModal .worker-table td:nth-child(1) { width: 16%; }
   html.role-leader #workerModal .worker-table th:nth-child(2),
   html.role-leader #workerModal .worker-table td:nth-child(2),
   html.role-admin #workerModal .worker-table th:nth-child(2),
-  html.role-admin #workerModal .worker-table td:nth-child(2) { width: 22%; }
+  html.role-admin #workerModal .worker-table td:nth-child(2) { width: 14%; }
   html.role-leader #workerModal .worker-table th:nth-child(3),
   html.role-leader #workerModal .worker-table td:nth-child(3),
   html.role-admin #workerModal .worker-table th:nth-child(3),
-  html.role-admin #workerModal .worker-table td:nth-child(3) { width: 17%; }
+  html.role-admin #workerModal .worker-table td:nth-child(3) { width: 11%; }
   html.role-leader #workerModal .worker-table th:nth-child(4),
   html.role-leader #workerModal .worker-table td:nth-child(4),
   html.role-admin #workerModal .worker-table th:nth-child(4),
-  html.role-admin #workerModal .worker-table td:nth-child(4) { width: 25%; }
+  html.role-admin #workerModal .worker-table td:nth-child(4) { width: 17%; }
   html.role-leader #workerModal .worker-table th:nth-child(5),
   html.role-leader #workerModal .worker-table td:nth-child(5),
   html.role-admin #workerModal .worker-table th:nth-child(5),
-  html.role-admin #workerModal .worker-table td:nth-child(5) { width: 14%; }
-  /* 액션 컬럼 폭 늘림에 맞춰 다른 컬럼 미세 조정 */
-  html.role-admin #workerModal .worker-table th:nth-child(4),
-  html.role-admin #workerModal .worker-table td:nth-child(4) { width: 22%; }
-  html.role-admin #workerModal .worker-table th:nth-child(1),
-  html.role-admin #workerModal .worker-table td:nth-child(1) { width: 25%; }
+  html.role-admin #workerModal .worker-table td:nth-child(5) { width: 11%; }
+  html.role-leader #workerModal .worker-table th:nth-child(6),
+  html.role-leader #workerModal .worker-table td:nth-child(6),
+  html.role-admin #workerModal .worker-table th:nth-child(6),
+  html.role-admin #workerModal .worker-table td:nth-child(6) { width: 10%; }
+  html.role-leader #workerModal .worker-table th:nth-child(7),
+  html.role-leader #workerModal .worker-table td:nth-child(7),
+  html.role-admin #workerModal .worker-table th:nth-child(7),
+  html.role-admin #workerModal .worker-table td:nth-child(7) { width: 10%; }
+  html.role-leader #workerModal .worker-table th:nth-child(8),
+  html.role-leader #workerModal .worker-table td:nth-child(8),
+  html.role-admin #workerModal .worker-table th:nth-child(8),
+  html.role-admin #workerModal .worker-table td:nth-child(8) { width: 11%; }
   html.role-leader #workerModal .worker-readonly-cell,
   html.role-admin #workerModal .worker-readonly-cell { font-size: 15px !important; padding: 12px 16px !important; }
   html.role-leader #workerModal .worker-table input,
@@ -1136,6 +1153,52 @@ html:not(.leader-mode) .leader-only { display: none !important; }
 .worker-row-leader > td { background: #fff7f0; }
 .worker-row-leader > td:first-child { border-left: 3px solid #ff7043; padding-left: 9px !important; }
 
+
+/* ===== 내 휴가증 모달 — 잔여 휴가 박스 ===== */
+.my-balance-box {
+  background: linear-gradient(135deg, #fff5f5 0%, #ffeaea 100%);
+  border: 1px solid #ffd0d0;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin: 12px 0;
+}
+.my-balance-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #c8102e;
+  margin-bottom: 10px;
+}
+.my-balance-note {
+  font-size: 11px;
+  font-weight: 500;
+  color: #999;
+  margin-left: 6px;
+}
+.my-balance-row {
+  display: flex;
+  gap: 10px;
+}
+.my-balance-item {
+  flex: 1;
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 1px 3px rgba(200, 16, 46, 0.08);
+}
+.my-balance-label {
+  font-size: 12px;
+  color: #777;
+  font-weight: 600;
+}
+.my-balance-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: #1a1a1a;
+}
 
 /* ===== 내 휴가증 모달 ===== */
 .my-leaves-notice {

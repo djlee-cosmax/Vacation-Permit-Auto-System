@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="휴가증">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="style.css?v=20260601g">
+  <link rel="stylesheet" href="style.css?v=20260601h">
   <!-- 즉시 인증 상태 검사 (메인 콘텐츠 깜빡임 방지) -->
   <script>
     (function() {
@@ -199,7 +199,16 @@
       <div class="worker-table-wrap">
         <table class="worker-table" id="workerTable">
           <thead>
-            <tr><th style="width:32%">이름</th><th style="width:22%">사번</th><th style="width:16%">근무지</th><th style="width:22%">연락처</th><th style="width:8%"></th></tr>
+            <tr>
+              <th>이름</th>
+              <th>사번</th>
+              <th>근무지</th>
+              <th>연락처</th>
+              <th class="leader-only">잔여 연차</th>
+              <th class="leader-only">잔여 생휴</th>
+              <th class="leader-only">잔여 하기</th>
+              <th></th>
+            </tr>
           </thead>
           <tbody id="workerTableBody"></tbody>
         </table>
@@ -232,6 +241,16 @@
           <input type="text" id="myAuthPhone4" placeholder="0000" maxlength="4" inputmode="numeric" pattern="[0-9]{4}" autocomplete="off">
         </div>
         <button class="btn-primary" onclick="fetchMyLeaves()">조회</button>
+      </div>
+
+      <!-- 본인 잔여 휴가 (그룹웨어 기준, 서무가 갱신) -->
+      <div class="my-balance-box" id="myBalanceBox" style="display:none">
+        <div class="my-balance-title">내 잔여 휴가 <span class="my-balance-note">(서무가 갱신)</span></div>
+        <div class="my-balance-row">
+          <div class="my-balance-item"><span class="my-balance-label">연차</span><span class="my-balance-value" id="myBalanceAnnual">-</span></div>
+          <div class="my-balance-item"><span class="my-balance-label">생휴</span><span class="my-balance-value" id="myBalanceBirth">-</span></div>
+          <div class="my-balance-item"><span class="my-balance-label">하기휴가</span><span class="my-balance-value" id="myBalanceSummer">-</span></div>
+        </div>
       </div>
 
       <div class="my-leaves-list" id="myLeavesList">
@@ -369,7 +388,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=20260601h"></script>
+  <script src="script.js?v=20260601i"></script>
   <!-- PWA Service Worker 등록 -->
   <script>
     if ('serviceWorker' in navigator) {

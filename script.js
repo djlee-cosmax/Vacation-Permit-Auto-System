@@ -1087,6 +1087,36 @@ function openMyLeavesModal() {
 function closeMyLeavesModal() {
   document.getElementById('myLeavesModal').style.display = 'none';
   myLeavesCache = [];
+  var box = document.getElementById('myBalanceBox');
+  if (box) box.style.display = 'none';
+}
+
+// [내 휴가증] 모달 상단 본인 잔여 휴가 표시
+function showMyBalance(empId) {
+  var box = document.getElementById('myBalanceBox');
+  if (!box) return;
+  if (!empId || !FB_DB) {
+    box.style.display = 'none';
+    return;
+  }
+  FB_DB.collection('users').doc(empId).get()
+    .then(function(doc) {
+      var d = doc.exists ? doc.data() : {};
+      var fmt = function(v, unit) {
+        return (v == null || v === '') ? '-' : (v + (unit || ''));
+      };
+      var aEl = document.getElementById('myBalanceAnnual');
+      var bEl = document.getElementById('myBalanceBirth');
+      var sEl = document.getElementById('myBalanceSummer');
+      if (aEl) aEl.textContent = fmt(d.balanceAnnual, '일');
+      if (bEl) bEl.textContent = fmt(d.balanceBirth, '개');
+      if (sEl) sEl.textContent = fmt(d.balanceSummer, '개');
+      box.style.display = '';
+    })
+    .catch(function(err) {
+      console.warn('잔여 조회 실패:', err);
+      box.style.display = 'none';
+    });
 }
 
 function fetchMyLeaves() {
@@ -1108,8 +1138,10 @@ function fetchMyLeaves() {
   document.getElementById('myLeavesList').innerHTML = '<div class="my-leaves-empty">조회 중...</div>';
 
   // 작업자 모드: 서무가 처리 완료한 휴가증만 표시
-  var sess = getSession();
   var workerMode = (sess && sess.role === 'worker');
+
+  // 작업자 모드 — 본인 잔여 휴가 조회·표시
+  showMyBalance(workerMode ? sess && sess.empId : null);
 
   FB_DB.collection('leaves')
     .where('name', '==', name)
@@ -1424,10 +1456,20 @@ function escapeHtml(s) {
 
 // ----- 작업자 명단 모달 -----
 var workerModalState = [];
+// 사번 → { annual, birth, summer } 잔여 캐시 (Firestore에서 페치)
+var balanceCache = {};
 var workerSearchQuery = '';
 
 function openWorkerModal() {
-  workerModalState = workers.map(function(w) { return Object.assign({}, w); });
+  workerModalState = workers.map(function(w) {
+    var copy = Object.assign({}, w);
+    // 캐시된 잔여 적용 (없으면 빈 값)
+    var b = balanceCache[String(w.employeeId || '').trim()] || {};
+    copy.balanceAnnual = (b.annual != null) ? b.annual : '';
+    copy.balanceBirth = (b.birth != null) ? b.birth : '';
+    copy.balanceSummer = (b.summer != null) ? b.summer : '';
+    return copy;
+  });
   workerSearchQuery = '';
   var searchInput = document.getElementById('workerSearch');
   if (searchInput) {
@@ -1443,6 +1485,66 @@ function openWorkerModal() {
   renderWorkerTable();
   document.getElementById('workerHint').textContent = '현재 ' + workers.length + '명 등록됨';
   document.getElementById('workerModal').style.display = 'flex';
+  // 서무·관리자만 잔여 정보를 Firestore에서 페치 (모달 열 때마다 최신화)
+  if (LEADER_MODE && FB_DB) {
+    fetchAllBalances().then(function() { renderWorkerTable(); });
+  }
+}
+
+// Firestore users 컬렉션에서 모든 사번의 잔여 정보 페치 → balanceCache + workerModalState 갱신
+function fetchAllBalances() {
+  if (!FB_DB) return Promise.resolve();
+  return FB_DB.collection('users').get().then(function(snapshot) {
+    balanceCache = {};
+    snapshot.forEach(function(doc) {
+      var d = doc.data() || {};
+      balanceCache[doc.id] = {
+        annual: d.balanceAnnual,
+        birth: d.balanceBirth,
+        summer: d.balanceSummer
+      };
+    });
+    workerModalState.forEach(function(w) {
+      var b = balanceCache[String(w.employeeId || '').trim()] || {};
+      w.balanceAnnual = (b.annual != null) ? b.annual : '';
+      w.balanceBirth = (b.birth != null) ? b.birth : '';
+      w.balanceSummer = (b.summer != null) ? b.summer : '';
+    });
+  }).catch(function(err) {
+    console.warn('잔여 정보 페치 실패:', err);
+  });
+}
+
+// 잔여 입력 시 Firestore 저장 (debounce)
+function updateWorkerBalance(idx, key, val) {
+  var w = workerModalState[idx];
+  if (!w || !w.employeeId) return;
+  w[key] = val;
+  var empId = String(w.employeeId).trim();
+  if (!empId || !FB_DB) return;
+  clearTimeout(w._saveTimer);
+  w._saveTimer = setTimeout(function() {
+    var trimmed = String(val || '').trim();
+    var update = {};
+    if (trimmed === '') {
+      update[key] = firebase.firestore.FieldValue.delete();
+    } else {
+      var num = parseFloat(trimmed);
+      if (isNaN(num)) return;
+      update[key] = num;
+    }
+    FB_DB.collection('users').doc(empId).set(update, { merge: true })
+      .then(function() {
+        // 캐시 갱신
+        if (!balanceCache[empId]) balanceCache[empId] = {};
+        var shortKey = key === 'balanceAnnual' ? 'annual' : (key === 'balanceBirth' ? 'birth' : 'summer');
+        balanceCache[empId][shortKey] = (trimmed === '') ? undefined : parseFloat(trimmed);
+      })
+      .catch(function(err) {
+        console.error('잔여 저장 실패:', err);
+        showToast('잔여 저장 실패: ' + (err.message || err), 'error');
+      });
+  }, 600);
 }
 
 function onWorkerSearch(value) {
@@ -1502,6 +1604,10 @@ function renderWorkerTable() {
     var leaderBadge = (!isAdminWorker(w) && isLeaderWorker(w)) ? '<span class="worker-leader-badge">서무</span>' : '';
     var roleBadge = adminBadge + leaderBadge;
     var trCls = isAdminWorker(w) ? ' class="worker-row-admin"' : (isLeaderWorker(w) ? ' class="worker-row-leader"' : '');
+    // 잔여 셀 — 서무·관리자에게만 보이는 input (leader-only 클래스)
+    var balAnnual = (w.balanceAnnual != null && w.balanceAnnual !== '') ? w.balanceAnnual : '';
+    var balBirth = (w.balanceBirth != null && w.balanceBirth !== '') ? w.balanceBirth : '';
+    var balSummer = (w.balanceSummer != null && w.balanceSummer !== '') ? w.balanceSummer : '';
     if (ADMIN_MODE) {
       var empIdSafe = String(w.employeeId || '').trim();
       var pwBtn = empIdSafe
@@ -1512,15 +1618,33 @@ function renderWorkerTable() {
         '<td><input type="text" value="' + escapeHtml(w.employeeId || '') + '" oninput="updateWorker(' + i + ',\'employeeId\',this.value)"></td>' +
         '<td><input type="text" value="' + escapeHtml(w.team || '') + '" oninput="updateWorker(' + i + ',\'team\',this.value)"></td>' +
         '<td><input type="text" value="' + escapeHtml(w.phone || '') + '" oninput="updateWorker(' + i + ',\'phone\',this.value)"></td>' +
+        '<td class="leader-only worker-balance-cell"><input type="number" step="0.25" min="0" value="' + escapeHtml(String(balAnnual)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceAnnual\',this.value)"></td>' +
+        '<td class="leader-only worker-balance-cell"><input type="number" step="1" min="0" value="' + escapeHtml(String(balBirth)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceBirth\',this.value)"></td>' +
+        '<td class="leader-only worker-balance-cell"><input type="number" step="1" min="0" value="' + escapeHtml(String(balSummer)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceSummer\',this.value)"></td>' +
         '<td class="worker-row-actions">' + pwBtn + '<button class="worker-row-del" onclick="deleteWorkerRow(' + i + ')" title="명단에서 삭제">×</button></td>' +
       '</tr>';
-    } else {
-      // 비관리자: 텍스트만 표시 (편집 불가)
+    } else if (LEADER_MODE) {
+      // 서무: 편집 불가지만 잔여만 편집 가능
       return '<tr' + trCls + '>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.name || '') + roleBadge + '</td>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.employeeId || '') + '</td>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.team || '') + '</td>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.phone || '') + '</td>' +
+        '<td class="leader-only worker-balance-cell"><input type="number" step="0.25" min="0" value="' + escapeHtml(String(balAnnual)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceAnnual\',this.value)"></td>' +
+        '<td class="leader-only worker-balance-cell"><input type="number" step="1" min="0" value="' + escapeHtml(String(balBirth)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceBirth\',this.value)"></td>' +
+        '<td class="leader-only worker-balance-cell"><input type="number" step="1" min="0" value="' + escapeHtml(String(balSummer)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceSummer\',this.value)"></td>' +
+        '<td></td>' +
+      '</tr>';
+    } else {
+      // 일반 작업자: 잔여 컬럼은 .leader-only로 숨김
+      return '<tr' + trCls + '>' +
+        '<td class="worker-readonly-cell">' + escapeHtml(w.name || '') + roleBadge + '</td>' +
+        '<td class="worker-readonly-cell">' + escapeHtml(w.employeeId || '') + '</td>' +
+        '<td class="worker-readonly-cell">' + escapeHtml(w.team || '') + '</td>' +
+        '<td class="worker-readonly-cell">' + escapeHtml(w.phone || '') + '</td>' +
+        '<td class="leader-only"></td>' +
+        '<td class="leader-only"></td>' +
+        '<td class="leader-only"></td>' +
         '<td></td>' +
       '</tr>';
     }
