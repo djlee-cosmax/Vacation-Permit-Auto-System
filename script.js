@@ -1209,8 +1209,6 @@ function showMyBalance(empId) {
         summerItem.appendChild(tag);
       }
       box.style.display = '';
-      // 올해 누적 사용량 (balanceLogs 기반)
-      loadMyYearUsage(empId, isMale);
     })
     .catch(function(err) {
       console.warn('잔여 조회 실패:', err);
