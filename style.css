@@ -1212,6 +1212,14 @@ html:not(.leader-mode) .leader-only { display: none !important; }
   padding: 2px 8px;
   border-radius: 8px;
   letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .my-balance-tag {
+    font-size: 9.5px;
+    padding: 2px 6px;
+    letter-spacing: 0;
+  }
 }
 .my-balance-tag.in-season {
   background: #e8f5e9;
