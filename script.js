@@ -1411,36 +1411,57 @@ function revertDeductionForLeave(leave) {
   });
 }
 
-// Firestore leaves 컬렉션 감시 — 외부에서 삭제된 휴가증의 차감 자동 환원
-// (Firebase Console에서 직접 삭제하거나 다른 PC에서 삭제한 경우 대응)
+// Firestore leaves 컬렉션 감시 — 외부 삭제 자동 처리
+// · 모든 모드: 본인 로컬 leaves에 있으면 화면에서 자동 제거
+// · 서무·관리자 모드: 차감된 휴가증이면 잔여 자동 환원
 var _leaveWatcher = null;
 function startLeaveDeletionWatcher() {
   if (_leaveWatcher) return;
-  if (!FB_DB || !LEADER_MODE) return;
+  if (!FB_DB) return;
   _leaveWatcher = FB_DB.collection('leaves').onSnapshot(function(snapshot) {
     snapshot.docChanges().forEach(function(change) {
       if (change.type !== 'removed') return;
-      var data = change.doc.data();
-      if (!data || !data.deductedAt) return; // 차감 안 된 doc은 환원 불필요
-      var pseudoLeave = {
-        id: change.doc.id,
-        name: data.name,
-        employeeId: data.employeeId,
-        items: data.items || (data.type ? [{ type: data.type, count: 1 }] : [])
-      };
-      revertDeductionForLeave(pseudoLeave).then(function(result) {
-        if (!result) return;
-        var ded = result.ded;
-        var parts = [];
-        if (ded.annual > 0) parts.push('연차 +' + ded.annual);
-        if (ded.birth > 0) parts.push('생휴 +' + ded.birth);
-        if (ded.summer > 0) parts.push('하기 +' + ded.summer);
-        if (parts.length > 0) {
-          showToast('휴가증 삭제됨 — ' + (data.name || '') + ' 잔여 환원: ' + parts.join(', '), 'success');
+      var data = change.doc.data() || {};
+
+      // 1) 로컬 leaves에 있으면 → 화면에서 제거 (모든 모드 공통)
+      var localIdx = leaves.findIndex
+        ? leaves.findIndex(function(l) { return l.id === change.doc.id; })
+        : (function() {
+            for (var i = 0; i < leaves.length; i++) if (leaves[i].id === change.doc.id) return i;
+            return -1;
+          })();
+      if (localIdx !== -1) {
+        var removedLeave = leaves[localIdx];
+        leaves.splice(localIdx, 1);
+        saveLeaves();
+        renderLeaveList();
+        if (!LEADER_MODE) {
+          showToast('휴가증이 서버에서 삭제되어 화면에서 제거됐습니다.\n(' + (removedLeave.name || '') + ')', '');
         }
-      }).catch(function(err) {
-        console.warn('자동 환원 실패:', err);
-      });
+      }
+
+      // 2) 차감된 휴가증이면 환원 (서무·관리자만)
+      if (LEADER_MODE && data.deductedAt) {
+        var pseudoLeave = {
+          id: change.doc.id,
+          name: data.name,
+          employeeId: data.employeeId,
+          items: data.items || (data.type ? [{ type: data.type, count: 1 }] : [])
+        };
+        revertDeductionForLeave(pseudoLeave).then(function(result) {
+          if (!result) return;
+          var ded = result.ded;
+          var parts = [];
+          if (ded.annual > 0) parts.push('연차 +' + ded.annual);
+          if (ded.birth > 0) parts.push('생휴 +' + ded.birth);
+          if (ded.summer > 0) parts.push('하기 +' + ded.summer);
+          if (parts.length > 0) {
+            showToast('휴가증 삭제됨 — ' + (data.name || '') + ' 잔여 환원: ' + parts.join(', '), 'success');
+          }
+        }).catch(function(err) {
+          console.warn('자동 환원 실패:', err);
+        });
+      }
     });
   }, function(err) { console.warn('leave watcher 오류:', err); });
 }
