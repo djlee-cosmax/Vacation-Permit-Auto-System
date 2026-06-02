@@ -887,6 +887,16 @@ function addLeave() {
   if (!reason) { showToast('사유를 입력해 주세요.', 'error'); return; }
   if (!phone) { showToast('연락처를 입력해 주세요.', 'error'); return; }
 
+  // 하기휴가 — 시작·종료가 모두 5~10월 사이여야 사용 가능 (시즌 외 사용 불가)
+  if (type === '하기휴가') {
+    var sMonth = parseInt((start || '').split('-')[1], 10);
+    var eMonth = parseInt((end || '').split('-')[1], 10);
+    if (!sMonth || !eMonth || sMonth < 5 || sMonth > 10 || eMonth < 5 || eMonth > 10) {
+      showToast('하기휴가는 5~10월에만 사용 가능합니다.\n기간을 다시 확인해 주세요.', 'error');
+      return;
+    }
+  }
+
   // 중복 / 초과 차단 — 같은 날짜에 기존 휴가 + 신규 휴가 합산이 1일 초과하면 막기
   function getDayWeight(t) {
     return FULL_RANGE_TYPES.indexOf(t) !== -1 ? 1 : (TYPE_WEIGHT[t] || 0);
@@ -1111,6 +1121,19 @@ function showMyBalance(empId) {
       if (aEl) aEl.textContent = fmt(d.balanceAnnual, '일');
       if (bEl) bEl.textContent = fmt(d.balanceBirth, '개');
       if (sEl) sEl.textContent = fmt(d.balanceSummer, '개');
+      // 하기휴가 시즌 표시 (5~10월만 사용 가능)
+      var month = (new Date()).getMonth() + 1;
+      var summerSeason = (month >= 5 && month <= 10);
+      var summerItem = sEl ? sEl.parentElement : null;
+      var existingTag = summerItem ? summerItem.querySelector('.my-balance-tag') : null;
+      if (existingTag) existingTag.remove();
+      if (summerItem) {
+        summerItem.classList.toggle('off-season', !summerSeason);
+        var tag = document.createElement('span');
+        tag.className = 'my-balance-tag ' + (summerSeason ? 'in-season' : 'off-season-tag');
+        tag.textContent = summerSeason ? '사용 시즌 (5~10월)' : '사용 시즌 외';
+        summerItem.appendChild(tag);
+      }
       box.style.display = '';
     })
     .catch(function(err) {
