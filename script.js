@@ -1109,6 +1109,9 @@ function showMyBalance(empId) {
     box.style.display = 'none';
     return;
   }
+  // 성별 확인 — 남자는 생휴 카드 숨김
+  var worker = workers.find(function(w) { return String(w.employeeId || '').trim() === String(empId).trim(); });
+  var isMale = worker && worker.gender === 'M';
   FB_DB.collection('users').doc(empId).get()
     .then(function(doc) {
       var d = doc.exists ? doc.data() : {};
@@ -1121,6 +1124,9 @@ function showMyBalance(empId) {
       if (aEl) aEl.textContent = fmt(d.balanceAnnual, '일');
       if (bEl) bEl.textContent = fmt(d.balanceBirth, '개');
       if (sEl) sEl.textContent = fmt(d.balanceSummer, '개');
+      // 생휴 카드 표시·숨김 (성별 기반)
+      var birthItem = bEl ? bEl.parentElement : null;
+      if (birthItem) birthItem.style.display = isMale ? 'none' : '';
       // 하기휴가 시즌 표시 (5~10월만 사용 가능)
       var month = (new Date()).getMonth() + 1;
       var summerSeason = (month >= 5 && month <= 10);
@@ -1631,6 +1637,11 @@ function renderWorkerTable() {
     var balAnnual = (w.balanceAnnual != null && w.balanceAnnual !== '') ? w.balanceAnnual : '';
     var balBirth = (w.balanceBirth != null && w.balanceBirth !== '') ? w.balanceBirth : '';
     var balSummer = (w.balanceSummer != null && w.balanceSummer !== '') ? w.balanceSummer : '';
+    // 남자는 생휴 셀 비활성 (해당 없음)
+    var isMale = w.gender === 'M';
+    var birthCellHtml = isMale
+      ? '<span class="worker-balance-na">해당 없음</span>'
+      : '<input type="number" step="1" min="0" value="' + escapeHtml(String(balBirth)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceBirth\',this.value)">';
     if (ADMIN_MODE) {
       var empIdSafe = String(w.employeeId || '').trim();
       var pwBtn = empIdSafe
@@ -1642,7 +1653,7 @@ function renderWorkerTable() {
         '<td><input type="text" value="' + escapeHtml(w.team || '') + '" oninput="updateWorker(' + i + ',\'team\',this.value)"></td>' +
         '<td><input type="text" value="' + escapeHtml(w.phone || '') + '" oninput="updateWorker(' + i + ',\'phone\',this.value)"></td>' +
         '<td class="leader-only worker-balance-cell"><input type="number" step="0.25" min="0" value="' + escapeHtml(String(balAnnual)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceAnnual\',this.value)"></td>' +
-        '<td class="leader-only worker-balance-cell"><input type="number" step="1" min="0" value="' + escapeHtml(String(balBirth)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceBirth\',this.value)"></td>' +
+        '<td class="leader-only worker-balance-cell">' + birthCellHtml + '</td>' +
         '<td class="leader-only worker-balance-cell"><input type="number" step="1" min="0" value="' + escapeHtml(String(balSummer)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceSummer\',this.value)"></td>' +
         '<td class="worker-row-actions">' + pwBtn + '<button class="worker-row-del" onclick="deleteWorkerRow(' + i + ')" title="명단에서 삭제">×</button></td>' +
       '</tr>';
@@ -1654,7 +1665,7 @@ function renderWorkerTable() {
         '<td class="worker-readonly-cell">' + escapeHtml(w.team || '') + '</td>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.phone || '') + '</td>' +
         '<td class="leader-only worker-balance-cell"><input type="number" step="0.25" min="0" value="' + escapeHtml(String(balAnnual)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceAnnual\',this.value)"></td>' +
-        '<td class="leader-only worker-balance-cell"><input type="number" step="1" min="0" value="' + escapeHtml(String(balBirth)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceBirth\',this.value)"></td>' +
+        '<td class="leader-only worker-balance-cell">' + birthCellHtml + '</td>' +
         '<td class="leader-only worker-balance-cell"><input type="number" step="1" min="0" value="' + escapeHtml(String(balSummer)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceSummer\',this.value)"></td>' +
         '<td></td>' +
       '</tr>';
@@ -1926,7 +1937,10 @@ function onLeaveBalanceFileSelected(e) {
       entries.forEach(function(en) {
         var update = {};
         if (en.annual != null && !isNaN(en.annual)) update.balanceAnnual = en.annual;
-        if (en.birth != null && !isNaN(en.birth)) update.balanceBirth = en.birth;
+        // 남자는 생휴 무시
+        var worker = workers.find(function(w) { return String(w.employeeId || '').trim() === en.empId; });
+        var isMale = worker && worker.gender === 'M';
+        if (!isMale && en.birth != null && !isNaN(en.birth)) update.balanceBirth = en.birth;
         if (en.summer != null && !isNaN(en.summer)) update.balanceSummer = en.summer;
         if (Object.keys(update).length === 0) return;
         batch.set(FB_DB.collection('users').doc(en.empId), update, { merge: true });

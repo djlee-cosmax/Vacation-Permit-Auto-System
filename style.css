@@ -930,6 +930,12 @@ input, select, textarea { font-family: inherit; }
 }
 .worker-balance-cell input::-webkit-outer-spin-button,
 .worker-balance-cell input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.worker-balance-na {
+  display: inline-block;
+  color: #bbb;
+  font-size: 12px;
+  font-style: italic;
+}
 
 /* PC 서무/관리자 모드 — 작업자 명단 모달 크게·가독성 ↑ */
 @media (min-width: 1024px) {
