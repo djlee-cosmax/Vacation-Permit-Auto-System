@@ -517,6 +517,54 @@ function getPhone4(phone) {
   return digits.length >= 4 ? digits.slice(-4) : '';
 }
 
+// ----- URL 모드 ↔ 권한 동기화 -----
+// URL이 모드를 결정. 이미 로그인된 세션이 있어도 URL 모드와 권한이 불일치하면 재설정.
+(function syncUrlMode() {
+  var raw = localStorage.getItem('p5_session');
+  if (!raw) return;
+  var session;
+  try { session = JSON.parse(raw); } catch (e) { return; }
+  if (!session || !session.empId) return;
+  if (session.expires && new Date(session.expires) <= new Date()) return; // 만료 세션은 손대지 않음
+  var urlMode = getUrlMode();
+  var actualRole = STAFF_ROLES[session.empId] ? STAFF_ROLES[session.empId].role : 'worker';
+  // 자격 미달 → silent 로그아웃 (HTML 클래스도 제거)
+  if ((urlMode === 'admin' && actualRole !== 'admin') ||
+      (urlMode === 'leader' && actualRole !== 'admin' && actualRole !== 'leader')) {
+    localStorage.removeItem('p5_session');
+    localStorage.removeItem('p5_admin');
+    localStorage.removeItem('p5_leader');
+    document.documentElement.classList.remove('authenticated');
+    ['role-admin', 'role-leader', 'role-worker'].forEach(function(c) {
+      document.documentElement.classList.remove(c);
+    });
+    setTimeout(function() {
+      showToast('해당 링크의 로그인 자격이 없어 로그아웃됐습니다.', 'error');
+    }, 600);
+    return;
+  }
+  // URL 모드에 맞게 권한 재설정
+  if (urlMode === 'admin') {
+    localStorage.setItem('p5_admin', '1');
+    localStorage.setItem('p5_leader', '1');
+  } else if (urlMode === 'leader') {
+    localStorage.removeItem('p5_admin');
+    localStorage.setItem('p5_leader', '1');
+  } else {
+    localStorage.removeItem('p5_admin');
+    localStorage.removeItem('p5_leader');
+  }
+  // session.role + HTML role 클래스 동기화
+  if (session.role !== urlMode) {
+    session.role = urlMode;
+    localStorage.setItem('p5_session', JSON.stringify(session));
+    ['role-admin', 'role-leader', 'role-worker'].forEach(function(c) {
+      document.documentElement.classList.remove(c);
+    });
+    document.documentElement.classList.add('role-' + urlMode);
+  }
+})();
+
 // ----- 권한 (사번 기반 — 로그인 시 설정됨) -----
 // 모바일에서는 권한 자체를 비활성 (작업자 모드만)
 var ADMIN_MODE = localStorage.getItem('p5_admin') === '1';
