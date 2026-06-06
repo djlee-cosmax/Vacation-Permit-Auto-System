@@ -1759,8 +1759,6 @@ function fetchTodayLeavesFromCloud() {
       var skippedFuture = 0;  // 미래(7일 초과) 휴가로 제외된 건수
       snapshot.forEach(function(doc) {
         var data = doc.data();
-        // [TEMP] 영상 녹화용 임시 필터 — 이동준 사번(122210202)으로 작성된 휴가증만 통과
-        if (String(data.employeeId || '') !== '122210202') return;
         if (data.processed === true) return;
         var t = data.serverCreatedAt && data.serverCreatedAt.toDate ? data.serverCreatedAt.toDate() : null;
         if (t && t < cutoffOld) return;
