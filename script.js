@@ -1789,11 +1789,12 @@ function fetchTodayLeavesFromCloud() {
         showToast('이미 모두 가져온 상태입니다. (서버 ' + fetched.length + '건 = 로컬과 동일)', '');
         return;
       }
-      var skipNote = skippedFuture > 0 ? '\n· 자동 제외: ' + skippedFuture + '건 (7일 이후 사용 예정)' : '';
+      var skipNote = skippedFuture > 0 ? '\n자동 제외: ' + skippedFuture + '건' : '';
       if (!confirm(
-        '서버에서 미처리 휴가증을 확인했습니다.\n\n' +
-        '· 7일 이내 사용 예정: ' + fetched.length + '건\n' +
-        '· 신규 추가 대상: ' + newOnes.length + '건' +
+        '서버에서 미처리 휴가증을 확인했습니다.\n' +
+        '(조회일 기준 7일 이내 사용 예정만 불러옵니다)\n\n' +
+        '사용 예정: ' + fetched.length + '건\n' +
+        '신규 추가 대상: ' + newOnes.length + '건' +
         skipNote + '\n\n' +
         '추가하시겠습니까?'
       )) return;
