@@ -1792,7 +1792,7 @@ function fetchTodayLeavesFromCloud() {
       var skipNote = skippedFuture > 0 ? '\n자동 제외: ' + skippedFuture + '건' : '';
       if (!confirm(
         '서버에서 미처리 휴가증을 확인했습니다.\n' +
-        '(조회일 기준 7일 이내 사용 예정만 불러옵니다)\n\n' +
+        '(조회일 기준 7일 이내 사용 예정인 휴가증만 불러옵니다)\n\n' +
         '사용 예정: ' + fetched.length + '건\n' +
         '신규 추가 대상: ' + newOnes.length + '건' +
         skipNote + '\n\n' +
