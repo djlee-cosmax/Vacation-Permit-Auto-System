@@ -1759,6 +1759,8 @@ function fetchTodayLeavesFromCloud() {
       var skippedFuture = 0;  // 미래(7일 초과) 휴가로 제외된 건수
       snapshot.forEach(function(doc) {
         var data = doc.data();
+        // [TEMP] 영상 녹화용 임시 필터 — 본인이 작성한 휴가증만 통과
+        if (data.submittedBy !== FB_UID) return;
         if (data.processed === true) return;
         var t = data.serverCreatedAt && data.serverCreatedAt.toDate ? data.serverCreatedAt.toDate() : null;
         if (t && t < cutoffOld) return;
