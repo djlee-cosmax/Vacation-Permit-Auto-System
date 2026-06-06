@@ -1791,7 +1791,8 @@ function fetchTodayLeavesFromCloud() {
       }
       var skipNote = skippedFuture > 0 ? '\n(7일 이후 사용 예정 ' + skippedFuture + '건은 제외됨)' : '';
       if (!confirm(
-        '서버에서 미처리 휴가증 ' + fetched.length + '건을 발견했습니다. (오늘부터 7일 이내 사용 예정)' + skipNote + '\n' +
+        '서버에서 미처리 휴가증 ' + fetched.length + '건을 발견했습니다.\n' +
+        '(오늘부터 7일 이내 사용 예정)' + skipNote + '\n' +
         '그 중 ' + newOnes.length + '건이 현재 화면에 없는 새 휴가증입니다.\n\n' +
         '추가하시겠습니까?'
       )) return;
