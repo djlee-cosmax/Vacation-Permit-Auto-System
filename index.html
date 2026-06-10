@@ -87,16 +87,6 @@
       <h2>휴가증 작성</h2>
       <p class="form-hint">작성일: <span id="todayLabel"></span></p>
 
-      <!-- 본인 잔여 휴가 표시 (작업자에게만) -->
-      <div class="my-balance-box" id="formBalanceBox" style="display:none">
-        <div class="my-balance-title">내 잔여 휴가</div>
-        <div class="my-balance-row">
-          <div class="my-balance-item"><span class="my-balance-label">연차</span><span class="my-balance-value" id="formBalanceAnnual">-</span></div>
-          <div class="my-balance-item"><span class="my-balance-label">생휴</span><span class="my-balance-value" id="formBalanceBirth">-</span></div>
-          <div class="my-balance-item"><span class="my-balance-label">하기휴가</span><span class="my-balance-value" id="formBalanceSummer">-</span></div>
-        </div>
-      </div>
-
       <div class="form-grid">
         <div class="form-group">
           <label for="leaveName">이름 <span class="req">*</span></label>
@@ -400,7 +390,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=20260610bal"></script>
+  <script src="script.js?v=20260610b"></script>
   <!-- PWA Service Worker 등록 -->
   <script>
     if ('serviceWorker' in navigator) {
