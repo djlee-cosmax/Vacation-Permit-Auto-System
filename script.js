@@ -914,7 +914,7 @@ function hideNameSuggestions() {
 }
 
 // ----- 휴가증 추가 -----
-function addLeave() {
+async function addLeave() {
   // 초기 비밀번호(1234) 사용 중이면 휴가증 작성 차단
   var __sess = getSession();
   if (__sess && __sess.isInitialPw) {
@@ -970,6 +970,43 @@ function addLeave() {
     if (dayTotal > 1.0 + 0.0001) {
       showToast('해당 날짜(' + dateStr + ')에 이미 등록된 휴가가 있어\n합계가 1일을 초과합니다.\n기존 휴가증을 삭제한 후 다시 작성해 주세요.', 'error');
       return;
+    }
+  }
+
+  // 서버에 이미 처리 완료된 동일 휴가증이 있으면 차단
+  // (작업자가 [내 휴가증] 확인 안 하고 같은 내용 또 올리는 케이스 방지)
+  if (FB_DB && FB_UID) {
+    try {
+      var dup = await FB_DB.collection('leaves')
+        .where('submittedBy', '==', FB_UID)
+        .get()
+        .then(function(snapshot) {
+          var found = null;
+          snapshot.forEach(function(doc) {
+            if (found) return;
+            var d = doc.data();
+            if (d.processed !== true) return;
+            if (d.start !== start || d.end !== end) return;
+            var items = d.items || [{ type: d.type, count: d.count || 1 }];
+            if (items.length !== 1) return;
+            if (items[0].type !== type) return;
+            if ((items[0].count || 1) !== count) return;
+            found = d;
+          });
+          return found;
+        });
+      if (dup) {
+        showToast(
+          '이미 처리 완료된 동일한 휴가증이 있습니다.\n' +
+          '[내 휴가증]에서 확인해 주세요.\n\n' +
+          '기존: ' + dup.start + ' ~ ' + dup.end + ' · ' + type + ' ' + count + '개',
+          'error'
+        );
+        return;
+      }
+    } catch (err) {
+      console.warn('처리 완료 휴가증 중복 체크 실패:', err);
+      // 서버 조회 실패 시 그냥 진행 (작성 자체는 막지 않음)
     }
   }
 
