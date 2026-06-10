@@ -465,6 +465,8 @@ try {
     firebase.auth().signInAnonymously()
       .then(function(cred) {
         FB_UID = cred.user.uid;
+        // 작업자 명단 Firestore에서 로드 (workers.json 대체)
+        loadDefaultWorkers();
         // 본인이 작성하고 서버에서 처리 완료된 휴가증은 우측 카드에서 자동 제거
         setTimeout(cleanupProcessedLeavesFromCloud, 200);
         // 외부에서 삭제된 휴가증의 차감 자동 환원 (서무·관리자 모드만)
@@ -584,54 +586,59 @@ if (LEADER_MODE) document.documentElement.classList.add('leader-mode');
 var workers = JSON.parse(localStorage.getItem('p5_workers') || '[]');
 // worker: { name, employeeId, team, phone }
 
-// workers.json (코드 내장 기본 명단) — 페이지 로드 시 fetch
+// 작업자 기본 명단 — Firestore 'workers' 컬렉션에서 가져옴 (인증 후 loadDefaultWorkers 호출)
 var DEFAULT_WORKERS = [];
-fetch('workers.json', { cache: 'no-cache' })
-  .then(function(r) {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
-  })
-  .then(function(data) {
-    DEFAULT_WORKERS = Array.isArray(data) ? data : [];
-    if (DEFAULT_WORKERS.length === 0) return;
-    // localStorage 명단이 비어있으면 기본 명단으로 자동 채움
-    if (workers.length === 0) {
-      workers = DEFAULT_WORKERS.slice();
-      localStorage.setItem('p5_workers', JSON.stringify(workers));
-      return;
-    }
-    // 신규 사번 자동 병합 + 관리자/서무 정보는 항상 workers.json 기준으로 동기화
-    var byId = {};
-    workers.forEach(function(w, idx) { byId[String(w.employeeId || '').trim()] = idx; });
-    var added = [];
-    var changed = false;
-    DEFAULT_WORKERS.forEach(function(w) {
-      var id = String(w.employeeId || '').trim();
-      if (!id) return;
-      if (byId[id] === undefined) {
-        added.push(w);
-      } else if (STAFF_ROLES[id]) {
-        // 관리자/서무는 workers.json이 항상 우선 (정보 변경 자동 반영)
-        var local = workers[byId[id]];
-        ['name', 'team', 'phone', 'department'].forEach(function(k) {
-          if (local[k] !== w[k]) { local[k] = w[k]; changed = true; }
-        });
+function loadDefaultWorkers() {
+  if (!FB_DB) return;
+  FB_DB.collection('workers').get()
+    .then(function(snapshot) {
+      var fetched = [];
+      snapshot.forEach(function(doc) {
+        var w = doc.data();
+        if (w && w.employeeId) fetched.push(w);
+      });
+      DEFAULT_WORKERS = fetched;
+      if (DEFAULT_WORKERS.length === 0) return;
+      // localStorage 명단이 비어있으면 기본 명단으로 자동 채움
+      if (workers.length === 0) {
+        workers = DEFAULT_WORKERS.slice();
+        localStorage.setItem('p5_workers', JSON.stringify(workers));
+        return;
+      }
+      // 신규 사번 자동 병합 + 관리자/서무 정보는 항상 서버 기준으로 동기화
+      var byId = {};
+      workers.forEach(function(w, idx) { byId[String(w.employeeId || '').trim()] = idx; });
+      var added = [];
+      var changed = false;
+      DEFAULT_WORKERS.forEach(function(w) {
+        var id = String(w.employeeId || '').trim();
+        if (!id) return;
+        if (byId[id] === undefined) {
+          added.push(w);
+        } else if (STAFF_ROLES[id]) {
+          // 관리자/서무는 서버가 항상 우선 (정보 변경 자동 반영)
+          var local = workers[byId[id]];
+          ['name', 'team', 'phone', 'department'].forEach(function(k) {
+            if (local[k] !== w[k]) { local[k] = w[k]; changed = true; }
+          });
+        }
+      });
+      if (added.length > 0) {
+        workers = added.concat(workers);
+        changed = true;
+      }
+      if (changed) localStorage.setItem('p5_workers', JSON.stringify(workers));
+    })
+    .catch(function(err) {
+      console.warn('workers 컬렉션 로드 실패:', err);
+      // 로컬 명단이라도 있으면 조용히 진행, 둘 다 없으면 사용자에게 안내
+      if (workers.length === 0) {
+        setTimeout(function() {
+          showToast('⚠ 작업자 명단을 불러오지 못했습니다.\n네트워크 확인 후 새로고침해 주세요.', 'error');
+        }, 1500);
       }
     });
-    if (added.length > 0) {
-      workers = added.concat(workers);
-      changed = true;
-    }
-    if (changed) localStorage.setItem('p5_workers', JSON.stringify(workers));
-  })
-  .catch(function(err) {
-    // 로컬 명단이라도 있으면 조용히 진행, 둘 다 없으면 사용자에게 안내
-    if (workers.length === 0) {
-      setTimeout(function() {
-        showToast('⚠ 작업자 명단을 불러오지 못했습니다.\n네트워크 확인 후 새로고침해 주세요.', 'error');
-      }, 1500);
-    }
-  });
+}
 
 var leaves = JSON.parse(localStorage.getItem('p5_leaves') || '[]');
 // leave: { id, name, employeeId, team, type, start, end, reason, phone, createdAt }
@@ -2248,11 +2255,16 @@ function deleteWorkerRow(idx) {
 
 function resetToDefaultWorkers() {
   if (DEFAULT_WORKERS.length === 0) {
-    // 다시 한 번 fetch 시도 (초기 로드 실패한 경우)
-    fetch('workers.json', { cache: 'no-cache' })
-      .then(function(r) { return r.ok ? r.json() : []; })
-      .then(function(data) {
-        DEFAULT_WORKERS = Array.isArray(data) ? data : [];
+    // 다시 한 번 Firestore 시도 (초기 로드 실패한 경우)
+    if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
+    FB_DB.collection('workers').get()
+      .then(function(snapshot) {
+        var fetched = [];
+        snapshot.forEach(function(doc) {
+          var w = doc.data();
+          if (w && w.employeeId) fetched.push(w);
+        });
+        DEFAULT_WORKERS = fetched;
         if (DEFAULT_WORKERS.length === 0) {
           showToast('서버에 등록된 기본 명단이 없습니다.', 'error');
           return;
@@ -2261,7 +2273,8 @@ function resetToDefaultWorkers() {
         workerModalState = DEFAULT_WORKERS.map(function(w) { return Object.assign({}, w); });
         renderWorkerTable();
         showToast('기본 명단으로 재설정되었습니다. 저장 버튼을 눌러 확정해 주세요.', 'success');
-      });
+      })
+      .catch(function(err) { showToast('명단 조회 실패: ' + err.message, 'error'); });
     return;
   }
   if (!confirm('현재 명단을 서버 기본 명단(' + DEFAULT_WORKERS.length + '명)으로 재설정합니다.\n계속하시겠습니까?')) return;
@@ -2828,31 +2841,3 @@ function exportLeavesAsXlsx(payload, today, workplaceSuffix) {
 
   XLSX.writeFile(wb, '휴가증_' + today + workplaceSuffix + '.xlsx');
 }
-// === [TEMP] workers.json → Firestore 일회성 업로드 (Phase B 이전 후 제거) ===
-window.uploadWorkersToFirestore = async function() {
-  if (!FB_DB) { alert('서버 연결 안 됨'); return; }
-  var session = getSession();
-  if (!session || session.role !== 'admin') {
-    alert('관리자만 실행 가능합니다.');
-    return;
-  }
-  try {
-    var res = await fetch('workers.json');
-    if (!res.ok) throw new Error('workers.json 로드 실패: ' + res.status);
-    var data = await res.json();
-    if (!Array.isArray(data)) throw new Error('workers.json 형식 오류');
-    var batch = FB_DB.batch();
-    var n = 0;
-    data.forEach(function(w) {
-      if (!w.employeeId) return;
-      var ref = FB_DB.collection('workers').doc(String(w.employeeId));
-      batch.set(ref, w);
-      n++;
-    });
-    await batch.commit();
-    alert('OK: ' + n + '명 Firestore workers 컬렉션에 업로드 완료');
-  } catch (err) {
-    alert('업로드 실패: ' + err.message);
-    console.error(err);
-  }
-};

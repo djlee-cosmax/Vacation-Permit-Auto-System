@@ -8,3 +8,6 @@ server.log
 automation/profile/
 automation/__pycache__/
 *.pyc
+
+# 직원 명단 — Firestore 'workers' 컬렉션으로 이전 (개인정보 보호)
+workers.json
