@@ -19,6 +19,28 @@ var STAFF_ROLES = {
   '122240096': { role: 'leader', name: '김가영', department: '생산3팀' }
 };
 
+// 비밀번호 SHA-256 해시 (브라우저 내장 crypto.subtle)
+async function sha256Hex(text) {
+  if (!window.crypto || !window.crypto.subtle) {
+    console.warn('crypto.subtle 미지원 — 평문 사용');
+    return String(text || '');
+  }
+  var enc = new TextEncoder().encode(String(text || ''));
+  var hash = await window.crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(hash))
+    .map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+}
+
+// 저장된 PW가 해시(64자 hex)인지 평문인지 판단 + 비교
+async function comparePassword(input, stored) {
+  if (!stored) return false;
+  if (typeof stored === 'string' && stored.length === 64 && /^[0-9a-f]+$/i.test(stored)) {
+    var inputHash = await sha256Hex(input);
+    return inputHash === stored;
+  }
+  return input === stored;  // 평문 (legacy)
+}
+
 function getSession() {
   try {
     var raw = localStorage.getItem('p5_session');
@@ -88,9 +110,18 @@ function login() {
   // 3) Firestore users/{empId} 문서에서 비밀번호 조회 (없으면 기본 1234)
   // Firestore가 준비되지 않은 경우 기본 PW로 폴백
   function finalizeLogin(storedPw) {
-    if (pw !== storedPw) { showToast('비밀번호가 일치하지 않습니다.', 'error'); return; }
-    var isInitialPw = (storedPw === DEFAULT_PASSWORD);
-    doLoginSuccess(empId, name, role, team, worker, isInitialPw);
+    comparePassword(pw, storedPw).then(function(ok) {
+      if (!ok) { showToast('비밀번호가 일치하지 않습니다.', 'error'); return; }
+      var isInitialPw = (pw === DEFAULT_PASSWORD);
+      // 저장된 PW가 평문(legacy)이면 해시로 자동 마이그레이션
+      var isHashed = (typeof storedPw === 'string' && storedPw.length === 64 && /^[0-9a-f]+$/i.test(storedPw));
+      if (FB_DB && !isHashed && !isInitialPw) {
+        sha256Hex(pw).then(function(hash) {
+          FB_DB.collection('users').doc(empId).set({ password: hash }, { merge: true }).catch(function() {});
+        });
+      }
+      doLoginSuccess(empId, name, role, team, worker, isInitialPw);
+    });
   }
   if (FB_DB) {
     FB_DB.collection('users').doc(empId).get()
@@ -255,27 +286,31 @@ function changePassword() {
   if (cur === newPw) { showToast('현재 비밀번호와 동일합니다.\n다른 비밀번호를 입력해 주세요.', 'error'); return; }
   if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
 
-  // 현재 PW 확인 → 새 PW 저장
+  // 현재 PW 확인 → 새 PW 해시 저장
   FB_DB.collection('users').doc(empId).get()
     .then(function(doc) {
       var storedPw = (doc.exists && doc.data().password) ? doc.data().password : DEFAULT_PASSWORD;
-      if (cur !== storedPw) {
-        showToast('현재 비밀번호가 일치하지 않습니다.', 'error');
-        throw new Error('PW_MISMATCH');
-      }
-      var question = document.getElementById('securityQuestion').value;
-      var answer = document.getElementById('securityAnswer').value.trim();
-      if (!question || !answer) {
-        showToast('보안 질문과 답변을 입력해 주세요.\n(비밀번호 찾기에 필요합니다)', 'error');
-        throw new Error('SECURITY_QUESTION_REQUIRED');
-      }
-      var dataToSave = {
-        password: newPw,
-        securityQuestion: question,
-        securityAnswer: answer,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-      return FB_DB.collection('users').doc(empId).set(dataToSave, { merge: true });
+      return comparePassword(cur, storedPw).then(function(ok) {
+        if (!ok) {
+          showToast('현재 비밀번호가 일치하지 않습니다.', 'error');
+          throw new Error('PW_MISMATCH');
+        }
+        var question = document.getElementById('securityQuestion').value;
+        var answer = document.getElementById('securityAnswer').value.trim();
+        if (!question || !answer) {
+          showToast('보안 질문과 답변을 입력해 주세요.\n(비밀번호 찾기에 필요합니다)', 'error');
+          throw new Error('SECURITY_QUESTION_REQUIRED');
+        }
+        return sha256Hex(newPw).then(function(newHash) {
+          var dataToSave = {
+            password: newHash,
+            securityQuestion: question,
+            securityAnswer: answer,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+          return FB_DB.collection('users').doc(empId).set(dataToSave, { merge: true });
+        });
+      });
     })
     .then(function() {
       // 초기 PW 플래그 해제
@@ -356,14 +391,18 @@ function forgotPwReset() {
         throw new Error('ANSWER_MISMATCH');
       }
       var storedPw = (doc.exists && doc.data().password) ? doc.data().password : DEFAULT_PASSWORD;
-      if (newPw === storedPw) {
-        showToast('새 비밀번호가 기존 비밀번호와 동일합니다.\n다른 비밀번호를 입력해 주세요.', 'error');
-        throw new Error('SAME_PW');
-      }
-      return FB_DB.collection('users').doc(empId).set({
-        password: newPw,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
+      return comparePassword(newPw, storedPw).then(function(same) {
+        if (same) {
+          showToast('새 비밀번호가 기존 비밀번호와 동일합니다.\n다른 비밀번호를 입력해 주세요.', 'error');
+          throw new Error('SAME_PW');
+        }
+        return sha256Hex(newPw);
+      }).then(function(newHash) {
+        return FB_DB.collection('users').doc(empId).set({
+          password: newHash,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      });
     })
     .then(function() {
       closeForgotPwModal();
