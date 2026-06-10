@@ -189,6 +189,7 @@ function doLoginSuccess(empId, name, role, team, worker, isInitialPw) {
   applyWorkerProfileToForm();
   refreshUserNameDisplay();
   refreshMyLeavesLabel();
+  refreshFormBalance();
 
   // 새 세션의 만료 경고 예약 (만료 10분 전 자동 안내)
   scheduleSessionExpiryWarning();
@@ -506,6 +507,8 @@ try {
         FB_UID = cred.user.uid;
         // 작업자 명단 Firestore에서 로드 (workers.json 대체)
         loadDefaultWorkers();
+        // 작성 폼 잔여 휴가 표시 (작업자만)
+        setTimeout(refreshFormBalance, 500);
         // 본인이 작성하고 서버에서 처리 완료된 휴가증은 우측 카드에서 자동 제거
         setTimeout(cleanupProcessedLeavesFromCloud, 200);
         // 외부에서 삭제된 휴가증의 차감 자동 환원 (서무·관리자 모드만)
@@ -1239,6 +1242,35 @@ function closeMyLeavesModal() {
   myLeavesCache = [];
   var box = document.getElementById('myBalanceBox');
   if (box) box.style.display = 'none';
+}
+
+// 휴가증 작성 폼 상단 본인 잔여 휴가 표시 (작업자만)
+function refreshFormBalance() {
+  var box = document.getElementById('formBalanceBox');
+  if (!box) return;
+  var sess = getSession();
+  if (!sess || !sess.empId || !FB_DB || sess.role !== 'worker') {
+    box.style.display = 'none';
+    return;
+  }
+  var worker = workers.find(function(w) { return String(w.employeeId || '').trim() === String(sess.empId).trim(); });
+  var isMale = worker && worker.gender === 'M';
+  FB_DB.collection('users').doc(sess.empId).get()
+    .then(function(doc) {
+      if (!doc.exists) { box.style.display = 'none'; return; }
+      var d = doc.data();
+      var fmt = function(v, unit) { return (v == null || v === '') ? '-' : (v + (unit || '')); };
+      var aEl = document.getElementById('formBalanceAnnual');
+      var bEl = document.getElementById('formBalanceBirth');
+      var sEl = document.getElementById('formBalanceSummer');
+      if (aEl) aEl.textContent = fmt(d.balanceAnnual, '개');
+      if (bEl) bEl.textContent = fmt(d.balanceBirth, '개');
+      if (sEl) sEl.textContent = fmt(d.balanceSummer, '개');
+      var birthItem = bEl ? bEl.parentElement : null;
+      if (birthItem) birthItem.style.display = isMale ? 'none' : '';
+      box.style.display = '';
+    })
+    .catch(function() { box.style.display = 'none'; });
 }
 
 // [내 휴가증] 모달 상단 본인 잔여 휴가 표시
