@@ -2828,3 +2828,31 @@ function exportLeavesAsXlsx(payload, today, workplaceSuffix) {
 
   XLSX.writeFile(wb, '휴가증_' + today + workplaceSuffix + '.xlsx');
 }
+// === [TEMP] workers.json → Firestore 일회성 업로드 (Phase B 이전 후 제거) ===
+window.uploadWorkersToFirestore = async function() {
+  if (!FB_DB) { alert('서버 연결 안 됨'); return; }
+  var session = getSession();
+  if (!session || session.role !== 'admin') {
+    alert('관리자만 실행 가능합니다.');
+    return;
+  }
+  try {
+    var res = await fetch('workers.json');
+    if (!res.ok) throw new Error('workers.json 로드 실패: ' + res.status);
+    var data = await res.json();
+    if (!Array.isArray(data)) throw new Error('workers.json 형식 오류');
+    var batch = FB_DB.batch();
+    var n = 0;
+    data.forEach(function(w) {
+      if (!w.employeeId) return;
+      var ref = FB_DB.collection('workers').doc(String(w.employeeId));
+      batch.set(ref, w);
+      n++;
+    });
+    await batch.commit();
+    alert('OK: ' + n + '명 Firestore workers 컬렉션에 업로드 완료');
+  } catch (err) {
+    alert('업로드 실패: ' + err.message);
+    console.error(err);
+  }
+};
