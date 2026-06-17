@@ -1019,12 +1019,16 @@ async function addLeave() {
     }
   }
 
+  // 본인 식별자: 연락처 마지막 4자리 — 중복 체크와 leave 저장 양쪽에서 사용
+  var phone4 = getPhone4(phone);
+
   // 서버에 이미 처리 완료된 동일 휴가증이 있으면 차단
   // (작업자가 [내 휴가증] 확인 안 하고 같은 내용 또 올리는 케이스 방지)
-  if (FB_DB && FB_UID) {
+  // submitterPhone4 기반 매칭 — 다른 기기/세션(다른 FB_UID)로 작성해도 동일 사용자 차단
+  if (FB_DB && phone4) {
     try {
       var dup = await FB_DB.collection('leaves')
-        .where('submittedBy', '==', FB_UID)
+        .where('submitterPhone4', '==', phone4)
         .get()
         .then(function(snapshot) {
           var found = null;
@@ -1060,8 +1064,7 @@ async function addLeave() {
   var matched = workers.find(function(w) { return w.name === name; });
   if (FULL_RANGE_TYPES.indexOf(type) !== -1) count = 1;  // 하기휴가: count 강제 1
   var days = (TYPE_WEIGHT[type] || 0) * count;
-  // 본인 식별자: 연락처에서 마지막 4자리 추출
-  var phone4 = getPhone4(phone);
+  // phone4는 위에서 이미 계산됨 (중복 체크용)
   setMyInfo(name, phone4);  // localStorage에 본인 정보 저장 (다음 작성·조회 시 자동 사용)
   var leave = {
     id: uuid(),
