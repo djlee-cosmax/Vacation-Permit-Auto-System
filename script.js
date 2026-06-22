@@ -2266,18 +2266,15 @@ function resetWorkerPassword(empId) {
     .then(function(doc) {
       if (!doc.exists) {
         showToast(name + '님은 이미 초기 비밀번호(1234) 상태입니다.', '');
-        return null;
+        return;
       }
       return FB_DB.collection('users').doc(empId).update({
         password: firebase.firestore.FieldValue.delete(),
         securityQuestion: firebase.firestore.FieldValue.delete(),
         securityAnswer: firebase.firestore.FieldValue.delete()
-      });
-    })
-    .then(function(result) {
-      if (result !== undefined && result !== null) {
+      }).then(function() {
         showToast(name + '님의 비밀번호가 초기화됐습니다. (1234)', 'success');
-      }
+      });
     })
     .catch(function(err) {
       console.error('비밀번호 초기화 실패:', err);
