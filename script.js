@@ -1064,6 +1064,41 @@ async function addLeave() {
   var matched = workers.find(function(w) { return w.name === name; });
   if (FULL_RANGE_TYPES.indexOf(type) !== -1) count = 1;  // 하기휴가: count 강제 1
   var days = (TYPE_WEIGHT[type] || 0) * count;
+
+  // 잔여 휴가 부족 차단 — 잔여 < 신청 일수면 작성 불가
+  // (연차/반차/반반차 → balanceAnnual, 생휴 → balanceBirth, 하기휴가 → balanceSummer)
+  // 경조/결근 등 차감 없는 유형은 통과
+  if (FB_DB && matched && matched.employeeId && days > 0) {
+    var BAL_FIELD = null;
+    var BAL_LABEL = '';
+    if (type === '연차' || type.indexOf('반차') === 0 || type.indexOf('반반차') === 0) {
+      BAL_FIELD = 'balanceAnnual'; BAL_LABEL = '연차';
+    } else if (type === '생휴') {
+      BAL_FIELD = 'balanceBirth'; BAL_LABEL = '생휴';
+    } else if (type === '하기휴가') {
+      BAL_FIELD = 'balanceSummer'; BAL_LABEL = '하기휴가';
+    }
+    if (BAL_FIELD) {
+      try {
+        var userDoc = await FB_DB.collection('users').doc(String(matched.employeeId)).get();
+        if (userDoc.exists) {
+          var bal = userDoc.data()[BAL_FIELD];
+          if (typeof bal === 'number' && bal < days) {
+            showToast(
+              '잔여 ' + BAL_LABEL + '가 부족하여 휴가증을 작성할 수 없습니다.\n' +
+              '잔여: ' + bal + ' / 신청: ' + days + ' (일)',
+              'error'
+            );
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('잔여 휴가 조회 실패:', err);
+        // 조회 실패 시 작성 자체는 막지 않음 (네트워크 등)
+      }
+    }
+  }
+
   // phone4는 위에서 이미 계산됨 (중복 체크용)
   setMyInfo(name, phone4);  // localStorage에 본인 정보 저장 (다음 작성·조회 시 자동 사용)
   var leave = {
