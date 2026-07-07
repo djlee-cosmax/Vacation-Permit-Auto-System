@@ -981,7 +981,12 @@ input, select, textarea { font-family: inherit; }
   html.role-leader #workerModal .worker-table th:nth-child(1),
   html.role-leader #workerModal .worker-table td:nth-child(1),
   html.role-admin #workerModal .worker-table th:nth-child(1),
-  html.role-admin #workerModal .worker-table td:nth-child(1) { width: auto; min-width: 120px; }
+  html.role-admin #workerModal .worker-table td:nth-child(1) { width: auto; min-width: 160px; }
+  /* 이름 열 input 자체도 컨텐츠 폭에 맞게 자동 확장 */
+  html.role-admin #workerModal .worker-table td:nth-child(1) input {
+    min-width: 140px;
+    width: 100%;
+  }
   html.role-leader #workerModal .worker-table th:nth-child(2),
   html.role-leader #workerModal .worker-table td:nth-child(2),
   html.role-admin #workerModal .worker-table th:nth-child(2),
