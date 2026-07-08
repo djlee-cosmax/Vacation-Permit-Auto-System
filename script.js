@@ -2133,8 +2133,11 @@ function updateWorkerBalance(idx, key, val) {
   var w = workerModalState[idx];
   if (!w || !w.employeeId) return;
   w[key] = val;
+  w._balanceDirty = true;  // 서무 모드에서 저장 버튼으로 일괄 저장할 때 사용
   var empId = String(w.employeeId).trim();
   if (!empId || !FB_DB) return;
+  // 서무 모드: 자동 저장 안 함 (저장 버튼 눌러야 반영)
+  if (LEADER_MODE && !ADMIN_MODE) return;
   clearTimeout(w._saveTimer);
   w._saveTimer = setTimeout(function() {
     var trimmed = String(val || '').trim();
@@ -2370,6 +2373,77 @@ function saveWorkerList() {
   localStorage.setItem('p5_workers', JSON.stringify(workers));
   closeWorkerModal();
   showToast(workers.length + '명 저장되었습니다.', 'success');
+}
+
+// 서무: 편집된 잔여 휴가를 일괄 Firestore 저장
+function saveWorkerBalances() {
+  if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
+  var dirty = workerModalState.filter(function(w) {
+    return w._balanceDirty && w.employeeId && String(w.employeeId).trim();
+  });
+  if (dirty.length === 0) {
+    showToast('변경된 내용이 없습니다.', '');
+    return;
+  }
+  var batch = FB_DB.batch();
+  var summary = [];
+  dirty.forEach(function(w) {
+    var empId = String(w.employeeId).trim();
+    var docRef = FB_DB.collection('users').doc(empId);
+    var update = {};
+    var isMale = w.gender === 'M';
+    [
+      { key: 'balanceAnnual', short: 'annual' },
+      { key: 'balanceBirth',  short: 'birth' },
+      { key: 'balanceSummer', short: 'summer' },
+    ].forEach(function(m) {
+      // 남자는 생휴 편집 없음
+      if (isMale && m.key === 'balanceBirth') return;
+      var v = w[m.key];
+      var trimmed = String(v == null ? '' : v).trim();
+      if (trimmed === '') {
+        update[m.key] = firebase.firestore.FieldValue.delete();
+      } else {
+        var num = parseFloat(trimmed);
+        if (isNaN(num)) return;
+        update[m.key] = num;
+      }
+    });
+    if (Object.keys(update).length > 0) {
+      batch.set(docRef, update, { merge: true });
+      summary.push({ w: w, empId: empId, update: update });
+    }
+  });
+  if (summary.length === 0) {
+    showToast('변경된 내용이 없습니다.', '');
+    return;
+  }
+  batch.commit()
+    .then(function() {
+      // 캐시 갱신 + 로그 기록
+      summary.forEach(function(s) {
+        if (!balanceCache[s.empId]) balanceCache[s.empId] = {};
+        var changes = {};
+        Object.keys(s.update).forEach(function(key) {
+          var shortKey = key === 'balanceAnnual' ? 'annual' : (key === 'balanceBirth' ? 'birth' : 'summer');
+          var v = s.update[key];
+          if (v && v.toString().indexOf('delete') !== -1) {
+            balanceCache[s.empId][shortKey] = undefined;
+            changes[shortKey] = 'cleared';
+          } else {
+            balanceCache[s.empId][shortKey] = v;
+            changes[shortKey] = v;
+          }
+        });
+        logBalanceChange(s.empId, 'manual', changes, { name: s.w.name });
+        s.w._balanceDirty = false;
+      });
+      showToast(summary.length + '명의 잔여 휴가가 저장됐습니다.', 'success');
+    })
+    .catch(function(err) {
+      console.error('잔여 일괄 저장 실패:', err);
+      showToast('저장 실패: ' + (err.message || err), 'error');
+    });
 }
 
 // ----- 엑셀 파일 업로드 -----

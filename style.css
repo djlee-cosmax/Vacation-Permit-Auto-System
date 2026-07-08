@@ -881,16 +881,39 @@ input, select, textarea { font-family: inherit; }
   width: auto;
   min-width: 80px;
   padding: 6px 8px;
-  border: 1px solid transparent;
+  border: 1px solid #d1d5db;
   border-radius: 4px;
   font-size: 13px;
-  background: transparent;
+  background: #f9fafb;
   text-align: left;
+  transition: background 0.12s, border-color 0.12s;
+  cursor: text;
+}
+.worker-table input:hover {
+  background: #fff;
+  border-color: #9ca3af;
 }
 .worker-table input:focus {
   outline: none;
   border-color: #c8102e;
   background: #fff;
+  box-shadow: 0 0 0 2px rgba(200,16,46,0.12);
+}
+/* 잔여 휴가 셀 — 편집 가능함을 더 명확하게 (핑크 배경) */
+.worker-balance-cell input {
+  background: #fef3f4;
+  border-color: #f9c8ce;
+  font-weight: 600;
+  color: #c8102e;
+  text-align: center;
+}
+.worker-balance-cell input:hover {
+  background: #fff;
+  border-color: #c8102e;
+}
+.worker-balance-cell input:focus {
+  background: #fff;
+  border-color: #c8102e;
 }
 .worker-row-actions {
   white-space: nowrap;
