@@ -2438,6 +2438,7 @@ function saveWorkerBalances() {
         logBalanceChange(s.empId, 'manual', changes, { name: s.w.name });
         s.w._balanceDirty = false;
       });
+      closeWorkerModal();
       showToast(summary.length + '명의 잔여 휴가가 저장됐습니다.', 'success');
     })
     .catch(function(err) {
