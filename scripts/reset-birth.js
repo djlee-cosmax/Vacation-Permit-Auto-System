@@ -7,6 +7,12 @@
 
 const admin = require('firebase-admin');
 
+// 관리자·서무는 리셋 대상에서 제외 (script.js:17 STAFF_ROLES 와 동기화)
+const SKIP_EMPLOYEE_IDS = new Set([
+  '122210202',  // 이동준 (관리자)
+  '122240096',  // 김가영 (서무)
+]);
+
 function loadServiceAccount() {
   const raw = process.env.FIREBASE_SA_KEY;
   if (!raw) throw new Error('환경변수 FIREBASE_SA_KEY 가 없습니다.');
@@ -50,9 +56,11 @@ async function main() {
   workersSnap.forEach(doc => {
     const w = doc.data() || {};
     const empId = String(w.employeeId || '').trim();
-    if (empId && w.gender !== 'M') femaleIds.push(empId);
+    if (!empId || w.gender === 'M') return;
+    if (SKIP_EMPLOYEE_IDS.has(empId)) return;  // 관리자·서무 제외
+    femaleIds.push(empId);
   });
-  console.log(`[reset-birth] 여자 작업자 ${femaleIds.length}명`);
+  console.log(`[reset-birth] 여자 작업자 ${femaleIds.length}명 (관리자·서무 ${SKIP_EMPLOYEE_IDS.size}명 제외)`);
 
   if (femaleIds.length === 0) {
     await resetRef.set({

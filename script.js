@@ -1619,9 +1619,13 @@ function maybeMonthlyBirthLeaveReset() {
     .then(function(doc) {
       var last = doc.exists ? (doc.data().lastBirthResetYearMonth || '') : '';
       if (last === currentYM) return null; // 이미 이번 달 리셋됨
-      // 여자 작업자 사번 목록
+      // 여자 작업자 사번 목록 (관리자·서무는 제외)
       var femaleIds = workers
-        .filter(function(w) { return w.gender !== 'M' && w.employeeId; })
+        .filter(function(w) {
+          if (!w.employeeId || w.gender === 'M') return false;
+          if (STAFF_ROLES[String(w.employeeId).trim()]) return false;
+          return true;
+        })
         .map(function(w) { return String(w.employeeId).trim(); });
       if (femaleIds.length === 0) {
         return FB_DB.collection('system').doc('balanceReset').set({ lastBirthResetYearMonth: currentYM }, { merge: true });
