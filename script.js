@@ -2099,7 +2099,7 @@ function openWorkerModal() {
   document.getElementById('workerHint').textContent = '현재 ' + workers.length + '명 등록됨';
   document.getElementById('workerModal').style.display = 'flex';
   // 서무·관리자만 잔여 정보를 Firestore에서 페치 (모달 열 때마다 최신화)
-  if (LEADER_MODE && FB_DB) {
+  if ((LEADER_MODE || ADMIN_MODE) && FB_DB) {
     fetchAllBalances().then(function() { renderWorkerTable(); });
   }
 }
