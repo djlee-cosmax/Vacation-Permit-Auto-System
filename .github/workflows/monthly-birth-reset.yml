@@ -1,0 +1,43 @@
+name: 매달 1일 생휴 자동 리셋
+
+on:
+  # 매달 1일 00:00 UTC = 09:00 KST (서무 출근 전)
+  # GitHub Actions cron은 최대 수분~수십분 지연될 수 있음
+  schedule:
+    - cron: '0 0 1 * *'
+  # 수동 실행 (Actions 탭에서 Run workflow) — 강제 리셋 옵션 제공
+  workflow_dispatch:
+    inputs:
+      force:
+        description: '이번 달 이미 리셋됐어도 강제로 다시 실행'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+concurrency:
+  group: monthly-birth-reset
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: scripts/package.json
+
+      - name: Install deps
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+
+      - name: Run reset-birth
+        working-directory: scripts
+        env:
+          FIREBASE_SA_KEY: ${{ secrets.FIREBASE_SA_KEY }}
+          FORCE_RESET: ${{ inputs.force == 'true' && '1' || '0' }}
+        run: node reset-birth.js
