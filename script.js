@@ -1067,26 +1067,31 @@ async function addLeave() {
 
   // 잔여 휴가 부족 차단 — 잔여 < 신청 일수면 작성 불가
   // (연차/반차/반반차 → balanceAnnual, 생휴 → balanceBirth, 하기휴가 → balanceSummer)
+  // 하기휴가는 잔여도 신청도 "개수" 단위 (1개 = 3일)
   // 경조/결근 등 차감 없는 유형은 통과
   if (FB_DB && matched && matched.employeeId && days > 0) {
     var BAL_FIELD = null;
     var BAL_LABEL = '';
+    var BAL_UNIT = '일';
+    var BAL_NEEDED = days;
     if (type === '연차' || type.indexOf('반차') === 0 || type.indexOf('반반차') === 0) {
       BAL_FIELD = 'balanceAnnual'; BAL_LABEL = '연차';
     } else if (type === '생휴') {
       BAL_FIELD = 'balanceBirth'; BAL_LABEL = '생휴';
+      BAL_UNIT = '개'; BAL_NEEDED = count;
     } else if (type === '하기휴가') {
       BAL_FIELD = 'balanceSummer'; BAL_LABEL = '하기휴가';
+      BAL_UNIT = '개'; BAL_NEEDED = count;
     }
     if (BAL_FIELD) {
       try {
         var userDoc = await FB_DB.collection('users').doc(String(matched.employeeId)).get();
         if (userDoc.exists) {
           var bal = userDoc.data()[BAL_FIELD];
-          if (typeof bal === 'number' && bal < days) {
+          if (typeof bal === 'number' && bal < BAL_NEEDED) {
             showToast(
               '잔여 ' + BAL_LABEL + '가 부족하여 휴가증을 작성할 수 없습니다.\n' +
-              '잔여: ' + bal + ' / 신청: ' + days + ' (일)',
+              '잔여: ' + bal + BAL_UNIT + ' / 신청: ' + BAL_NEEDED + BAL_UNIT,
               'error'
             );
             return;
