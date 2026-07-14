@@ -1145,6 +1145,8 @@ html:not(.admin-mode) .admin-only { display: none !important; }
 html.admin-mode .not-admin-only { display: none !important; }
 /* 서무 모드일 때만 보임 */
 html:not(.leader-mode) .leader-only { display: none !important; }
+/* 서무·관리자에서는 숨김 (일반 작업자만 보임) */
+html.leader-mode .not-leader-only { display: none !important; }
 
 .worker-readonly-notice {
   font-size: 12px;
