@@ -167,8 +167,8 @@ function doLoginSuccess(empId, name, role, team, worker, isInitialPw) {
     localStorage.removeItem('p5_remembered_id');
   }
 
-  // 24시간 세션 (하루 후 자동 로그아웃)
-  var expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  // 10분 세션 (배포 시 자연스러운 새 코드 반영 유도 — 만료 시 자동 reload)
+  var expires = new Date(Date.now() + 10 * 60 * 1000);
   var phone = worker ? (worker.phone || '') : '';
   var session = { empId: empId, name: name, team: team, role: role, phone: phone, expires: expires.toISOString(), isInitialPw: !!isInitialPw };
   localStorage.setItem('p5_session', JSON.stringify(session));
@@ -861,42 +861,48 @@ function countWorkdays(startStr, endStr) {
   if (rememberedId && loginEmpInput) loginEmpInput.value = rememberedId;
   if (loginRememberEl) loginRememberEl.checked = !!rememberedId;
 
-  // 세션 자동 갱신 비활성 — 24시간 고정 만료 (하루 후 자동 로그아웃)
-  // 로그인 상태에서 만료 10분 전 사전 경고 예약
+  // 세션 자동 갱신 비활성 — 10분 고정 만료 (배포 시 새 코드 반영 유도)
+  // 만료 30초 전 사전 경고 예약 + 만료 시점 자동 reload 예약
   scheduleSessionExpiryWarning();
 })();
 
 // ===== 세션 만료 사전 경고 =====
 var _sessionWarnTimer = null;
+var _sessionExpireTimer = null;
 function scheduleSessionExpiryWarning() {
   if (_sessionWarnTimer) { clearTimeout(_sessionWarnTimer); _sessionWarnTimer = null; }
+  if (_sessionExpireTimer) { clearTimeout(_sessionExpireTimer); _sessionExpireTimer = null; }
   var sess = getSession();
   if (!sess || !sess.expires) return;
   var msLeft = new Date(sess.expires).getTime() - Date.now();
-  var WARN_BEFORE = 10 * 60 * 1000; // 만료 10분 전
-  var delay = msLeft - WARN_BEFORE;
-  if (delay <= 0) {
-    if (msLeft > 0) showSessionExpiryWarning();
-    return;
+  if (msLeft <= 0) return;
+  var WARN_BEFORE = 30 * 1000; // 만료 30초 전 경고
+  var warnDelay = msLeft - WARN_BEFORE;
+  if (warnDelay <= 0) {
+    showSessionExpiryWarning();
+  } else {
+    _sessionWarnTimer = setTimeout(showSessionExpiryWarning, warnDelay);
   }
-  // setTimeout 최대치 (~24.8일) 안에 들어가도록 24시간 이내일 때만 예약
-  if (delay > 25 * 60 * 60 * 1000) return;
-  _sessionWarnTimer = setTimeout(showSessionExpiryWarning, delay);
+  // 만료 시점 자동 로그아웃 + 페이지 reload (배포 시 새 코드 반영)
+  _sessionExpireTimer = setTimeout(function() {
+    try { localStorage.removeItem('p5_session'); } catch (e) {}
+    location.reload();
+  }, msLeft);
 }
 function showSessionExpiryWarning() {
   if (!getSession()) return;
-  if (confirm('자동 로그아웃까지 약 10분 남았습니다.\n로그인 상태를 24시간 더 유지하시겠습니까?')) {
-    extendSession24h();
+  if (confirm('자동 로그아웃까지 약 30초 남았습니다.\n로그인 상태를 10분 더 유지하시겠습니까?')) {
+    extendSession();
   }
 }
-function extendSession24h() {
+function extendSession() {
   try {
     var raw = localStorage.getItem('p5_session');
     if (!raw) return;
     var s = JSON.parse(raw);
-    s.expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    s.expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     localStorage.setItem('p5_session', JSON.stringify(s));
-    showToast('로그인 상태가 24시간 연장되었습니다.', 'success');
+    showToast('로그인 상태가 10분 연장되었습니다.', 'success');
     scheduleSessionExpiryWarning();
   } catch (e) {}
 }
