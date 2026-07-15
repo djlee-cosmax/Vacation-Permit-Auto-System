@@ -960,7 +960,11 @@ function hideNameSuggestions() {
 }
 
 // ----- 휴가증 추가 -----
-async function addLeave() {
+// 중복 클릭 방지 플래그 — 아래 wrapper 에서 관리
+var __addLeaveInProgress = false;
+
+// 실제 addLeave 로직 (wrapper 가 중복 실행 방지)
+async function addLeaveImpl() {
   // 초기 비밀번호(1234) 사용 중이면 휴가증 작성 차단
   var __sess = getSession();
   if (__sess && __sess.isInitialPw) {
@@ -1021,6 +1025,27 @@ async function addLeave() {
 
   // 본인 식별자: 연락처 마지막 4자리 — 중복 체크와 leave 저장 양쪽에서 사용
   var phone4 = getPhone4(phone);
+
+  // 로컬 leaves 중복 체크 — 이미 목록에 동일 내용 있으면 확인 팝업
+  // (서버 처리 완료 여부와 무관하게, 이번 세션에서 이미 추가한 경우 재추가 방지)
+  var localDup = leaves.find(function(l) {
+    if (l.name !== name) return false;
+    if (l.start !== start || l.end !== end) return false;
+    var items = normalizeLeaveItems(l);
+    if (items.length !== 1) return false;
+    if (items[0].type !== type) return false;
+    if ((items[0].count || 1) !== count) return false;
+    return true;
+  });
+  if (localDup) {
+    if (!confirm(
+      '동일 내용의 휴가증이 이미 목록에 있습니다.\n\n' +
+      '· ' + name + ' / ' + start + ' ~ ' + end + ' / ' + type + ' ' + count + '개\n\n' +
+      '그래도 추가로 작성하시겠습니까?'
+    )) {
+      return;
+    }
+  }
 
   // 서버에 이미 처리 완료된 동일 휴가증이 있으면 차단
   // (작업자가 [내 휴가증] 확인 안 하고 같은 내용 또 올리는 케이스 방지)
@@ -1127,6 +1152,23 @@ async function addLeave() {
   resetForm();
   uploadLeaveToCloud(leave);  // Firestore에도 저장 (실패해도 로컬은 유지)
   showToast(name + ' / ' + type + ' ' + count + '개 (' + fmtDays(days) + ') 추가됨', 'success');
+}
+
+// [+ 추가] 버튼 wrapper — 중복 클릭 완전 차단
+async function addLeave() {
+  if (__addLeaveInProgress) return;  // 진행 중이면 무시 (더블클릭·연속클릭 차단)
+  __addLeaveInProgress = true;
+  var btn = document.querySelector('button[onclick="addLeave()"]');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+  try {
+    await addLeaveImpl();
+  } catch (e) {
+    console.error('addLeave 실패:', e);
+    showToast('휴가증 작성 중 오류: ' + (e && e.message || e), 'error');
+  } finally {
+    __addLeaveInProgress = false;
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
 }
 
 // ----- Firestore 업로드/삭제 -----
