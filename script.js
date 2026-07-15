@@ -167,8 +167,8 @@ function doLoginSuccess(empId, name, role, team, worker, isInitialPw) {
     localStorage.removeItem('p5_remembered_id');
   }
 
-  // 10분 세션 (배포 시 자연스러운 새 코드 반영 유도 — 만료 시 자동 reload)
-  var expires = new Date(Date.now() + 10 * 60 * 1000);
+  // 세션 TTL — 일반 작업자 10분(새 코드 반영 유도), 서무·관리자 8시간(장시간 업무 배려)
+  var expires = new Date(Date.now() + getSessionTtlMs(role));
   var phone = worker ? (worker.phone || '') : '';
   var session = { empId: empId, name: name, team: team, role: role, phone: phone, expires: expires.toISOString(), isInitialPw: !!isInitialPw };
   localStorage.setItem('p5_session', JSON.stringify(session));
@@ -866,7 +866,19 @@ function countWorkdays(startStr, endStr) {
   scheduleSessionExpiryWarning();
 })();
 
-// ===== 세션 만료 사전 경고 =====
+// ===== 세션 TTL·경고 정책 (역할별) =====
+// 일반 작업자: 10분(짧게 만료해 배포 시 새 코드 반영 유도)
+// 서무·관리자: 8시간(장시간 업무 배려)
+function getSessionTtlMs(role) {
+  return (role === 'admin' || role === 'leader') ? 8 * 60 * 60 * 1000 : 10 * 60 * 1000;
+}
+function getWarnBeforeMs(role) {
+  return (role === 'admin' || role === 'leader') ? 10 * 60 * 1000 : 30 * 1000;
+}
+function fmtExtendLabel(role) {
+  return (role === 'admin' || role === 'leader') ? '8시간' : '10분';
+}
+
 var _sessionWarnTimer = null;
 var _sessionExpireTimer = null;
 function scheduleSessionExpiryWarning() {
@@ -876,7 +888,7 @@ function scheduleSessionExpiryWarning() {
   if (!sess || !sess.expires) return;
   var msLeft = new Date(sess.expires).getTime() - Date.now();
   if (msLeft <= 0) return;
-  var WARN_BEFORE = 30 * 1000; // 만료 30초 전 경고
+  var WARN_BEFORE = getWarnBeforeMs(sess.role);
   var warnDelay = msLeft - WARN_BEFORE;
   if (warnDelay <= 0) {
     showSessionExpiryWarning();
@@ -890,8 +902,12 @@ function scheduleSessionExpiryWarning() {
   }, msLeft);
 }
 function showSessionExpiryWarning() {
-  if (!getSession()) return;
-  if (confirm('자동 로그아웃까지 약 30초 남았습니다.\n로그인 상태를 10분 더 유지하시겠습니까?')) {
+  var sess = getSession();
+  if (!sess) return;
+  var role = sess.role;
+  var warnLabel = (role === 'admin' || role === 'leader') ? '약 10분' : '약 30초';
+  var extLabel = fmtExtendLabel(role);
+  if (confirm('자동 로그아웃까지 ' + warnLabel + ' 남았습니다.\n로그인 상태를 ' + extLabel + ' 더 유지하시겠습니까?')) {
     extendSession();
   }
 }
@@ -900,9 +916,10 @@ function extendSession() {
     var raw = localStorage.getItem('p5_session');
     if (!raw) return;
     var s = JSON.parse(raw);
-    s.expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    var ttl = getSessionTtlMs(s.role);
+    s.expires = new Date(Date.now() + ttl).toISOString();
     localStorage.setItem('p5_session', JSON.stringify(s));
-    showToast('로그인 상태가 10분 연장되었습니다.', 'success');
+    showToast('로그인 상태가 ' + fmtExtendLabel(s.role) + ' 연장되었습니다.', 'success');
     scheduleSessionExpiryWarning();
   } catch (e) {}
 }
