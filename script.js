@@ -2323,7 +2323,11 @@ function renderWorkerTable() {
         '<td class="worker-row-actions">' + pwBtn + '<button class="worker-row-del" onclick="deleteWorkerRow(' + i + ')" title="명단에서 삭제">×</button></td>' +
       '</tr>';
     } else if (LEADER_MODE) {
-      // 서무: 편집 불가지만 잔여만 편집 가능
+      // 서무: 이름·사번·근무지·연락처는 읽기 전용, 잔여 3종·PW 초기화만 가능
+      var leaderEmpIdSafe = String(w.employeeId || '').trim();
+      var leaderPwBtn = leaderEmpIdSafe
+        ? '<button class="worker-row-pw" onclick="resetWorkerPassword(\'' + leaderEmpIdSafe + '\')" title="비밀번호를 1234로 초기화">PW</button>'
+        : '';
       return '<tr' + trCls + '>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.name || '') + roleBadge + '</td>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.employeeId || '') + '</td>' +
@@ -2332,7 +2336,7 @@ function renderWorkerTable() {
         '<td class="leader-only worker-balance-cell"><input type="number" step="0.25" min="0" value="' + escapeHtml(String(balAnnual)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceAnnual\',this.value)"></td>' +
         '<td class="leader-only worker-balance-cell">' + birthCellHtml + '</td>' +
         '<td class="leader-only worker-balance-cell"><input type="number" step="1" min="0" value="' + escapeHtml(String(balSummer)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceSummer\',this.value)"></td>' +
-        '<td></td>' +
+        '<td class="worker-row-actions">' + leaderPwBtn + '</td>' +
       '</tr>';
     } else {
       // 일반 작업자: 잔여 컬럼은 .leader-only로 숨김
@@ -2354,7 +2358,7 @@ function updateWorker(idx, key, val) {
   if (workerModalState[idx]) workerModalState[idx][key] = val;
 }
 
-// 관리자: 특정 작업자 비밀번호를 초기 상태(1234)로 리셋
+// 관리자·서무: 특정 작업자 비밀번호를 초기 상태(1234)로 리셋
 function resetWorkerPassword(empId) {
   empId = String(empId || '').trim();
   if (!empId) return;
