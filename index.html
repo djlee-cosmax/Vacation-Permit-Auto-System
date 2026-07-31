@@ -314,17 +314,10 @@
             <button type="button" class="pw-toggle" onclick="togglePwVisibility('newPwConfirm', this)">👁</button>
           </div>
         </div>
-        <div class="change-pw-divider">비밀번호 찾기용 (필수)</div>
-        <div class="change-pw-field">
-          <label>보안 질문</label>
-          <select id="securityQuestion">
-            <option value="">선택하지 않음</option>
-          </select>
-        </div>
-        <div class="change-pw-field">
-          <label>답변</label>
-          <input type="text" id="securityAnswer" placeholder="답변 입력 (4자 이상)" autocomplete="off" onkeydown="if(event.key==='Enter'){changePassword();}">
-        </div>
+        <p class="change-pw-note">
+          비밀번호를 잊으면 <b>서무에게 초기화를 요청</b>해 주세요.<br>
+          초기화 후 <b>1234</b>로 로그인하면 새 비밀번호를 등록할 수 있습니다.
+        </p>
       </div>
       <div class="modal-actions">
         <button class="btn-primary" onclick="changePassword()">변경</button>
@@ -339,45 +332,18 @@
       <button class="modal-close" onclick="closeForgotPwModal()">×</button>
       <h3>비밀번호 찾기</h3>
 
-      <!-- 1단계: 사번 입력 -->
-      <div id="forgotPwStep1" class="change-pw-form">
-        <div class="change-pw-field">
-          <label>사번</label>
-          <input type="text" id="forgotEmpId" placeholder="본인 사번" autocomplete="username" inputmode="numeric" onkeydown="if(event.key==='Enter'){forgotPwLookup();}">
-        </div>
+      <div class="change-pw-form">
+        <p class="forgot-guide">
+          비밀번호는 보안을 위해 서버에 <b>복원할 수 없는 형태</b>로 보관됩니다.<br>
+          본인 확인 후 <b>서무가 초기화</b>해 드립니다.
+        </p>
+        <ol class="forgot-steps">
+          <li><b>서무에게 비밀번호 초기화를 요청</b>합니다.</li>
+          <li>초기화되면 <b>사번 + 1234</b>로 로그인합니다.</li>
+          <li>로그인 직후 <b>새 비밀번호 등록</b> 안내가 자동으로 뜹니다.</li>
+        </ol>
         <div class="modal-actions">
-          <button class="btn-primary" onclick="forgotPwLookup()">다음</button>
-          <button class="btn-secondary" onclick="closeForgotPwModal()">취소</button>
-        </div>
-      </div>
-
-      <!-- 2단계: 보안 질문 답변 + 새 비밀번호 -->
-      <div id="forgotPwStep2" class="change-pw-form" style="display:none">
-        <div class="change-pw-field">
-          <label>보안 질문</label>
-          <p id="forgotQuestion" class="forgot-question"></p>
-        </div>
-        <div class="change-pw-field">
-          <label>답변</label>
-          <input type="text" id="forgotAnswer" autocomplete="off">
-        </div>
-        <div class="change-pw-field">
-          <label>새 비밀번호 (숫자 6~10자리)</label>
-          <div class="pw-input-wrap">
-            <input type="password" id="forgotNewPw" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="10">
-            <button type="button" class="pw-toggle" onclick="togglePwVisibility('forgotNewPw', this)">👁</button>
-          </div>
-        </div>
-        <div class="change-pw-field">
-          <label>새 비밀번호 확인</label>
-          <div class="pw-input-wrap">
-            <input type="password" id="forgotNewPwConfirm" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="10" onkeydown="if(event.key==='Enter'){forgotPwReset();}">
-            <button type="button" class="pw-toggle" onclick="togglePwVisibility('forgotNewPwConfirm', this)">👁</button>
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn-primary" onclick="forgotPwReset()">비밀번호 재설정</button>
-          <button class="btn-secondary" onclick="closeForgotPwModal()">취소</button>
+          <button class="btn-secondary" onclick="closeForgotPwModal()">확인</button>
         </div>
       </div>
     </div>

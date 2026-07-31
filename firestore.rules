@@ -1,0 +1,104 @@
+rules_version = '2';
+
+// ============================================================
+// 휴가증 자동 반영 프로그램 — Firestore 보안 규칙
+//
+// ⚠️ 배포 시점 주의
+//   이 규칙은 "모든 작업자가 Firebase Auth 계정으로 이관된 뒤" 배포해야 한다.
+//   먼저 배포하면 아직 이관되지 않은 작업자가 로그인하지 못한다.
+//
+//   확인 방법: GitHub Actions → [계정 관리] → action=status 실행
+//              "전원 이관 완료" 메시지가 나오면 배포 가능.
+//
+// 배포 후에는 Firebase Console → Authentication → Sign-in method 에서
+// "익명" 로그인을 사용 중지해야 익명 접근 경로가 완전히 닫힌다.
+//
+// 역할은 Custom Claims 로 부여한다 (scripts/auth-admin.js, action=claims).
+//   role=admin  이동준
+//   role=leader 김가영 (서무)
+//   그 외       일반 작업자 (클레임 없음)
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- 공통 헬퍼 ----------
+    function signedIn() {
+      // 익명 계정은 사용자로 인정하지 않는다.
+      // (이관 이전의 익명 인증만으로 전 직원 정보가 읽히던 것이 문제의 핵심)
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function role() {
+      return signedIn() ? request.auth.token.get('role', 'worker') : '';
+    }
+
+    function isAdmin()  { return role() == 'admin'; }
+    function isStaff()  { return role() == 'admin' || role() == 'leader'; }
+
+    // 로그인한 본인의 사번 (이메일 로컬파트 = 사번)
+    function myEmpId() {
+      return signedIn() ? request.auth.token.email.split('@')[0] : '';
+    }
+
+    // ---------- users : 사번별 잔여 휴가 ----------
+    // 비밀번호·보안답변은 Firebase Auth 로 이관되어 더 이상 여기 없다.
+    match /users/{empId} {
+      // 본인 문서는 본인이, 전체 조회는 서무·관리자만
+      allow get:  if signedIn() && (empId == myEmpId() || isStaff());
+      allow list: if isStaff();
+
+      // 잔여 휴가 차감·복원은 서무·관리자만.
+      // 본인은 이관 표시 등 인증 관련 필드만 스스로 정리할 수 있다.
+      allow create, update: if isStaff()
+        || (signedIn() && empId == myEmpId()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['authMigrated', 'authMigratedAt', 'password',
+                           'securityQuestion', 'securityAnswer', 'updatedAt']));
+      allow delete: if isAdmin();
+    }
+
+    // ---------- workers : 작업자 명단 (이름·사번·부서·휴대폰) ----------
+    // 개인정보이므로 명단 전체 조회는 서무·관리자로 제한한다.
+    match /workers/{docId} {
+      allow get:  if signedIn();
+      allow list: if isStaff();
+      allow write: if isStaff();
+    }
+
+    // ---------- leaves : 휴가증 ----------
+    // 앱이 여러 형태로 조회한다 — 중복 확인(submitterPhone4), 내 휴가증(name),
+    // 처리완료 정리(processed), 삭제 감시(전체 onSnapshot).
+    // 이 쿼리들을 규칙으로 좁히려면 클라이언트 쿼리부터 손봐야 하므로
+    // 지금은 "로그인한 실제 사용자" 까지만 제한한다.
+    //
+    // 이것만으로도 핵심 문제(공개 API 키 + 익명 인증으로 외부에서 열람)는 닫힌다.
+    // 남은 과제: 일반 작업자가 다른 사람 휴가증까지 볼 수 있다 — 쿼리 정리 후 추가 제한.
+    match /leaves/{leaveId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn();   // 차감 처리 등에서 본인·서무 모두 갱신한다
+      allow delete: if isStaff();
+    }
+
+    // ---------- system : 자동화 상태 (생휴 리셋 기록 등) ----------
+    // 서버(Admin SDK)만 쓰고, 앱은 읽기만 한다.
+    match /system/{docId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ---------- balanceLogs : 잔여 변경 이력 ----------
+    match /balanceLogs/{logId} {
+      allow read: if isStaff();
+      allow create: if isStaff();
+      allow update, delete: if isAdmin();
+    }
+
+    // 그 외 경로는 모두 차단
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

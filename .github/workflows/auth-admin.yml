@@ -1,0 +1,58 @@
+name: 계정 관리 (초기화 · 역할 · 이관현황)
+
+# 브라우저에서는 남의 계정을 건드릴 수 없어 서버 권한이 필요한 작업을 여기서 처리한다.
+#
+#   비밀번호 초기화 → 작업자가 비밀번호를 잊었을 때 (서무·관리자가 실행)
+#   역할 부여       → 관리자·서무 권한 클레임 적용 (최초 1회 + 인원 변경 시)
+#   이관 현황       → Firebase Auth 이관이 몇 명 끝났는지 확인 (규칙 배포 전 필수)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: '실행할 작업'
+        required: true
+        default: 'status'
+        type: choice
+        options:
+          - status
+          - reset
+          - claims
+      emp_id:
+        description: '사번 (비밀번호 초기화 선택 시에만 입력)'
+        required: false
+        type: string
+
+concurrency:
+  group: auth-admin
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: scripts/package.json
+
+      - name: Install deps
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+
+      - name: 입력 확인
+        if: inputs.action == 'reset' && inputs.emp_id == ''
+        run: |
+          echo "::error::비밀번호 초기화에는 사번(emp_id) 입력이 필요합니다."
+          exit 1
+
+      - name: 실행
+        working-directory: scripts
+        env:
+          FIREBASE_SA_KEY: ${{ secrets.FIREBASE_SA_KEY }}
+          ACTION: ${{ inputs.action }}
+          EMP_ID: ${{ inputs.emp_id }}
+        run: node auth-admin.js

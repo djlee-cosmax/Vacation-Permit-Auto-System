@@ -2,17 +2,6 @@
 
 // ----- 로그인 / 세션 -----
 var DEFAULT_PASSWORD = '1234';
-// 보안 질문 옵션 (비밀번호 찾기용)
-var SECURITY_QUESTIONS = [
-  '어머니의 성함은?',
-  '가장 좋아하는 음식은?',
-  '처음 다닌 초등학교 이름은?',
-  '본인의 별명은?',
-  '좋아하는 색상은?',
-  '좋아하는 운동·취미는?',
-  '가장 기억에 남는 여행지는?',
-  '첫 애완동물의 이름은?'
-];
 // 관리자 / 서무 사번 (workers.json 외 별도 권한 부여)
 var STAFF_ROLES = {
   '122210202': { role: 'admin', name: '이동준', department: '생산3팀' },
@@ -111,24 +100,42 @@ async function comparePassword(input, stored) {
   return input === stored;  // 평문 (legacy)
 }
 
-// 보안답변 정규화 — 앞뒤 공백·대소문자 차이로 실패하지 않게
-function normalizeAnswer(a) {
-  return String(a || '').trim().toLowerCase();
+// ============================================================
+// Firebase Authentication 이관
+//
+// 기존 구조는 브라우저가 users/{사번} 문서의 비밀번호 해시를 "읽어서" 직접
+// 비교했다. 검증에 읽기가 필요하니 규칙으로 막을 수 없고, 결과적으로 익명
+// 인증만으로 전 직원 해시·개인정보가 외부에 노출됐다.
+//
+// 이제 비밀번호 검증은 Firebase Auth 가 담당하고, Firestore 에서는 비밀번호
+// 필드를 아예 제거한다. 사번을 이메일 형태로 매핑해 계정을 만든다.
+//
+// 이관은 자가 진행 방식이다 — 작업자는 평소대로 로그인만 하면 되고,
+// 그 순간(평문 비밀번호를 아는 유일한 시점) Auth 계정이 자동 생성된다.
+// ============================================================
+var AUTH_EMAIL_DOMAIN = 'vacation.local';
+
+function authEmailFor(empId) {
+  return String(empId || '').trim() + '@' + AUTH_EMAIL_DOMAIN;
 }
 
-// 보안답변 비교. 구형(평문)은 원문 그대로 비교해 기존 사용자가 막히지 않게 한다.
-async function compareAnswer(input, stored) {
-  if (!stored) return false;
-  if (isModernHash(stored) || isLegacySha256(stored)) {
-    return await comparePassword(normalizeAnswer(input), stored);
-  }
-  // 평문 legacy — 기존 동작과 동일하게 원문 비교, 실패 시 정규화 비교도 허용
-  if (String(input) === String(stored)) return true;
-  return normalizeAnswer(input) === normalizeAnswer(stored);
+// Firebase Auth 는 6자 이상을 요구한다. 기본 비밀번호 '1234' 는 4자라
+// 계정 생성이 불가능하므로 내부적으로만 패딩해서 저장한다.
+// 사용자는 계속 '1234' 를 입력하고, 로그인 직후 변경 안내가 뜬다.
+function authPasswordFor(pw) {
+  var p = String(pw == null ? '' : pw);
+  return p.length >= 6 ? p : (p + '______').slice(0, 6);
 }
 
-// 보안답변 최소 길이 — 기존에 2자짜리가 다수라 신규 등록부터 강화
-var MIN_ANSWER_LEN = 4;
+function isNoAccountError(code) {
+  // 이메일 열거 보호가 켜져 있으면 user-not-found 와 wrong-password 가
+  // 모두 invalid-credential 로 합쳐진다. 구분이 불가능하므로 둘 다
+  // 레거시 경로로 넘겨 Firestore 해시로 판정한다.
+  return code === 'auth/user-not-found' ||
+         code === 'auth/invalid-credential' ||
+         code === 'auth/invalid-login-credentials' ||
+         code === 'auth/wrong-password';
+}
 
 function getSession() {
   try {
@@ -196,42 +203,107 @@ function login() {
   // role은 "선택한 모드" 기준 — 관리자도 작업자 모드 선택 시 worker로 동작
   role = selectedMode;
 
-  // 3) Firestore users/{empId} 문서에서 비밀번호 조회 (없으면 기본 1234)
-  // Firestore가 준비되지 않은 경우 기본 PW로 폴백
-  function finalizeLogin(storedPw, storedAnswer) {
-    comparePassword(pw, storedPw).then(function(ok) {
-      if (!ok) { showToast('비밀번호가 일치하지 않습니다.', 'error'); return; }
-      var isInitialPw = (pw === DEFAULT_PASSWORD);
-      // 로그인 성공 시점 = 평문 비밀번호를 아는 유일한 순간 → 구형 저장값을 신형으로 승격.
-      // 작업자는 아무것도 하지 않아도 되고, 실패해도 로그인은 그대로 진행된다.
-      if (FB_DB && !isInitialPw && !isModernHash(storedPw)) {
-        hashSecret(pw).then(function(newHash) {
-          return FB_DB.collection('users').doc(empId)
-            .set({ password: newHash }, { merge: true });
-        }).catch(function() {});
-      }
-      // 보안답변이 평문으로 남아 있으면 함께 해시로 승격 (답변 원문을 여기서만 알 수 있음)
-      if (FB_DB && storedAnswer && !isModernHash(storedAnswer) && !isLegacySha256(storedAnswer)) {
-        hashSecret(normalizeAnswer(storedAnswer)).then(function(ansHash) {
-          return FB_DB.collection('users').doc(empId)
-            .set({ securityAnswer: ansHash }, { merge: true });
-        }).catch(function() {});
-      }
-      doLoginSuccess(empId, name, role, team, worker, isInitialPw);
-    });
+  var isInitialPw = (pw === DEFAULT_PASSWORD);
+
+  // Firebase Auth 를 못 쓰는 환경(SDK 로드 실패 등)에서는 기존 방식으로 폴백
+  if (typeof firebase === 'undefined' || !firebase.auth || !FB_DB) {
+    legacyVerifyOnly();
+    return;
   }
-  if (FB_DB) {
+
+  // ---- 1순위: Firebase Auth 로그인 ----
+  firebase.auth().signInWithEmailAndPassword(authEmailFor(empId), authPasswordFor(pw))
+    .then(function() {
+      doLoginSuccess(empId, name, role, team, worker, isInitialPw);
+    })
+    .catch(function(err) {
+      if (isNoAccountError(err && err.code)) {
+        // 아직 이관 전이거나 비밀번호가 틀린 경우 — Firestore 해시로 판정
+        migrateThenLogin();
+        return;
+      }
+      if (err && err.code === 'auth/too-many-requests') {
+        showToast('로그인 시도가 많아 잠시 차단됐습니다.\n잠시 후 다시 시도해 주세요.', 'error');
+        return;
+      }
+      console.error('Auth 로그인 실패:', err);
+      showToast('로그인 실패: ' + ((err && err.message) || err), 'error');
+    });
+
+  // ---- 2순위: 기존 Firestore 해시로 검증 후 Auth 계정 생성 (자가 이관) ----
+  function migrateThenLogin() {
     FB_DB.collection('users').doc(empId).get()
       .then(function(doc) {
         var d = doc.exists ? doc.data() : {};
+
+        // 이미 이관된 사용자인데 여기까지 왔다면 = 비밀번호가 틀린 것.
+        // (이관 후에는 password 필드가 없어 DEFAULT_PASSWORD 로 폴백되므로
+        //  이 확인이 없으면 1234 입력만으로 통과해 버린다)
+        if (d.authMigrated) {
+          showToast('비밀번호가 일치하지 않습니다.', 'error');
+          return;
+        }
+
         var storedPw = d.password ? d.password : DEFAULT_PASSWORD;
-        finalizeLogin(storedPw, d.securityAnswer);
+        return comparePassword(pw, storedPw).then(function(ok) {
+          if (!ok) { showToast('비밀번호가 일치하지 않습니다.', 'error'); return; }
+
+          // 검증 통과 → Auth 계정 생성 (생성과 동시에 로그인 상태가 된다)
+          return firebase.auth()
+            .createUserWithEmailAndPassword(authEmailFor(empId), authPasswordFor(pw))
+            .then(function() {
+              // 이관 완료 표시 + 비밀번호·보안답변 필드 제거 (더 이상 필요 없음)
+              return FB_DB.collection('users').doc(empId).set({
+                authMigrated: true,
+                authMigratedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                password: firebase.firestore.FieldValue.delete(),
+                securityAnswer: firebase.firestore.FieldValue.delete(),
+                securityQuestion: firebase.firestore.FieldValue.delete()
+              }, { merge: true }).catch(function(e) {
+                // 필드 정리 실패해도 로그인은 성공시킨다 (다음 로그인에서 재시도)
+                console.warn('이관 후 필드 정리 실패:', e);
+              });
+            })
+            .then(function() {
+              doLoginSuccess(empId, name, role, team, worker, isInitialPw);
+            })
+            .catch(function(err) {
+              if (err && err.code === 'auth/email-already-in-use') {
+                // 계정은 있는데 1순위 로그인이 실패했다 = 비밀번호 불일치
+                showToast('비밀번호가 일치하지 않습니다.', 'error');
+                return;
+              }
+              if (err && err.code === 'auth/operation-not-allowed') {
+                console.error('이메일/비밀번호 로그인이 Firebase Console 에서 비활성 상태입니다.');
+                showToast('로그인 설정이 아직 준비되지 않았습니다.\n관리자에게 문의해 주세요.', 'error');
+                return;
+              }
+              console.error('계정 생성 실패:', err);
+              showToast('로그인 실패: ' + ((err && err.message) || err), 'error');
+            });
+        });
+      })
+      .catch(function(err) {
+        console.error('사용자 조회 실패:', err);
+        showToast('로그인 실패: ' + ((err && err.message) || err), 'error');
+      });
+  }
+
+  // ---- 폴백: Auth 자체를 못 쓰는 환경 ----
+  function legacyVerifyOnly() {
+    if (!FB_DB) { doLoginSuccess(empId, name, role, team, worker, isInitialPw); return; }
+    FB_DB.collection('users').doc(empId).get()
+      .then(function(doc) {
+        var d = doc.exists ? doc.data() : {};
+        return comparePassword(pw, d.password ? d.password : DEFAULT_PASSWORD);
+      })
+      .then(function(ok) {
+        if (!ok) { showToast('비밀번호가 일치하지 않습니다.', 'error'); return; }
+        doLoginSuccess(empId, name, role, team, worker, isInitialPw);
       })
       .catch(function() {
-        finalizeLogin(DEFAULT_PASSWORD);
+        showToast('로그인 실패: 서버에 연결할 수 없습니다.', 'error');
       });
-  } else {
-    finalizeLogin(DEFAULT_PASSWORD);
   }
 }
 
@@ -297,16 +369,6 @@ function doLoginSuccess(empId, name, role, team, worker, isInitialPw) {
       alert('보안을 위해 비밀번호를 변경해 주세요.\n(초기 비밀번호 1234 사용 중)');
       openChangePwModal();
     }, 600);
-  } else if (FB_DB) {
-    // 비밀번호 변경했지만 보안 질문 미등록이면 등록 안내
-    FB_DB.collection('users').doc(empId).get().then(function(doc) {
-      if (doc.exists && doc.data().password && !doc.data().securityQuestion) {
-        setTimeout(function() {
-          alert('보안 질문이 등록되지 않았습니다.\n비밀번호 찾기를 위해 등록해 주세요.');
-          openChangePwModal();
-        }, 600);
-      }
-    }).catch(function() {});
   }
 }
 
@@ -335,24 +397,6 @@ function openChangePwModal() {
   document.getElementById('currentPw').value = '';
   document.getElementById('newPw').value = '';
   document.getElementById('newPwConfirm').value = '';
-  document.getElementById('securityAnswer').value = '';
-
-  // 보안 질문 드롭다운 채우기
-  var sel = document.getElementById('securityQuestion');
-  sel.innerHTML = '<option value="">선택하지 않음</option>' +
-    SECURITY_QUESTIONS.map(function(q) { return '<option value="' + escapeHtml(q) + '">' + escapeHtml(q) + '</option>'; }).join('');
-
-  // 기존 보안 질문 (있으면 선택)
-  var session = getSession();
-  if (FB_DB && session) {
-    FB_DB.collection('users').doc(session.empId).get()
-      .then(function(doc) {
-        if (doc.exists && doc.data().securityQuestion) {
-          sel.value = doc.data().securityQuestion;
-        }
-      })
-      .catch(function() {});
-  }
 
   document.getElementById('changePwModal').style.display = 'flex';
   setTimeout(function() { document.getElementById('currentPw').focus(); }, 50);
@@ -384,38 +428,38 @@ function changePassword() {
   if (cur === newPw) { showToast('현재 비밀번호와 동일합니다.\n다른 비밀번호를 입력해 주세요.', 'error'); return; }
   if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
 
-  // 현재 PW 확인 → 새 PW 해시 저장
-  FB_DB.collection('users').doc(empId).get()
-    .then(function(doc) {
-      var storedPw = (doc.exists && doc.data().password) ? doc.data().password : DEFAULT_PASSWORD;
-      return comparePassword(cur, storedPw).then(function(ok) {
-        if (!ok) {
-          showToast('현재 비밀번호가 일치하지 않습니다.', 'error');
-          throw new Error('PW_MISMATCH');
-        }
-        var question = document.getElementById('securityQuestion').value;
-        var answer = document.getElementById('securityAnswer').value.trim();
-        if (!question || !answer) {
-          showToast('보안 질문과 답변을 입력해 주세요.\n(비밀번호 찾기에 필요합니다)', 'error');
-          throw new Error('SECURITY_QUESTION_REQUIRED');
-        }
-        if (normalizeAnswer(answer).length < MIN_ANSWER_LEN) {
-          showToast('보안 답변은 ' + MIN_ANSWER_LEN + '자 이상 입력해 주세요.\n(짧으면 쉽게 추측됩니다)', 'error');
-          throw new Error('ANSWER_TOO_SHORT');
-        }
-        return Promise.all([
-          hashSecret(newPw),
-          hashSecret(normalizeAnswer(answer))
-        ]).then(function(hashes) {
-          var dataToSave = {
-            password: hashes[0],
-            securityQuestion: question,
-            securityAnswer: hashes[1],
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          };
-          return FB_DB.collection('users').doc(empId).set(dataToSave, { merge: true });
-        });
-      });
+  // 비밀번호는 Firebase Auth 가 보관한다.
+  // 현재 비밀번호로 재인증(= 현재 PW 검증) → updatePassword 로 변경.
+  var user = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+  if (!user) {
+    showToast('로그인이 만료되었습니다. 다시 로그인해 주세요.', 'error');
+    return;
+  }
+
+  var cred = firebase.auth.EmailAuthProvider.credential(
+    authEmailFor(empId), authPasswordFor(cur)
+  );
+  user.reauthenticateWithCredential(cred)
+    .catch(function(err) {
+      if (isNoAccountError(err && err.code)) {
+        showToast('현재 비밀번호가 일치하지 않습니다.', 'error');
+        throw new Error('PW_MISMATCH');
+      }
+      throw err;
+    })
+    .then(function() {
+      return user.updatePassword(authPasswordFor(newPw));
+    })
+    .then(function() {
+      // 이관 이전 사용자가 여기로 들어온 경우를 대비해 잔여 필드 정리
+      if (!FB_DB) return;
+      return FB_DB.collection('users').doc(empId).set({
+        authMigrated: true,
+        password: firebase.firestore.FieldValue.delete(),
+        securityAnswer: firebase.firestore.FieldValue.delete(),
+        securityQuestion: firebase.firestore.FieldValue.delete(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true }).catch(function() {});
     })
     .then(function() {
       // 초기 PW 플래그 해제
@@ -428,103 +472,29 @@ function changePassword() {
     })
     .catch(function(err) {
       if (err && (err.message === 'PW_MISMATCH' || err.message === 'SECURITY_QUESTION_REQUIRED')) return;
+      if (err && err.code === 'auth/requires-recent-login') {
+        showToast('보안을 위해 다시 로그인한 뒤 변경해 주세요.', 'error');
+        return;
+      }
+      if (err && err.code === 'auth/weak-password') {
+        showToast('비밀번호가 너무 단순합니다. 다른 번호로 시도해 주세요.', 'error');
+        return;
+      }
       console.error('비밀번호 변경 실패:', err);
       showToast('변경 실패: ' + (err.message || err), 'error');
     });
 }
 
-// 비밀번호 찾기 — 사번 입력 → 보안 질문 표시 → 답변 확인 → 새 PW 설정
-var forgotEmpIdCache = '';
-
+// 비밀번호 찾기 — 안내 전용.
+// 비밀번호는 Firebase Auth 가 복원 불가능한 형태로 보관하므로 브라우저에서
+// 재설정할 수 없다. 서무가 GitHub Actions 워크플로로 계정을 초기화하면
+// 작업자가 1234 로 재로그인하며 새 비밀번호를 등록한다.
 function openForgotPwModal() {
-  forgotEmpIdCache = '';
-  document.getElementById('forgotEmpId').value = '';
-  document.getElementById('forgotAnswer').value = '';
-  document.getElementById('forgotNewPw').value = '';
-  document.getElementById('forgotNewPwConfirm').value = '';
-  document.getElementById('forgotPwStep1').style.display = '';
-  document.getElementById('forgotPwStep2').style.display = 'none';
   document.getElementById('forgotPwModal').style.display = 'flex';
-  setTimeout(function() { document.getElementById('forgotEmpId').focus(); }, 50);
 }
 
 function closeForgotPwModal() {
   document.getElementById('forgotPwModal').style.display = 'none';
-}
-
-function forgotPwLookup() {
-  var empId = document.getElementById('forgotEmpId').value.trim();
-  if (!empId) { showToast('사번을 입력해 주세요.', 'error'); return; }
-  if (!FB_DB) { showToast('서버 연결 안 됨', 'error'); return; }
-
-  FB_DB.collection('users').doc(empId).get()
-    .then(function(doc) {
-      if (!doc.exists || !doc.data().securityQuestion || !doc.data().securityAnswer) {
-        showToast('등록된 보안 질문이 없습니다. 관리자(이동준)에게 비밀번호 초기화를 요청해 주세요.', 'error');
-        return;
-      }
-      forgotEmpIdCache = empId;
-      document.getElementById('forgotQuestion').textContent = doc.data().securityQuestion;
-      document.getElementById('forgotPwStep1').style.display = 'none';
-      document.getElementById('forgotPwStep2').style.display = '';
-      setTimeout(function() { document.getElementById('forgotAnswer').focus(); }, 50);
-    })
-    .catch(function(err) {
-      console.error(err);
-      showToast('조회 실패: ' + (err.message || err), 'error');
-    });
-}
-
-function forgotPwReset() {
-  var empId = forgotEmpIdCache;
-  if (!empId) return;
-  var answer = document.getElementById('forgotAnswer').value.trim();
-  var newPw = document.getElementById('forgotNewPw').value;
-  var confirmPw = document.getElementById('forgotNewPwConfirm').value;
-
-  if (!answer) { showToast('답변을 입력해 주세요.', 'error'); return; }
-  if (!newPw) { showToast('새 비밀번호를 입력해 주세요.', 'error'); return; }
-  if (!/^[0-9]+$/.test(newPw)) { showToast('새 비밀번호는 숫자만 입력 가능합니다.', 'error'); return; }
-  if (newPw.length < 6 || newPw.length > 10) { showToast('새 비밀번호는 숫자 6~10자리여야 합니다.', 'error'); return; }
-  if (newPw !== confirmPw) { showToast('새 비밀번호 확인이 일치하지 않습니다.', 'error'); return; }
-
-  FB_DB.collection('users').doc(empId).get()
-    .then(function(doc) {
-      var storedAnswer = doc.exists ? (doc.data().securityAnswer || '') : '';
-      return compareAnswer(answer, storedAnswer).then(function(answerOk) {
-        if (!answerOk) {
-          showToast('답변이 일치하지 않습니다.', 'error');
-          throw new Error('ANSWER_MISMATCH');
-        }
-        var storedPw = (doc.exists && doc.data().password) ? doc.data().password : DEFAULT_PASSWORD;
-        return comparePassword(newPw, storedPw).then(function(same) {
-          if (same) {
-            showToast('새 비밀번호가 기존 비밀번호와 동일합니다.\n다른 비밀번호를 입력해 주세요.', 'error');
-            throw new Error('SAME_PW');
-          }
-          // 답변이 맞았으므로 이 시점에 평문 답변도 해시로 승격
-          return Promise.all([hashSecret(newPw), hashSecret(normalizeAnswer(answer))]);
-        }).then(function(hashes) {
-          return FB_DB.collection('users').doc(empId).set({
-            password: hashes[0],
-            securityAnswer: hashes[1],
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
-        });
-      });
-    })
-    .then(function() {
-      closeForgotPwModal();
-      // 로그인 화면 사번 자동 채움
-      var loginEmp = document.getElementById('loginEmpId');
-      if (loginEmp) loginEmp.value = empId;
-      showToast('비밀번호가 재설정되었습니다. 새 비밀번호로 로그인해 주세요.', 'success');
-    })
-    .catch(function(err) {
-      if (err && (err.message === 'ANSWER_MISMATCH' || err.message === 'SAME_PW')) return;
-      console.error('비밀번호 재설정 실패:', err);
-      showToast('재설정 실패: ' + (err.message || err), 'error');
-    });
 }
 
 // 역할에 따라 [내 휴가증] / [휴가증 조회] 버튼·모달 텍스트 변경
@@ -577,6 +547,12 @@ function applyWorkerProfileToForm() {
 
 function logout() {
   if (!confirm('로그아웃하시겠습니까?')) return;
+  // Firebase Auth 세션도 함께 종료 — 안 하면 Firestore 접근 권한이 남는다
+  try {
+    if (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) {
+      firebase.auth().signOut().catch(function() {});
+    }
+  } catch (e) {}
   localStorage.removeItem('p5_session');
   localStorage.removeItem('p5_admin');
   localStorage.removeItem('p5_leader');
@@ -610,31 +586,34 @@ try {
   if (typeof firebase !== 'undefined') {
     firebase.initializeApp(firebaseConfig);
     FB_DB = firebase.firestore();
-    firebase.auth().signInAnonymously()
-      .then(function(cred) {
-        FB_UID = cred.user.uid;
-        // 작업자 명단 Firestore에서 로드 (workers.json 대체)
-        loadDefaultWorkers();
-        // 본인이 작성하고 서버에서 처리 완료된 휴가증은 우측 카드에서 자동 제거
-        setTimeout(cleanupProcessedLeavesFromCloud, 200);
-        // 외부에서 삭제된 휴가증의 차감 자동 환원 (서무·관리자 모드만)
-        startLeaveDeletionWatcher();
-        // 매월 1일 (또는 그 후 첫 진입 시) 생휴 자동 리셋
-        setTimeout(maybeMonthlyBirthLeaveReset, 300);
-        // 페이지 로드 시 보안 질문 미등록 체크 (이미 로그인된 상태에서도 안내)
-        var sess = getSession();
-        if (sess && sess.empId && FB_DB) {
-          FB_DB.collection('users').doc(sess.empId).get().then(function(doc) {
-            if (doc.exists && doc.data().password && !doc.data().securityQuestion) {
-              setTimeout(function() {
-                alert('보안 질문이 등록되지 않았습니다.\n비밀번호 찾기를 위해 등록해 주세요.');
-                openChangePwModal();
-              }, 800);
-            }
-          }).catch(function() {});
-        }
-      })
-      .catch(function(err) { console.warn('Firebase 익명 인증 실패:', err); });
+
+    // 인증이 확립될 때마다 Firestore 의존 작업을 시작한다.
+    // 익명 → 실제 사용자로 승격되면 한 번 더 돌려서, 규칙을 조인 뒤에도
+    // (익명이 읽지 못하는) 작업자 명단이 로그인 후 정상적으로 채워지게 한다.
+    var _lastAuthKind = null;
+    firebase.auth().onAuthStateChanged(function(user) {
+      if (!user) {
+        _lastAuthKind = null;
+        // 로그인 전 상태 — 이관 기간에는 익명 인증으로 레거시 검증 경로를 유지한다.
+        // 전원 이관 후 Console 에서 익명 로그인을 끄면 이 경로는 자연히 닫힌다.
+        firebase.auth().signInAnonymously()
+          .catch(function(err) { console.warn('익명 인증 실패:', err); });
+        return;
+      }
+      FB_UID = user.uid;
+      var kind = user.isAnonymous ? 'anon' : 'user';
+      if (kind === _lastAuthKind) return;
+      _lastAuthKind = kind;
+
+      // 작업자 명단 Firestore에서 로드 (workers.json 대체)
+      loadDefaultWorkers();
+      // 본인이 작성하고 서버에서 처리 완료된 휴가증은 우측 카드에서 자동 제거
+      setTimeout(cleanupProcessedLeavesFromCloud, 200);
+      // 외부에서 삭제된 휴가증의 차감 자동 환원 (서무·관리자 모드만)
+      startLeaveDeletionWatcher();
+      // 매월 1일 (또는 그 후 첫 진입 시) 생휴 자동 리셋
+      setTimeout(maybeMonthlyBirthLeaveReset, 300);
+    });
   }
 } catch (e) {
   console.warn('Firebase 초기화 실패:', e);
@@ -2481,24 +2460,44 @@ function resetWorkerPassword(empId) {
   var worker = workers.find(function(w) { return String(w.employeeId || '').trim() === empId; });
   var name = worker ? worker.name : empId;
 
+  // 비밀번호는 Firebase Auth 가 보관하므로 브라우저에서 남의 것을 바꿀 수 없다.
+  // 여기서는 "초기화 요청"만 접수하고, 실제 계정 삭제는 관리자가
+  // GitHub Actions 의 [비밀번호 초기화] 워크플로로 처리한다.
   if (!confirm(
-    '[' + name + ' / ' + empId + ']의 비밀번호를 초기 비밀번호(1234)로 초기화하시겠습니까?\n\n' +
-    '※ 보안 질문도 함께 삭제됩니다.\n' +
-    '※ 작업자가 다음 로그인 시 새 비밀번호와 보안 질문을 다시 등록해야 합니다.'
+    '[' + name + ' / ' + empId + ']의 비밀번호 초기화를 요청하시겠습니까?\n\n' +
+    '※ 요청 접수 후 관리자가 처리하면 초기 비밀번호(1234)로 로그인할 수 있습니다.\n' +
+    '※ 작업자는 다음 로그인 시 새 비밀번호를 등록해야 합니다.'
   )) return;
 
   FB_DB.collection('users').doc(empId).get()
     .then(function(doc) {
-      if (!doc.exists) {
-        showToast(name + '님은 이미 초기 비밀번호(1234) 상태입니다.', '');
-        return;
+      var d = doc.exists ? doc.data() : {};
+      // 아직 Auth 로 이관되지 않은 사용자는 예전처럼 필드 삭제만으로 초기화된다
+      if (!d.authMigrated) {
+        if (!doc.exists) {
+          showToast(name + '님은 이미 초기 비밀번호(1234) 상태입니다.', '');
+          return;
+        }
+        return FB_DB.collection('users').doc(empId).update({
+          password: firebase.firestore.FieldValue.delete(),
+          securityQuestion: firebase.firestore.FieldValue.delete(),
+          securityAnswer: firebase.firestore.FieldValue.delete()
+        }).then(function() {
+          showToast(name + '님의 비밀번호가 초기화됐습니다. (1234)', 'success');
+        });
       }
-      return FB_DB.collection('users').doc(empId).update({
-        password: firebase.firestore.FieldValue.delete(),
-        securityQuestion: firebase.firestore.FieldValue.delete(),
-        securityAnswer: firebase.firestore.FieldValue.delete()
-      }).then(function() {
-        showToast(name + '님의 비밀번호가 초기화됐습니다. (1234)', 'success');
+      // 이관 완료 사용자 — 요청 플래그만 남긴다
+      return FB_DB.collection('users').doc(empId).set({
+        pwResetRequested: true,
+        pwResetRequestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        pwResetRequestedBy: session.empId
+      }, { merge: true }).then(function() {
+        alert(
+          name + '님의 초기화 요청이 접수됐습니다.\n\n' +
+          '관리자가 GitHub Actions 의 [비밀번호 초기화] 워크플로를 실행하면\n' +
+          '해당 작업자는 사번 + 1234 로 다시 로그인할 수 있습니다.'
+        );
+        showToast(name + '님 초기화 요청 접수됨', 'success');
       });
     })
     .catch(function(err) {
