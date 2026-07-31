@@ -152,6 +152,9 @@
     border-collapse: collapse;
     margin: 4mm 0;
     font-size: 10pt;
+    /* 표가 페이지 경계에서 한두 행만 남고 잘리지 않게 (최대 7행이라 안전) */
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
   table th {
     background: #c8102e;
@@ -219,12 +222,15 @@
   .badge.green { background: #2e7d32; color: white; }
 
   .footer-note {
-    margin-top: 12mm;
-    padding-top: 4mm;
+    margin-top: 6mm;
+    padding-top: 3mm;
     border-top: 1pt solid #ddd;
     font-size: 9pt;
     color: #999;
     text-align: center;
+    /* 푸터만 남은 빈 페이지가 생기지 않도록 앞 내용과 붙여 둔다 */
+    break-before: avoid;
+    page-break-before: avoid;
   }
 </style>
 </head>
