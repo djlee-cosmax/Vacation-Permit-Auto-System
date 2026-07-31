@@ -315,14 +315,16 @@
 <p>주소: <span class="mono">https://djlee-cosmax.github.io/Vacation-Permit-Auto-System/</span></p>
 <ul class="bullet">
   <li><strong>사번</strong> + <strong>비밀번호 1234</strong> 입력 → [로그인]</li>
-  <li>로그인 유지(24시간) / 아이디 저장 / 👁 보기 토글 지원</li>
+  <li>아이디 저장 / 👁 보기 토글 지원</li>
+  <li>자리를 비우면 자동 로그아웃됩니다 — 작업자 <strong>10분</strong>, 서무·관리자 <strong>8시간</strong></li>
 </ul>
 
 <div class="warn-box">
-  <strong>비밀번호 변경 (필수):</strong> 첫 로그인 후 상단 [내 정보] → [비밀번호 변경] → 숫자 6~10자리 + 보안 질문/답변. 보안 질문은 비밀번호 찾기에 사용됩니다.
+  <strong>비밀번호 변경 (필수):</strong> 첫 로그인 후 상단 [내 정보] → [비밀번호 변경] → 숫자 6~10자리.
+  초기 비밀번호(1234)로 로그인하면 변경 안내가 자동으로 뜹니다.
 </div>
 
-<p style="font-size:10pt;color:#666">※ 비밀번호 분실 시 로그인 화면의 [비밀번호 찾기] 사용 (보안 질문 미등록은 관리자에게 초기화 요청)</p>
+<p style="font-size:10pt;color:#666">※ 비밀번호 분실 시 <strong>서무에게 초기화를 요청</strong>해 주세요. 초기화되면 사번 + 1234로 로그인한 뒤 새 비밀번호를 등록하면 됩니다.</p>
 
 <h3>2.2 홈 화면에 추가 (모바일 권장)</h3>
 <p>휴대폰 홈 화면에 앱 아이콘으로 추가하면 한 번 탭으로 실행됩니다.</p>
@@ -370,7 +372,8 @@
   <thead><tr><th style="width:40%">증상</th><th>해결</th></tr></thead>
   <tbody>
     <tr><td>"등록되지 않은 사번"</td><td>관리자(이동준)에게 명단 추가 요청</td></tr>
-    <tr><td>비밀번호 분실</td><td>로그인 화면의 [비밀번호 찾기] 또는 관리자에게 초기화 요청</td></tr>
+    <tr><td>비밀번호 분실</td><td><strong>서무에게 초기화 요청</strong> → 초기화되면 사번 + <strong>1234</strong>로 로그인 → 새 비밀번호 등록</td></tr>
+    <tr><td>비밀번호가 갑자기 안 됨</td><td>대소문자·숫자 확인 후에도 안 되면 서무에게 초기화 요청 (연속 실패 시 잠시 차단될 수 있음 — 몇 분 뒤 재시도)</td></tr>
     <tr><td>"⚠ 서버 저장 실패"</td><td>인터넷 확인 후 다시 작성 (실패한 휴가증은 서버에 전달 안 됨)</td></tr>
     <tr><td>"이미 처리 완료된 동일한 휴가증이 있습니다"</td><td>서무가 이미 처리한 휴가증과 동일한 내용입니다. <strong>[내 휴가증]</strong>에서 처리 상태 확인. 같은 날짜에 다른 종류 휴가가 필요하면 종류를 바꿔서 작성.</td></tr>
     <tr><td>화면이 옛 디자인</td><td>시크릿 창으로 접속 또는 브라우저 캐시 삭제</td></tr>
@@ -422,11 +425,26 @@
   </tbody>
 </table>
 
-<h3>3.5 자주 묻는 질문</h3>
+<h3>3.5 작업자 비밀번호 초기화</h3>
+<p>작업자가 비밀번호를 잊었을 때 처리하는 절차입니다. 비밀번호는 복원할 수 없는 형태로 보관되므로 <strong>초기화만 가능</strong>합니다.</p>
+<ol class="steps">
+  <li>PC에서 <strong>[작업자 명단]</strong> → 해당 작업자 행의 <strong>[PW]</strong> 버튼 클릭 → 초기화 요청 접수</li>
+  <li>관리자(이동준)가 GitHub Actions의 <strong>[계정 관리]</strong> 워크플로를 실행<br>
+      <span class="mono">action = reset</span> / <span class="mono">사번 = 해당 작업자 사번</span></li>
+  <li>작업자에게 <strong>사번 + 1234</strong>로 로그인하도록 안내</li>
+  <li>작업자가 로그인하면 새 비밀번호 등록 안내가 자동으로 표시됨</li>
+</ol>
+<div class="info-box">
+  <strong>보안 질문은 더 이상 사용하지 않습니다.</strong> 답변만 알면 남의 비밀번호를 바꿀 수 있어 폐지했고,
+  비밀번호는 Firebase 인증 서버가 보관합니다. 그래서 브라우저에서는 본인 것만 변경할 수 있습니다.
+</div>
+
+<h3>3.6 자주 묻는 질문</h3>
 <table>
   <thead><tr><th style="width:40%">증상</th><th>해결</th></tr></thead>
   <tbody>
     <tr><td>[서버에서 불러오기] 버튼이 안 보임</td><td>서무 사번(122240096)으로 다시 로그인</td></tr>
+    <tr><td>작업자가 비밀번호를 잊음</td><td><strong>3.5 절차</strong>대로 초기화 요청 → 관리자가 처리 → 1234로 로그인</td></tr>
     <tr><td>자동화 에러 (setup/run.bat)</td><td>Python PATH 확인 / setup.bat 재실행</td></tr>
     <tr><td>실수로 [처리 완료] 일찍 클릭</td><td>관리자(이동준)에게 요청</td></tr>
     <tr><td>자동화가 중간에 멈춤</td><td><span class="mono">error_*.png</span>, <span class="mono">last_error.log</span>를 관리자에게 전달</td></tr>
@@ -434,7 +452,7 @@
 </table>
 
 <div class="footer-note">
-  COSMAX 생산3팀 · 휴가증 자동 반영 프로그램 종합 매뉴얼 · 2026-05-22 · 담당 이동준
+  COSMAX 생산3팀 · 휴가증 자동 반영 프로그램 종합 매뉴얼 · 2026-07-31 · 담당 이동준
 </div>
 
 </section>
