@@ -19,7 +19,40 @@ var STAFF_ROLES = {
   '122240096': { role: 'leader', name: '김가영', department: '생산3팀' }
 };
 
-// 비밀번호 SHA-256 해시 (브라우저 내장 crypto.subtle)
+// ============================================================
+// 비밀번호 · 보안답변 해싱
+//
+// 저장 형식은 3가지가 공존한다 (구형은 로그인·검증 시 자동으로 신형으로 승격):
+//   1) 신형  { salt, hash, iterations }  — PBKDF2-SHA256, 사용자별 랜덤 salt
+//   2) 구형  "64자 hex 문자열"           — salt 없는 SHA-256 1회
+//   3) 초구형 "평문"
+// 구형(2)은 salt가 없어 레인보우 테이블 한 벌로 전원이 동시에 뚫린다.
+// 비밀번호 정책이 숫자 6~10자리라 경우의 수도 작아 PBKDF2 반복이 필수.
+// ============================================================
+// OWASP 2023 권고치 (PBKDF2-SHA256). 비밀번호가 숫자 6~10자리로 경우의 수가 작아
+// 반복 횟수를 높게 잡는다. 검증값은 저장 시 iterations 를 함께 기록하므로
+// 나중에 이 값을 올려도 기존 사용자 로그인은 그대로 동작한다.
+var PBKDF2_ITERATIONS = 600000;
+
+function _bytesToHex(bytes) {
+  var hex = '';
+  for (var i = 0; i < bytes.length; i++) hex += bytes[i].toString(16).padStart(2, '0');
+  return hex;
+}
+
+function _hexToBytes(hex) {
+  var bytes = new Uint8Array(hex.length / 2);
+  for (var i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+  return bytes;
+}
+
+function _randomSaltHex() {
+  var b = new Uint8Array(16);
+  window.crypto.getRandomValues(b);
+  return _bytesToHex(b);
+}
+
+// 비밀번호 SHA-256 해시 (구형 형식 검증용으로만 유지)
 async function sha256Hex(text) {
   if (!window.crypto || !window.crypto.subtle) {
     console.warn('crypto.subtle 미지원 — 평문 사용');
@@ -31,15 +64,71 @@ async function sha256Hex(text) {
     .map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
 }
 
-// 저장된 PW가 해시(64자 hex)인지 평문인지 판단 + 비교
+async function _pbkdf2Hex(text, saltHex, iterations) {
+  var enc = new TextEncoder();
+  var key = await window.crypto.subtle.importKey(
+    'raw', enc.encode(String(text || '')), { name: 'PBKDF2' }, false, ['deriveBits']
+  );
+  var bits = await window.crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: _hexToBytes(saltHex), iterations: iterations, hash: 'SHA-256' },
+    key, 256
+  );
+  return _bytesToHex(new Uint8Array(bits));
+}
+
+// 비밀번호·보안답변 → 저장용 신형 해시 객체
+async function hashSecret(text) {
+  if (!window.crypto || !window.crypto.subtle) {
+    console.warn('crypto.subtle 미지원 — 구형 해시로 폴백');
+    return await sha256Hex(text);
+  }
+  var salt = _randomSaltHex();
+  var hash = await _pbkdf2Hex(text, salt, PBKDF2_ITERATIONS);
+  return { salt: salt, hash: hash, iterations: PBKDF2_ITERATIONS, alg: 'PBKDF2-SHA256' };
+}
+
+// 저장값이 신형 해시 객체인지
+function isModernHash(stored) {
+  return !!(stored && typeof stored === 'object' && stored.salt && stored.hash);
+}
+
+// 저장값이 구형 SHA-256 hex 인지
+function isLegacySha256(stored) {
+  return typeof stored === 'string' && stored.length === 64 && /^[0-9a-f]+$/i.test(stored);
+}
+
+// 저장 형식(신형/구형/평문)을 판별해 비교 — 세 형식 모두 지원
 async function comparePassword(input, stored) {
   if (!stored) return false;
-  if (typeof stored === 'string' && stored.length === 64 && /^[0-9a-f]+$/i.test(stored)) {
+  if (isModernHash(stored)) {
+    var h = await _pbkdf2Hex(input, stored.salt, stored.iterations || PBKDF2_ITERATIONS);
+    return h === stored.hash;
+  }
+  if (isLegacySha256(stored)) {
     var inputHash = await sha256Hex(input);
     return inputHash === stored;
   }
   return input === stored;  // 평문 (legacy)
 }
+
+// 보안답변 정규화 — 앞뒤 공백·대소문자 차이로 실패하지 않게
+function normalizeAnswer(a) {
+  return String(a || '').trim().toLowerCase();
+}
+
+// 보안답변 비교. 구형(평문)은 원문 그대로 비교해 기존 사용자가 막히지 않게 한다.
+async function compareAnswer(input, stored) {
+  if (!stored) return false;
+  if (isModernHash(stored) || isLegacySha256(stored)) {
+    return await comparePassword(normalizeAnswer(input), stored);
+  }
+  // 평문 legacy — 기존 동작과 동일하게 원문 비교, 실패 시 정규화 비교도 허용
+  if (String(input) === String(stored)) return true;
+  return normalizeAnswer(input) === normalizeAnswer(stored);
+}
+
+// 보안답변 최소 길이 — 기존에 2자짜리가 다수라 신규 등록부터 강화
+var MIN_ANSWER_LEN = 4;
 
 function getSession() {
   try {
@@ -109,16 +198,24 @@ function login() {
 
   // 3) Firestore users/{empId} 문서에서 비밀번호 조회 (없으면 기본 1234)
   // Firestore가 준비되지 않은 경우 기본 PW로 폴백
-  function finalizeLogin(storedPw) {
+  function finalizeLogin(storedPw, storedAnswer) {
     comparePassword(pw, storedPw).then(function(ok) {
       if (!ok) { showToast('비밀번호가 일치하지 않습니다.', 'error'); return; }
       var isInitialPw = (pw === DEFAULT_PASSWORD);
-      // 저장된 PW가 평문(legacy)이면 해시로 자동 마이그레이션
-      var isHashed = (typeof storedPw === 'string' && storedPw.length === 64 && /^[0-9a-f]+$/i.test(storedPw));
-      if (FB_DB && !isHashed && !isInitialPw) {
-        sha256Hex(pw).then(function(hash) {
-          FB_DB.collection('users').doc(empId).set({ password: hash }, { merge: true }).catch(function() {});
-        });
+      // 로그인 성공 시점 = 평문 비밀번호를 아는 유일한 순간 → 구형 저장값을 신형으로 승격.
+      // 작업자는 아무것도 하지 않아도 되고, 실패해도 로그인은 그대로 진행된다.
+      if (FB_DB && !isInitialPw && !isModernHash(storedPw)) {
+        hashSecret(pw).then(function(newHash) {
+          return FB_DB.collection('users').doc(empId)
+            .set({ password: newHash }, { merge: true });
+        }).catch(function() {});
+      }
+      // 보안답변이 평문으로 남아 있으면 함께 해시로 승격 (답변 원문을 여기서만 알 수 있음)
+      if (FB_DB && storedAnswer && !isModernHash(storedAnswer) && !isLegacySha256(storedAnswer)) {
+        hashSecret(normalizeAnswer(storedAnswer)).then(function(ansHash) {
+          return FB_DB.collection('users').doc(empId)
+            .set({ securityAnswer: ansHash }, { merge: true });
+        }).catch(function() {});
       }
       doLoginSuccess(empId, name, role, team, worker, isInitialPw);
     });
@@ -126,8 +223,9 @@ function login() {
   if (FB_DB) {
     FB_DB.collection('users').doc(empId).get()
       .then(function(doc) {
-        var storedPw = (doc.exists && doc.data().password) ? doc.data().password : DEFAULT_PASSWORD;
-        finalizeLogin(storedPw);
+        var d = doc.exists ? doc.data() : {};
+        var storedPw = d.password ? d.password : DEFAULT_PASSWORD;
+        finalizeLogin(storedPw, d.securityAnswer);
       })
       .catch(function() {
         finalizeLogin(DEFAULT_PASSWORD);
@@ -301,11 +399,18 @@ function changePassword() {
           showToast('보안 질문과 답변을 입력해 주세요.\n(비밀번호 찾기에 필요합니다)', 'error');
           throw new Error('SECURITY_QUESTION_REQUIRED');
         }
-        return sha256Hex(newPw).then(function(newHash) {
+        if (normalizeAnswer(answer).length < MIN_ANSWER_LEN) {
+          showToast('보안 답변은 ' + MIN_ANSWER_LEN + '자 이상 입력해 주세요.\n(짧으면 쉽게 추측됩니다)', 'error');
+          throw new Error('ANSWER_TOO_SHORT');
+        }
+        return Promise.all([
+          hashSecret(newPw),
+          hashSecret(normalizeAnswer(answer))
+        ]).then(function(hashes) {
           var dataToSave = {
-            password: newHash,
+            password: hashes[0],
             securityQuestion: question,
-            securityAnswer: answer,
+            securityAnswer: hashes[1],
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           };
           return FB_DB.collection('users').doc(empId).set(dataToSave, { merge: true });
@@ -386,22 +491,26 @@ function forgotPwReset() {
   FB_DB.collection('users').doc(empId).get()
     .then(function(doc) {
       var storedAnswer = doc.exists ? (doc.data().securityAnswer || '') : '';
-      if (answer !== storedAnswer) {
-        showToast('답변이 일치하지 않습니다.', 'error');
-        throw new Error('ANSWER_MISMATCH');
-      }
-      var storedPw = (doc.exists && doc.data().password) ? doc.data().password : DEFAULT_PASSWORD;
-      return comparePassword(newPw, storedPw).then(function(same) {
-        if (same) {
-          showToast('새 비밀번호가 기존 비밀번호와 동일합니다.\n다른 비밀번호를 입력해 주세요.', 'error');
-          throw new Error('SAME_PW');
+      return compareAnswer(answer, storedAnswer).then(function(answerOk) {
+        if (!answerOk) {
+          showToast('답변이 일치하지 않습니다.', 'error');
+          throw new Error('ANSWER_MISMATCH');
         }
-        return sha256Hex(newPw);
-      }).then(function(newHash) {
-        return FB_DB.collection('users').doc(empId).set({
-          password: newHash,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+        var storedPw = (doc.exists && doc.data().password) ? doc.data().password : DEFAULT_PASSWORD;
+        return comparePassword(newPw, storedPw).then(function(same) {
+          if (same) {
+            showToast('새 비밀번호가 기존 비밀번호와 동일합니다.\n다른 비밀번호를 입력해 주세요.', 'error');
+            throw new Error('SAME_PW');
+          }
+          // 답변이 맞았으므로 이 시점에 평문 답변도 해시로 승격
+          return Promise.all([hashSecret(newPw), hashSecret(normalizeAnswer(answer))]);
+        }).then(function(hashes) {
+          return FB_DB.collection('users').doc(empId).set({
+            password: hashes[0],
+            securityAnswer: hashes[1],
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        });
       });
     })
     .then(function() {
