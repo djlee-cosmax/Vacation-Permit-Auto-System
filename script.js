@@ -127,6 +127,30 @@ function authPasswordFor(pw) {
   return p.length >= 6 ? p : (p + '______').slice(0, 6);
 }
 
+// 이관 후 남아 있는 인증 잔여 필드를 정리한다.
+// 자가 이관 시점의 정리 write 가 실패하면 그 뒤로는 계속 1순위(Auth) 경로만 타서
+// 재시도 기회가 없어진다 — 로그인 성공 때마다 한 번씩 확인해 보정하는 안전장치.
+// 실패해도 로그인에는 영향을 주지 않는다.
+function ensureMigrationCleanup(empId) {
+  if (!FB_DB) return;
+  FB_DB.collection('users').doc(empId).get()
+    .then(function(doc) {
+      if (!doc.exists) return;
+      var d = doc.data() || {};
+      var leftover = (d.password !== undefined)
+        || (d.securityAnswer !== undefined)
+        || (d.securityQuestion !== undefined);
+      if (!leftover && d.authMigrated === true) return;   // 이미 깨끗함
+      return FB_DB.collection('users').doc(empId).set({
+        authMigrated: true,
+        password: firebase.firestore.FieldValue.delete(),
+        securityAnswer: firebase.firestore.FieldValue.delete(),
+        securityQuestion: firebase.firestore.FieldValue.delete()
+      }, { merge: true });
+    })
+    .catch(function(e) { console.warn('이관 잔여 필드 정리 실패:', e); });
+}
+
 function isNoAccountError(code) {
   // 이메일 열거 보호가 켜져 있으면 user-not-found 와 wrong-password 가
   // 모두 invalid-credential 로 합쳐진다. 구분이 불가능하므로 둘 다
@@ -214,6 +238,9 @@ function login() {
   // ---- 1순위: Firebase Auth 로그인 ----
   firebase.auth().signInWithEmailAndPassword(authEmailFor(empId), authPasswordFor(pw))
     .then(function() {
+      // 이관 당시 필드 정리에 실패했을 수 있다(네트워크 순단 등).
+      // 그대로 두면 평문 보안답변·해시가 계속 남으므로 로그인마다 확인해 보정한다.
+      ensureMigrationCleanup(empId);
       doLoginSuccess(empId, name, role, team, worker, isInitialPw);
     })
     .catch(function(err) {
