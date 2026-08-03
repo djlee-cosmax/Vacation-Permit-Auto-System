@@ -3,9 +3,11 @@
 // 브라우저에서는 남의 계정을 건드릴 수 없어 서버 권한이 필요한 작업만 모았다.
 //
 // 사용:
-//   ACTION=status                 node auth-admin.js   이관 현황 집계
-//   ACTION=claims                 node auth-admin.js   관리자·서무 역할 클레임 부여
-//   ACTION=reset EMP_ID=12224xxxx node auth-admin.js   비밀번호 초기화 (계정 삭제)
+//   ACTION=status                        node auth-admin.js  이관 현황 집계
+//   ACTION=claims                        node auth-admin.js  관리자·서무 역할 클레임 부여
+//   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호 초기화 (계정 삭제)
+//   ACTION=remove EMP_ID=12224xxxx       node auth-admin.js  퇴직자 완전 삭제 (미리보기)
+//   ACTION=remove EMP_ID=... CONFIRM=DELETE  실제 삭제 실행
 //
 // 필요 환경변수:
 //   FIREBASE_SA_KEY  — Firebase Service Account JSON (문자열)
@@ -169,6 +171,97 @@ async function actionReset(db) {
   console.log('    로그인 직후 새 비밀번호 등록 안내가 자동으로 표시됩니다.');
 }
 
+// ---------- remove: 퇴직자 완전 삭제 ----------
+// 기본은 미리보기(삭제 안 함). CONFIRM=DELETE 를 줘야 실제로 지운다.
+async function actionRemove(db) {
+  const empId = String(process.env.EMP_ID || '').trim();
+  if (!empId) throw new Error('EMP_ID 가 필요합니다. (삭제할 작업자 사번)');
+  const confirmed = String(process.env.CONFIRM || '').trim() === 'DELETE';
+
+  console.log(`===== 퇴직자 삭제${confirmed ? '' : ' (미리보기)'}: ${empId} =====`);
+
+  // 1) 대상 확인
+  const wSnap = await db.collection('workers').where('employeeId', '==', empId).get();
+  if (wSnap.empty) {
+    console.log('※ 작업자 명단에서 찾지 못했습니다. 사번을 확인하세요.');
+    process.exitCode = 1;
+    return;
+  }
+  const w = wSnap.docs[0].data() || {};
+  const name = w.name || empId;
+  console.log(`  이름: ${name} / 팀: ${w.team || '-'} / 부서: ${w.department || '-'}`);
+
+  // 2) 삭제 대상 수집
+  const userRef = db.collection('users').doc(empId);
+  const userSnap = await userRef.get();
+  const u = userSnap.exists ? (userSnap.data() || {}) : null;
+
+  // 휴가증은 사번 또는 이름으로 연결된다 (초기 데이터는 사번이 없는 경우가 있음)
+  const [byId, byName] = await Promise.all([
+    db.collection('leaves').where('employeeId', '==', empId).get(),
+    db.collection('leaves').where('name', '==', name).get(),
+  ]);
+  const leaveDocs = new Map();
+  byId.forEach((d) => leaveDocs.set(d.id, d));
+  byName.forEach((d) => leaveDocs.set(d.id, d));
+
+  let authUid = null;
+  try {
+    const au = await admin.auth().getUserByEmail(emailFor(empId));
+    authUid = au.uid;
+  } catch (e) {
+    if (e.code !== 'auth/user-not-found') throw e;
+  }
+
+  console.log('');
+  console.log('[삭제 대상]');
+  console.log(`  workers  : ${wSnap.size}건`);
+  console.log(`  users    : ${u ? 1 : 0}건` +
+    (u ? `  (연차 ${u.balanceAnnual ?? '-'} / 생휴 ${u.balanceBirth ?? '-'} / 하기 ${u.balanceSummer ?? '-'})` : ''));
+  console.log(`  leaves   : ${leaveDocs.size}건`);
+  leaveDocs.forEach((d) => {
+    const f = d.data() || {};
+    console.log(`    - ${f.start || '?'} ~ ${f.end || '?'}  ${f.type || ''}  (${d.id})`);
+  });
+  console.log(`  Auth 계정: ${authUid ? '있음' : '없음'}`);
+
+  // 3) 백업 출력 — Actions 로그에 남겨 필요 시 복원 근거로 쓴다
+  console.log('');
+  console.log('[백업 JSON] — 복원이 필요하면 이 내용을 사용하세요');
+  console.log(JSON.stringify({
+    empId, name,
+    worker: w,
+    user: u,
+    leaves: Array.from(leaveDocs.values()).map((d) => ({ id: d.id, data: d.data() })),
+  }, null, 2));
+
+  if (!confirmed) {
+    console.log('');
+    console.log('>>> 미리보기입니다. 실제로 지우려면 confirm 입력란에 DELETE 를 넣고 다시 실행하세요.');
+    return;
+  }
+
+  // 4) 삭제
+  console.log('');
+  console.log('[삭제 실행]');
+  const batch = db.batch();
+  leaveDocs.forEach((d) => batch.delete(d.ref));
+  if (userSnap.exists) batch.delete(userRef);
+  wSnap.docs.forEach((d) => batch.delete(d.ref));
+  await batch.commit();
+  console.log(`  Firestore 삭제 완료 (workers ${wSnap.size} / users ${u ? 1 : 0} / leaves ${leaveDocs.size})`);
+
+  if (authUid) {
+    await admin.auth().deleteUser(authUid);
+    console.log('  Auth 계정 삭제 완료');
+  }
+
+  const remain = await db.collection('workers').get();
+  console.log('');
+  console.log(`>>> ${name}(${empId}) 삭제 완료. 남은 작업자 ${remain.size}명.`);
+  console.log('    각 기기는 다음 접속 시 명단에서 자동으로 사라집니다.');
+}
+
 async function main() {
   const action = String(process.env.ACTION || 'status').trim();
   admin.initializeApp({ credential: admin.credential.cert(loadServiceAccount()) });
@@ -177,7 +270,8 @@ async function main() {
   if (action === 'status') return actionStatus(db);
   if (action === 'claims') return actionClaims();
   if (action === 'reset') return actionReset(db);
-  throw new Error(`알 수 없는 ACTION: ${action} (status | claims | reset)`);
+  if (action === 'remove') return actionRemove(db);
+  throw new Error(`알 수 없는 ACTION: ${action} (status | claims | reset | remove)`);
 }
 
 main().catch((e) => {
