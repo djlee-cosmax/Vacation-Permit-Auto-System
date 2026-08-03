@@ -759,11 +759,35 @@ function loadDefaultWorkers() {
         localStorage.setItem('p5_workers', JSON.stringify(workers));
         return;
       }
+      var changed = false;
+
+      // 서버에서 사라진 사번은 로컬에서도 제거 — 퇴직·전출 반영.
+      // Firestore workers 가 명단의 단일 기준이고 로컬은 캐시일 뿐인데,
+      // 예전에는 추가만 하고 제거를 안 해서 한번 받아간 기기에 계속 남았다.
+      // 사번이 없는 행은 서버와 대조할 수 없으므로 건드리지 않는다.
+      var serverIds = {};
+      DEFAULT_WORKERS.forEach(function(w) {
+        var id = String(w.employeeId || '').trim();
+        if (id) serverIds[id] = true;
+      });
+      var kept = [];
+      var removed = [];
+      workers.forEach(function(w) {
+        var id = String(w.employeeId || '').trim();
+        if (id && !serverIds[id]) removed.push(w);
+        else kept.push(w);
+      });
+      if (removed.length > 0) {
+        workers = kept;
+        changed = true;
+        console.info('명단에서 제거됨 (서버 기준):',
+          removed.map(function(w) { return (w.name || '') + '/' + w.employeeId; }).join(', '));
+      }
+
       // 신규 사번 자동 병합 + 관리자/서무 정보는 항상 서버 기준으로 동기화
       var byId = {};
       workers.forEach(function(w, idx) { byId[String(w.employeeId || '').trim()] = idx; });
       var added = [];
-      var changed = false;
       DEFAULT_WORKERS.forEach(function(w) {
         var id = String(w.employeeId || '').trim();
         if (!id) return;
