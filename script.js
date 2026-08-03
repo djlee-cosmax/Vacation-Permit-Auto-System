@@ -201,6 +201,17 @@ function login() {
   if (!empId) { showToast('사번을 입력해 주세요.', 'error'); return; }
   if (!pw) { showToast('비밀번호를 입력해 주세요.', 'error'); return; }
 
+  // 명단 동기화가 끝난 뒤에 자격을 판정한다.
+  // 로컬 캐시만 믿으면, 퇴직 처리된 사람이 동기화 전(1~2초)에 로그인해
+  // 기본 비밀번호로 계정을 되살릴 수 있다.
+  if (_workersReady) {
+    var readyPromise = _workersReady;
+    _workersReady = null;              // 중복 대기 방지 — 이후 호출은 바로 진행
+    showToast('명단을 확인하는 중입니다...', '');
+    readyPromise.then(function() { login(); });
+    return;
+  }
+
   // 모드 자격 검증 (서무 URL: leader/admin만 / 관리자 URL: admin만)
   var staff = STAFF_ROLES[empId];
   var actualRole = staff ? staff.role : 'worker';
@@ -269,6 +280,19 @@ function login() {
         if (d.authMigrated) {
           showToast('비밀번호가 일치하지 않습니다.', 'error');
           return;
+        }
+
+        // 퇴직 처리로 users 문서까지 지워진 사람은 "비밀번호 미설정 신규자"와
+        // 구분이 안 돼 기본 비밀번호(1234)로 통과해 버린다.
+        // 서버 명단에 있는 사번일 때만 기본 비밀번호 폴백을 허용한다.
+        if (!d.password) {
+          var onServer = DEFAULT_WORKERS.some(function(w) {
+            return String(w.employeeId || '').trim() === empId;
+          });
+          if (!onServer) {
+            showToast('등록되지 않은 사번입니다.', 'error');
+            return;
+          }
         }
 
         var storedPw = d.password ? d.password : DEFAULT_PASSWORD;
@@ -742,8 +766,14 @@ var workers = JSON.parse(localStorage.getItem('p5_workers') || '[]');
 
 // 작업자 기본 명단 — Firestore 'workers' 컬렉션에서 가져옴 (인증 후 loadDefaultWorkers 호출)
 var DEFAULT_WORKERS = [];
+// 첫 명단 동기화가 끝날 때까지 로그인 판정을 미루기 위한 신호.
+// 성공·실패 어느 쪽이든 resolve 한다 (실패 시엔 아래 서버 대조에서 막힌다).
+var _workersReady = null;
+var _workersReadyResolve = null;
+_workersReady = new Promise(function(res) { _workersReadyResolve = res; });
+
 function loadDefaultWorkers() {
-  if (!FB_DB) return;
+  if (!FB_DB) { if (_workersReadyResolve) _workersReadyResolve(); return; }
   FB_DB.collection('workers').get()
     .then(function(snapshot) {
       var fetched = [];
@@ -807,7 +837,9 @@ function loadDefaultWorkers() {
       }
       if (changed) localStorage.setItem('p5_workers', JSON.stringify(workers));
     })
+    .then(function() { if (_workersReadyResolve) _workersReadyResolve(); })
     .catch(function(err) {
+      if (_workersReadyResolve) _workersReadyResolve();
       console.warn('workers 컬렉션 로드 실패:', err);
       // 로컬 명단이라도 있으면 조용히 진행, 둘 다 없으면 사용자에게 안내
       if (workers.length === 0) {
