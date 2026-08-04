@@ -61,6 +61,20 @@ async function actionStatus(db) {
     .map((d) => String((d.data() || {}).employeeId || '').trim())
     .filter(Boolean);
 
+  // 사번만 나오면 현장 안내가 안 되므로 이름·팀을 같이 뽑는다.
+  const info = new Map();
+  workersSnap.forEach((d) => {
+    const w = d.data() || {};
+    const id = String(w.employeeId || '').trim();
+    if (id) info.set(id, { name: w.name || '', team: w.team || '', dept: w.department || '' });
+  });
+  const label = (id) => {
+    const w = info.get(id);
+    if (!w) return id;
+    const where = [w.dept, w.team].filter(Boolean).join(' / ');
+    return `${id}  ${(w.name || '(이름 없음)').padEnd(6, ' ')}${where ? '  ' + where : ''}`;
+  };
+
   // 아직 Firestore 에 비밀번호 해시가 남아 있는 = 미이관 사용자
   const stillHashed = [];
   usersSnap.forEach((d) => {
@@ -80,12 +94,12 @@ async function actionStatus(db) {
 
   if (notMigrated.length) {
     console.log('[미이관 사번] — 아직 한 번도 로그인하지 않았거나 기본 비밀번호 상태');
-    notMigrated.forEach((id) => console.log('  ' + id));
+    notMigrated.forEach((id) => console.log('  ' + label(id)));
     console.log('');
   }
   if (stillHashed.length) {
     console.log('[users 문서에 password 필드가 남아 있는 사번]');
-    stillHashed.forEach((id) => console.log('  ' + id));
+    stillHashed.forEach((id) => console.log('  ' + label(id)));
     console.log('');
   }
 
