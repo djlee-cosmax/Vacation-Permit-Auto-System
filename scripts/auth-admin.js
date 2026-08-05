@@ -6,6 +6,8 @@
 //   ACTION=status                        node auth-admin.js  이관 현황 집계
 //   ACTION=inspect EMP_ID=12224xxxx      node auth-admin.js  한 사람 상태 상세
 //   ACTION=rules                         node auth-admin.js  현재 배포된 보안 규칙 조회
+//   ACTION=cleanup                       node auth-admin.js  이관 잔여 필드 정리 (미리보기)
+//   ACTION=cleanup CONFIRM=OK                                실제 정리 실행
 //   ACTION=claims                        node auth-admin.js  관리자·서무 역할 클레임 부여
 //   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호 초기화 (계정 삭제)
 //   ACTION=remove EMP_ID=12224xxxx       node auth-admin.js  퇴직자 완전 삭제 (미리보기)
@@ -48,6 +50,75 @@ async function listAuthUsers() {
     pageToken = res.pageToken;
   } while (pageToken);
   return out;
+}
+
+// ---------- cleanup: 이관 잔여 필드 일괄 정리 ----------
+// 이관 시 클라이언트의 필드 삭제 쓰기가 실패해도 로그인은 통과시킨다(경고만).
+// 그래서 평문 보안답변·비밀번호 해시가 남는 경우가 생긴다.
+// 다음 로그인에서 재시도되지만 그 사이 계속 남아 있으므로 서버에서 정리한다.
+//
+// Auth 계정이 있는 사람만 대상으로 한다 — 미이관자는 password 로 로그인해야 하므로
+// 지우면 로그인이 막힌다.
+async function actionCleanup(db) {
+  const confirm = String(process.env.CONFIRM || '').trim();
+  const [authUsers, usersSnap] = await Promise.all([
+    listAuthUsers(),
+    db.collection('users').get(),
+  ]);
+  const authIds = new Set(authUsers.map((u) => empIdFromEmail(u.email)));
+
+  const targets = [];
+  usersSnap.forEach((d) => {
+    const v = d.data() || {};
+    const leftover = v.password !== undefined
+      || v.securityAnswer !== undefined
+      || v.securityQuestion !== undefined;
+    if (!leftover && v.authMigrated === true) return;
+    if (!leftover) return;                       // 지울 게 없다
+    if (!authIds.has(d.id)) return;              // 미이관자는 건드리지 않는다
+    targets.push({
+      empId: d.id,
+      password: v.password !== undefined,
+      answer: v.securityAnswer !== undefined,
+      question: v.securityQuestion !== undefined,
+      migrated: v.authMigrated === true,
+    });
+  });
+
+  console.log('===== 이관 잔여 필드 정리 =====');
+  console.log(`users 문서 ${usersSnap.size}건 / Auth 계정 ${authIds.size}명`);
+  console.log(`정리 대상 ${targets.length}명 (Auth 계정 있고 잔여 필드 있음)`);
+  console.log('');
+  if (!targets.length) {
+    console.log('>>> 정리할 문서가 없습니다.');
+    return;
+  }
+  targets.forEach((t) => {
+    const what = [t.password && 'password', t.answer && 'securityAnswer',
+                  t.question && 'securityQuestion'].filter(Boolean).join(', ');
+    console.log(`  ${t.empId}   남은 필드: ${what}   authMigrated=${t.migrated}`);
+  });
+  console.log('');
+
+  if (confirm !== 'OK') {
+    console.log('>>> 미리보기입니다. 실제로 지우려면 CONFIRM=OK 로 다시 실행하세요.');
+    return;
+  }
+
+  let done = 0;
+  for (const t of targets) {
+    await db.collection('users').doc(t.empId).set({
+      authMigrated: true,
+      authMigratedAt: admin.firestore.FieldValue.serverTimestamp(),
+      password: admin.firestore.FieldValue.delete(),
+      securityAnswer: admin.firestore.FieldValue.delete(),
+      securityQuestion: admin.firestore.FieldValue.delete(),
+    }, { merge: true });
+    done += 1;
+    console.log(`  정리 완료: ${t.empId}`);
+  }
+  console.log('');
+  console.log(`>>> ${done}명 정리했습니다.`);
 }
 
 // ---------- rules: 현재 배포된 Firestore 보안 규칙 ----------
@@ -394,10 +465,11 @@ async function main() {
   if (action === 'status') return actionStatus(db);
   if (action === 'inspect') return actionInspect(db);
   if (action === 'rules') return actionRules();
+  if (action === 'cleanup') return actionCleanup(db);
   if (action === 'claims') return actionClaims();
   if (action === 'reset') return actionReset(db);
   if (action === 'remove') return actionRemove(db);
-  throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | claims | reset | remove)`);
+  throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | cleanup | claims | reset | remove)`);
 }
 
 main().catch((e) => {

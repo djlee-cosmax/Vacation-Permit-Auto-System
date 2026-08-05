@@ -18,6 +18,7 @@ on:
           - status
           - inspect
           - rules
+          - cleanup
           - reset
           - claims
           - remove
