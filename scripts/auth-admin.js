@@ -52,7 +52,10 @@ async function listAuthUsers() {
 // ---------- inspect: 한 사람 상태 상세 ----------
 // 이관이 왜 덜 됐는지 판단하려면 문서에 실제로 무엇이 남아 있는지 봐야 한다.
 // 비밀번호 해시는 값 대신 존재 여부와 길이만 찍는다.
-async function actionInspect(db, empId) {
+async function actionInspect(db) {
+  const empId = String(process.env.EMP_ID || '').trim();
+  if (!empId) throw new Error('EMP_ID 가 필요합니다. (조회할 작업자 사번)');
+
   const [authUsers, wSnap, uDoc] = await Promise.all([
     listAuthUsers(),
     db.collection('workers').where('employeeId', '==', empId).get(),
@@ -350,7 +353,7 @@ async function main() {
   const db = admin.firestore();
 
   if (action === 'status') return actionStatus(db);
-  if (action === 'inspect') return actionInspect(db, empId());
+  if (action === 'inspect') return actionInspect(db);
   if (action === 'claims') return actionClaims();
   if (action === 'reset') return actionReset(db);
   if (action === 'remove') return actionRemove(db);
