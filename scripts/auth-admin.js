@@ -98,8 +98,25 @@ async function actionStatus(db) {
     console.log('');
   }
   if (stillHashed.length) {
+    // 정리 로직은 로그인 성공 시 돈다. 마지막 로그인이 배포(2026-08-03 10:25 KST)
+    // 이전이면 아직 한 번도 정리 기회가 없었다는 뜻이다.
+    const authBy = new Map(authUsers.map((u) => [empIdFromEmail(u.email), u]));
+    const kst = (iso) => {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      if (isNaN(d)) return '-';
+      return new Date(d.getTime() + 9 * 3600 * 1000)
+        .toISOString().replace('T', ' ').slice(0, 16) + ' KST';
+    };
     console.log('[users 문서에 password 필드가 남아 있는 사번]');
-    stillHashed.forEach((id) => console.log('  ' + label(id)));
+    stillHashed.forEach((id) => {
+      const u = authBy.get(id);
+      const m = (u && u.metadata) || {};
+      console.log('  ' + label(id));
+      console.log('      Auth 계정 ' + (u ? '있음' : '없음')
+        + '   생성 ' + kst(m.creationTime)
+        + '   최근 로그인 ' + kst(m.lastSignInTime));
+    });
     console.log('');
   }
 
