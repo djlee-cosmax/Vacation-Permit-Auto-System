@@ -5,6 +5,7 @@
 // 사용:
 //   ACTION=status                        node auth-admin.js  이관 현황 집계
 //   ACTION=inspect EMP_ID=12224xxxx      node auth-admin.js  한 사람 상태 상세
+//   ACTION=rules                         node auth-admin.js  현재 배포된 보안 규칙 조회
 //   ACTION=claims                        node auth-admin.js  관리자·서무 역할 클레임 부여
 //   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호 초기화 (계정 삭제)
 //   ACTION=remove EMP_ID=12224xxxx       node auth-admin.js  퇴직자 완전 삭제 (미리보기)
@@ -47,6 +48,44 @@ async function listAuthUsers() {
     pageToken = res.pageToken;
   } while (pageToken);
   return out;
+}
+
+// ---------- rules: 현재 배포된 Firestore 보안 규칙 ----------
+// 저장소의 firestore.rules 는 아직 배포 전이다. 실제로 적용 중인 규칙을 봐야
+// 클라이언트 쓰기가 왜 막혔는지 판단할 수 있다.
+async function actionRules() {
+  const { JWT } = require('google-auth-library');
+  const sa = loadServiceAccount();
+  const client = new JWT({
+    email: sa.client_email,
+    key: sa.private_key,
+    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+  });
+  const base = `https://firebaserules.googleapis.com/v1/projects/${sa.project_id}`;
+
+  const rel = await client.request({ url: `${base}/releases` });
+  const releases = (rel.data && rel.data.releases) || [];
+  const fs = releases.find((r) => String(r.name).endsWith('cloud.firestore'));
+  if (!fs) {
+    console.log('cloud.firestore 릴리스를 찾지 못했습니다.');
+    console.log('릴리스 목록:', releases.map((r) => r.name).join(', ') || '(없음)');
+    return;
+  }
+  console.log('===== 현재 배포된 Firestore 규칙 =====');
+  console.log(`릴리스   ${fs.name}`);
+  console.log(`룰셋     ${fs.rulesetName}`);
+  console.log(`생성     ${fs.createTime}`);
+  console.log(`갱신     ${fs.updateTime}`);
+  console.log('');
+
+  const rs = await client.request({
+    url: `https://firebaserules.googleapis.com/v1/${fs.rulesetName}`,
+  });
+  const files = ((rs.data || {}).source || {}).files || [];
+  files.forEach((f) => {
+    console.log(`----- ${f.name} -----`);
+    console.log(f.content);
+  });
 }
 
 // ---------- inspect: 한 사람 상태 상세 ----------
@@ -354,10 +393,11 @@ async function main() {
 
   if (action === 'status') return actionStatus(db);
   if (action === 'inspect') return actionInspect(db);
+  if (action === 'rules') return actionRules();
   if (action === 'claims') return actionClaims();
   if (action === 'reset') return actionReset(db);
   if (action === 'remove') return actionRemove(db);
-  throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | claims | reset | remove)`);
+  throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | claims | reset | remove)`);
 }
 
 main().catch((e) => {
