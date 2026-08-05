@@ -4,6 +4,7 @@
 //
 // 사용:
 //   ACTION=status                        node auth-admin.js  이관 현황 집계
+//   ACTION=inspect EMP_ID=12224xxxx      node auth-admin.js  한 사람 상태 상세
 //   ACTION=claims                        node auth-admin.js  관리자·서무 역할 클레임 부여
 //   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호 초기화 (계정 삭제)
 //   ACTION=remove EMP_ID=12224xxxx       node auth-admin.js  퇴직자 완전 삭제 (미리보기)
@@ -46,6 +47,56 @@ async function listAuthUsers() {
     pageToken = res.pageToken;
   } while (pageToken);
   return out;
+}
+
+// ---------- inspect: 한 사람 상태 상세 ----------
+// 이관이 왜 덜 됐는지 판단하려면 문서에 실제로 무엇이 남아 있는지 봐야 한다.
+// 비밀번호 해시는 값 대신 존재 여부와 길이만 찍는다.
+async function actionInspect(db, empId) {
+  const [authUsers, wSnap, uDoc] = await Promise.all([
+    listAuthUsers(),
+    db.collection('workers').where('employeeId', '==', empId).get(),
+    db.collection('users').doc(empId).get(),
+  ]);
+  const kst = (iso) => {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    return isNaN(d) ? '-'
+      : new Date(d.getTime() + 9 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' KST';
+  };
+
+  console.log(`===== ${empId} 상태 =====`);
+  const w = wSnap.empty ? null : (wSnap.docs[0].data() || {});
+  console.log(`workers  : ${w ? `${w.name || '-'} / ${w.team || '-'} / ${w.department || '-'}` : '없음'}`);
+
+  const au = authUsers.find((u) => empIdFromEmail(u.email) === empId);
+  if (au) {
+    const m = au.metadata || {};
+    console.log(`Auth     : 있음  uid=${au.uid}`);
+    console.log(`           생성 ${kst(m.creationTime)}  최근 로그인 ${kst(m.lastSignInTime)}`);
+    console.log(`           claims=${JSON.stringify(au.customClaims || {})}`);
+  } else {
+    console.log('Auth     : 없음');
+  }
+
+  if (!uDoc.exists) {
+    console.log('users    : 문서 없음');
+    return;
+  }
+  const d = uDoc.data() || {};
+  console.log('users    : 필드 목록');
+  Object.keys(d).sort().forEach((k) => {
+    const v = d[k];
+    let shown;
+    if (k === 'password' || k === 'securityAnswer') {
+      shown = `(값 숨김, 길이 ${String(v).length})`;
+    } else if (v && typeof v.toDate === 'function') {
+      shown = kst(v.toDate().toISOString());
+    } else {
+      shown = JSON.stringify(v);
+    }
+    console.log(`           ${k} = ${shown}`);
+  });
 }
 
 // ---------- status: 이관 현황 ----------
@@ -299,10 +350,11 @@ async function main() {
   const db = admin.firestore();
 
   if (action === 'status') return actionStatus(db);
+  if (action === 'inspect') return actionInspect(db, empId());
   if (action === 'claims') return actionClaims();
   if (action === 'reset') return actionReset(db);
   if (action === 'remove') return actionRemove(db);
-  throw new Error(`알 수 없는 ACTION: ${action} (status | claims | reset | remove)`);
+  throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | claims | reset | remove)`);
 }
 
 main().catch((e) => {

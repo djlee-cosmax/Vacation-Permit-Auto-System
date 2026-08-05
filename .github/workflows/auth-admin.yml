@@ -16,6 +16,7 @@ on:
         type: choice
         options:
           - status
+          - inspect
           - reset
           - claims
           - remove
@@ -49,7 +50,7 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: 입력 확인
-        if: (inputs.action == 'reset' || inputs.action == 'remove') && inputs.emp_id == ''
+        if: (inputs.action == 'reset' || inputs.action == 'remove' || inputs.action == 'inspect') && inputs.emp_id == ''
         run: |
           echo "::error::${{ inputs.action }} 작업에는 사번(emp_id) 입력이 필요합니다."
           exit 1
