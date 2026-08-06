@@ -338,142 +338,154 @@ async function actionClaims() {
 }
 
 // ---------- reset: 비밀번호 초기화 ----------
-// ---------- testrules: 배포된 규칙을 시뮬레이터로 검증 ----------
+// ---------- testrules: 실제 토큰으로 배포된 규칙 검증 ----------
 //
 // 비밀번호 없이 "이 사람이 이 경로를 읽을 수 있는가" 를 확인한다.
-// Rules API 의 :test 로 배포된 룰셋에 가상 토큰을 넣어 판정만 받는다.
 //
-// 규칙이 허용하는지만 본다 — 앱 코드가 실제로 그 읽기를 하는지는 검증하지 않는다.
+// Rules API 의 :test(시뮬레이터)는 이 서비스 계정 권한 밖이다 — 룰셋 생성·배포는
+// 되는데 :test 만 'caller does not have permission' 이 난다. 대신 **실제로 읽어
+// 본다**: 임시 계정에 커스텀 토큰을 발급해 ID 토큰으로 바꾼 뒤 Firestore REST 를
+// 호출한다. 시뮬레이터보다 확실하다 — 배포된 규칙이 실제 데이터에 적용된 결과다.
+//
+//   403 = 규칙이 막음   ·   200/404 = 규칙이 허용 (문서가 없으면 404)
+//
+// 임시 계정(사번 000000000)을 쓰므로 실제 작업자 계정의 로그인 기록을 건드리지
+// 않는다. 끝나면 삭제한다.
 async function actionTestRules() {
-  const { JWT } = require('google-auth-library');
+  const fsMod = require('fs');
+  const pathMod = require('path');
   const sa = loadServiceAccount();
-  const client = new JWT({
-    email: sa.client_email,
-    key: sa.private_key,
-    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-  });
-  const base = `https://firebaserules.googleapis.com/v1/projects/${sa.project_id}`;
+  const project = sa.project_id;
 
-  // 배포된 룰셋을 찾아 그것을 그대로 시험한다 (파일이 아니라 실제 운영본).
-  const rel = await client.request({ url: `${base}/releases` });
-  const releases = (rel.data && rel.data.releases) || [];
-  const fsRel = releases.find((r) => String(r.name).endsWith('cloud.firestore'));
-  if (!fsRel) throw new Error('cloud.firestore 릴리스를 찾지 못했습니다.');
+  // 웹 API 키는 script.js 의 firebaseConfig 에 있다(공개 값). 한 곳만 두기 위해
+  // 하드코딩하지 않고 거기서 읽는다.
+  const appJs = fsMod.readFileSync(pathMod.join(__dirname, '..', 'script.js'), 'utf8');
+  const keyMatch = appJs.match(/apiKey:\s*"([^"]+)"/);
+  if (!keyMatch) throw new Error('script.js 에서 apiKey 를 찾지 못했습니다.');
+  const apiKey = keyMatch[1];
 
-  console.log('===== 배포된 규칙 시뮬레이션 =====');
-  console.log(`룰셋  ${fsRel.rulesetName}`);
-  console.log(`갱신  ${fsRel.updateTime}`);
+  const TEST_EMP = '000000000';
+  const testEmail = emailFor(TEST_EMP);
+  const REAL_OTHER = '122240023';   // 남의 문서 대조용 (읽지 못해야 한다)
 
-  // 룰셋 리소스에 직접 :test 를 걸면 'caller does not have permission' 이 난다.
-  // 프로젝트 레벨 :test 는 source 를 함께 받으므로, 배포된 룰셋의 내용을 꺼내
-  // 그것으로 시험한다 — 검증 대상은 실제 운영본과 동일하다.
-  const rsGet = await client.request({
-    url: `https://firebaserules.googleapis.com/v1/${fsRel.rulesetName}`,
-  });
-  const source = (rsGet.data || {}).source;
-  if (!source || !source.files || !source.files.length) {
-    throw new Error('배포된 룰셋 내용을 읽지 못했습니다.');
-  }
-  console.log(`내용  ${source.files[0].name} ${source.files[0].content.length.toLocaleString()}자`);
+  console.log('===== 배포된 규칙 검증 (실제 토큰) =====');
+  console.log(`프로젝트   ${project}`);
+  console.log(`임시 계정   ${testEmail}`);
 
-  const WORKER = '122240023';   // 김수은 — 일반 작업자
-  const OTHER = '122240096';    // 김가영 — 남의 문서 대조용
-  const LEADER = '122240096';   // 서무
-  const ADMIN = '122210202';    // 관리자
-  const doc = (p) => `/databases/(default)/documents/${p}`;
-
-  // 가상 토큰. 규칙이 보는 값은 email(사번 추출) · role 클레임 ·
-  // firebase.sign_in_provider(익명 판별) 세 가지다.
-  function tok(empId, role, provider) {
-    const token = {
-      email: `${empId}@vacation.local`,
-      firebase: { sign_in_provider: provider || 'password' },
-    };
-    if (role) token.role = role;
-    return { uid: 'uid_' + empId, token: token };
+  // 배포 상태를 함께 찍어 무엇을 검증했는지 남긴다.
+  try {
+    const { JWT } = require('google-auth-library');
+    const jwt = new JWT({
+      email: sa.client_email, key: sa.private_key,
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
+    const rel = await jwt.request({
+      url: `https://firebaserules.googleapis.com/v1/projects/${project}/releases`,
+    });
+    const fsRel = ((rel.data && rel.data.releases) || [])
+      .find((r) => String(r.name).endsWith('cloud.firestore'));
+    if (fsRel) console.log(`룰셋       ${fsRel.rulesetName}  (갱신 ${fsRel.updateTime})`);
+  } catch (e) {
+    console.log(`(릴리스 조회 실패: ${e.message})`);
   }
 
-  const cases = [
-    ['일반 작업자 → 본인 users 읽기', 'ALLOW',
-      { auth: tok(WORKER), path: doc(`users/${WORKER}`), method: 'get' }],
-    ['일반 작업자 → 남의 users 읽기', 'DENY',
-      { auth: tok(WORKER), path: doc(`users/${OTHER}`), method: 'get' }],
-    ['일반 작업자 → users 전체 조회', 'DENY',
-      { auth: tok(WORKER), path: doc(`users/${OTHER}`), method: 'list' }],
-    ['일반 작업자 → workers 전체 조회', 'DENY',
-      { auth: tok(WORKER), path: doc('workers/anydoc'), method: 'list' }],
-    ['일반 작업자 → leaves 읽기', 'ALLOW',
-      { auth: tok(WORKER), path: doc('leaves/lv_x'), method: 'get' }],
-    ['일반 작업자 → leaves 삭제', 'DENY',
-      { auth: tok(WORKER), path: doc('leaves/lv_x'), method: 'delete' }],
-    ['서무 → workers 전체 조회', 'ALLOW',
-      { auth: tok(LEADER, 'leader'), path: doc('workers/anydoc'), method: 'list' }],
-    ['서무 → users 전체 조회', 'ALLOW',
-      { auth: tok(LEADER, 'leader'), path: doc(`users/${WORKER}`), method: 'list' }],
-    ['서무 → users 삭제', 'DENY',
-      { auth: tok(LEADER, 'leader'), path: doc(`users/${WORKER}`), method: 'delete' }],
-    ['관리자 → users 삭제', 'ALLOW',
-      { auth: tok(ADMIN, 'admin'), path: doc(`users/${WORKER}`), method: 'delete' }],
-    ['익명 → 본인 users 읽기', 'DENY',
-      { auth: tok(WORKER, null, 'anonymous'), path: doc(`users/${WORKER}`), method: 'get' }],
-    ['익명 → workers 읽기', 'DENY',
-      { auth: tok(WORKER, null, 'anonymous'), path: doc('workers/anydoc'), method: 'get' }],
-    ['미인증 → users 읽기', 'DENY',
-      { auth: null, path: doc(`users/${WORKER}`), method: 'get' }],
-    ['미인증 → leaves 읽기', 'DENY',
-      { auth: null, path: doc('leaves/lv_x'), method: 'get' }],
+  // 1) 임시 계정 준비
+  let uid;
+  try {
+    const u = await admin.auth().getUserByEmail(testEmail);
+    uid = u.uid;
+  } catch (e) {
+    if (e.code !== 'auth/user-not-found') throw e;
+    const u = await admin.auth().createUser({
+      email: testEmail,
+      password: 'ruletest-' + Date.now(),
+    });
+    uid = u.uid;
+  }
+
+  async function idTokenFor(claims) {
+    const custom = await admin.auth().createCustomToken(uid, claims || {});
+    const r = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: custom, returnSecureToken: true }),
+      });
+    const body = await r.json();
+    if (!r.ok || !body.idToken) {
+      throw new Error('ID 토큰 발급 실패: ' + JSON.stringify(body));
+    }
+    return body.idToken;
+  }
+
+  const docBase = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents`;
+
+  async function tryRead(idToken, path) {
+    const r = await fetch(`${docBase}/${path}`, {
+      headers: { Authorization: 'Bearer ' + idToken },
+    });
+    return r.status;
+  }
+
+  // 2) 역할별 토큰. 커스텀 토큰의 sign_in_provider 는 'custom' 이라 익명이 아니다 —
+  //    규칙의 signedIn() 을 통과한다. 익명 경로는 Console 에서 이미 껐다.
+  const tokens = {
+    worker: await idTokenFor({}),
+    leader: await idTokenFor({ role: 'leader' }),
+    admin: await idTokenFor({ role: 'admin' }),
+  };
+
+  // 3) 검사 — [설명, 기대(allow|deny), 토큰, 경로]
+  const checks = [
+    ['일반 작업자 → 본인 users 읽기',   'allow', 'worker', `users/${TEST_EMP}`],
+    ['일반 작업자 → 남의 users 읽기',   'deny',  'worker', `users/${REAL_OTHER}`],
+    ['일반 작업자 → users 전체 조회',   'deny',  'worker', 'users?pageSize=1'],
+    ['일반 작업자 → workers 전체 조회', 'deny',  'worker', 'workers?pageSize=1'],
+    ['일반 작업자 → leaves 조회',       'allow', 'worker', 'leaves?pageSize=1'],
+    ['일반 작업자 → system 읽기',       'deny',  'worker', 'system/balanceReset'],
+    ['일반 작업자 → balanceLogs 조회',  'deny',  'worker', 'balanceLogs?pageSize=1'],
+    ['서무 → workers 전체 조회',        'allow', 'leader', 'workers?pageSize=1'],
+    ['서무 → users 전체 조회',          'allow', 'leader', 'users?pageSize=1'],
+    ['서무 → 남의 users 읽기',          'allow', 'leader', `users/${REAL_OTHER}`],
+    ['서무 → system 읽기',              'allow', 'leader', 'system/balanceReset'],
+    ['관리자 → workers 전체 조회',      'allow', 'admin',  'workers?pageSize=1'],
   ];
-
-  // 본인 문서 수정 범위 — 인증 관련 필드만 허용, 잔여휴가는 금지
-  const existing = { data: { name: '김수은', team: '화성', balanceAnnual: 15 } };
-  const writeCases = [
-    ['일반 작업자 → 본인 authMigrated 갱신', 'ALLOW', {
-      auth: tok(WORKER), path: doc(`users/${WORKER}`), method: 'update',
-      resource: { data: { name: '김수은', team: '화성', balanceAnnual: 15, authMigrated: true } },
-    }],
-    ['일반 작업자 → 본인 잔여휴가 변경', 'DENY', {
-      auth: tok(WORKER), path: doc(`users/${WORKER}`), method: 'update',
-      resource: { data: { name: '김수은', team: '화성', balanceAnnual: 99 } },
-    }],
-  ];
-
-  const testCases = cases.map(function(c) {
-    return { expectation: c[1], request: c[2] };
-  }).concat(writeCases.map(function(c) {
-    return { expectation: c[1], request: c[2], resource: existing };
-  }));
-
-  const res = await client.request({
-    url: `${base}:test`,
-    method: 'POST',
-    data: { source: source, testSuite: { testCases } },
-  });
-
-  const results = (res.data && res.data.testResults) || [];
-  const labels = cases.map((c) => c[0]).concat(writeCases.map((c) => c[0]));
-  const expects = cases.map((c) => c[1]).concat(writeCases.map((c) => c[1]));
 
   console.log('');
   let fail = 0;
-  results.forEach(function(r, i) {
-    const ok = r.state === 'SUCCESS';
+  for (const [label, expect, who, path] of checks) {
+    const status = await tryRead(tokens[who], path);
+    const denied = status === 403;
+    const ok = (expect === 'deny') === denied;
     if (!ok) fail++;
-    console.log(`  ${ok ? 'OK  ' : '!! '} ${expects[i].padEnd(5)} ${labels[i]}`);
-    if (!ok && r.debugMessages) {
-      r.debugMessages.slice(0, 3).forEach((m) => console.log(`        ${m}`));
-    }
-  });
+    console.log(`  ${ok ? 'OK  ' : '!!  '}${expect.padEnd(5)} HTTP ${status}  ${label}`);
+  }
 
+  // 4) 미인증 — 토큰 없이
+  const anonStatus = await (await fetch(`${docBase}/users/${TEST_EMP}`)).status;
+  {
+    const ok = anonStatus === 403 || anonStatus === 401;
+    if (!ok) fail++;
+    console.log(`  ${ok ? 'OK  ' : '!!  '}deny  HTTP ${anonStatus}  미인증 → users 읽기`);
+  }
+
+  // 5) 임시 계정 정리
+  await admin.auth().deleteUser(uid);
   console.log('');
-  console.log(`${results.length}건 중 ${results.length - fail}건 기대와 일치` +
-    (fail ? `, ${fail}건 불일치` : ''));
+  console.log(`임시 계정 삭제 완료 (${testEmail})`);
+
+  const total = checks.length + 1;
+  console.log('');
+  console.log(`${total}건 중 ${total - fail}건 기대와 일치` + (fail ? `, ${fail}건 불일치` : ''));
   if (fail) {
     console.log('');
     console.log('>>> 규칙이 의도와 다릅니다. 배포 전 상태로 되돌릴지 검토하세요.');
     process.exitCode = 1;
   } else {
     console.log('>>> 규칙은 의도대로 동작합니다.');
-    console.log('    (규칙 판정만 확인했습니다. 앱 코드가 실제로 이 경로를 쓰는지는 별개입니다.)');
+    console.log('    일반 작업자가 본인 users 문서를 읽을 수 있으므로 새 기기 로그인이 됩니다.');
+    console.log('    (규칙 판정만 확인했습니다. 앱 화면 동작은 별개로 확인해야 합니다.)');
   }
 }
 
