@@ -6,6 +6,8 @@
 //   ACTION=status                        node auth-admin.js  이관 현황 집계
 //   ACTION=inspect EMP_ID=12224xxxx      node auth-admin.js  한 사람 상태 상세
 //   ACTION=rules                         node auth-admin.js  현재 배포된 보안 규칙 조회
+//   ACTION=deployrules                   node auth-admin.js  firestore.rules 배포 (미리보기)
+//   ACTION=deployrules CONFIRM=DEPLOY                        실제 배포
 //   ACTION=cleanup                       node auth-admin.js  이관 잔여 필드 정리 (미리보기)
 //   ACTION=cleanup CONFIRM=OK                                실제 정리 실행
 //   ACTION=claims                        node auth-admin.js  관리자·서무 역할 클레임 부여
@@ -333,6 +335,111 @@ async function actionClaims() {
 }
 
 // ---------- reset: 비밀번호 초기화 ----------
+// ---------- deployrules: firestore.rules 배포 ----------
+//
+// firebase CLI 를 쓰지 않는다 (이 저장소에 firebase.json 이 없고 CLI 로그인도
+// 없다). ACTION=rules 와 같은 서비스 계정으로 Rules REST API 를 직접 호출한다.
+//
+// 순서: 룰셋 생성 → 릴리스가 그 룰셋을 가리키게 갱신.
+// 룰셋 생성 단계에서 문법 검사가 이뤄지므로, 규칙이 잘못됐으면 릴리스 전에 막힌다.
+//
+// 기본은 미리보기다. CONFIRM=DEPLOY 를 줘야 실제로 배포한다 —
+// 규칙을 잘못 올리면 전 직원이 로그인하지 못한다.
+async function actionDeployRules() {
+  const fsMod = require('fs');
+  const pathMod = require('path');
+  const { JWT } = require('google-auth-library');
+
+  const file = pathMod.join(__dirname, '..', 'firestore.rules');
+  if (!fsMod.existsSync(file)) throw new Error(`규칙 파일이 없습니다: ${file}`);
+  const content = fsMod.readFileSync(file, 'utf8');
+
+  const confirmed = String(process.env.CONFIRM || '').trim() === 'DEPLOY';
+  const sa = loadServiceAccount();
+  const client = new JWT({
+    email: sa.client_email,
+    key: sa.private_key,
+    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+  });
+  const base = `https://firebaserules.googleapis.com/v1/projects/${sa.project_id}`;
+  const releaseName = `projects/${sa.project_id}/releases/cloud.firestore`;
+
+  console.log(`===== Firestore 규칙 배포${confirmed ? '' : ' (미리보기)'} =====`);
+  console.log(`프로젝트  ${sa.project_id}`);
+  console.log(`파일      firestore.rules  ${content.length.toLocaleString()}자 / ` +
+              `${content.split('\n').length}줄`);
+
+  // 현재 릴리스
+  let current = null;
+  try {
+    const rel = await client.request({ url: `${base}/releases` });
+    const releases = (rel.data && rel.data.releases) || [];
+    current = releases.find((r) => String(r.name).endsWith('cloud.firestore')) || null;
+  } catch (e) {
+    console.log(`  (현재 릴리스 조회 실패: ${e.message})`);
+  }
+  console.log(`현재 룰셋  ${current ? current.rulesetName : '(없음)'}`);
+  if (current) console.log(`현재 갱신  ${current.updateTime}`);
+
+  // 이관이 안 끝났으면 배포하지 않는다 — 규칙을 올리면 미이관자가 로그인 못 한다.
+  const db = admin.firestore();
+  const [authUsers, workersSnap] = await Promise.all([
+    listAuthUsers(),
+    db.collection('workers').get(),
+  ]);
+  const authIds = new Set(authUsers.map((u) => empIdFromEmail(u.email)));
+  const notMigrated = [];
+  workersSnap.forEach((d) => {
+    const v = d.data() || {};
+    const id = String(v.employeeId || '').trim();
+    if (id && !authIds.has(id)) notMigrated.push(`${id} ${v.name || ''}`);
+  });
+
+  console.log('');
+  console.log(`이관 현황  ${authIds.size} / ${workersSnap.size}명`);
+  if (notMigrated.length) {
+    console.log('');
+    console.log('※ 아직 이관되지 않은 작업자가 있어 배포를 중단합니다.');
+    notMigrated.forEach((s) => console.log(`   ${s}`));
+    console.log('');
+    console.log('  ACTION=premigrate 로 미리 이관하거나 본인 로그인을 기다린 뒤 다시 실행하세요.');
+    process.exitCode = 1;
+    return;
+  }
+  console.log('  전원 이관 완료 — 배포 가능');
+
+  if (!confirmed) {
+    console.log('');
+    console.log('>>> 미리보기입니다. 실제로 배포하려면 confirm 입력란에 DEPLOY 를 넣고 다시 실행하세요.');
+    return;
+  }
+
+  // 룰셋 생성 (여기서 문법 검사가 된다)
+  console.log('');
+  console.log('[배포 실행]');
+  const created = await client.request({
+    url: `${base}/rulesets`,
+    method: 'POST',
+    data: { source: { files: [{ name: 'firestore.rules', content }] } },
+  });
+  const rulesetName = created.data.name;
+  console.log(`  룰셋 생성 완료  ${rulesetName}`);
+
+  // 릴리스 갱신
+  await client.request({
+    url: `https://firebaserules.googleapis.com/v1/${releaseName}`,
+    method: 'PATCH',
+    data: { release: { name: releaseName, rulesetName } },
+  });
+  console.log(`  릴리스 갱신 완료  ${releaseName}`);
+
+  console.log('');
+  console.log('>>> 배포 완료. 즉시 적용됩니다.');
+  console.log('    남은 일: Firebase Console → Authentication → Sign-in method');
+  console.log('             에서 "익명" 을 사용 중지해야 익명 접근 경로가 완전히 닫힙니다.');
+  if (current) console.log(`    되돌리려면 이전 룰셋: ${current.rulesetName}`);
+}
+
 // ---------- premigrate: 로그인할 수 없는 사람을 서버에서 미리 이관 ----------
 //
 // 이관은 원래 자가 진행이다 — 로그인하는 순간(평문 비밀번호를 아는 유일한 시점)
@@ -564,10 +671,11 @@ async function main() {
   if (action === 'cleanup') return actionCleanup(db);
   if (action === 'claims') return actionClaims();
   if (action === 'premigrate') return actionPremigrate(db);
+  if (action === 'deployrules') return actionDeployRules();
   if (action === 'reset') return actionReset(db);
   if (action === 'remove') return actionRemove(db);
-  throw new Error(`알 수 없는 ACTION: ${action} `
-    + `(status | inspect | rules | cleanup | claims | premigrate | reset | remove)`);
+  throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | deployrules `
+    + `| cleanup | claims | premigrate | reset | remove)`);
 }
 
 main().catch((e) => {

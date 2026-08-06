@@ -22,13 +22,14 @@ on:
           - reset
           - claims
           - premigrate
+          - deployrules
           - remove
       emp_id:
         description: '사번 (비밀번호 초기화 / 서버 이관 / 퇴직자 삭제 시 입력)'
         required: false
         type: string
       confirm:
-        description: '퇴직자 삭제는 DELETE · 서버 이관에서 비밀번호까지 초기화하려면 RESETPW (비워두면 미리보기/거부)'
+        description: '퇴직자 삭제 DELETE · 규칙 배포 DEPLOY · 서버 이관 시 비밀번호 초기화 RESETPW (비워두면 미리보기)'
         required: false
         type: string
 
