@@ -24,6 +24,7 @@ on:
           - premigrate
           - syncprofile
           - deployrules
+          - testrules
           - remove
       emp_id:
         description: '사번 (비밀번호 초기화 / 서버 이관 / 퇴직자 삭제 시 입력)'

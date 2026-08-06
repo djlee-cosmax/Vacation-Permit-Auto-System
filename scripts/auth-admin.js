@@ -8,6 +8,7 @@
 //   ACTION=rules                         node auth-admin.js  현재 배포된 보안 규칙 조회
 //   ACTION=deployrules                   node auth-admin.js  firestore.rules 배포 (미리보기)
 //   ACTION=deployrules CONFIRM=DEPLOY                        실제 배포
+//   ACTION=testrules                     node auth-admin.js  배포된 규칙 시뮬레이션 검증
 //   ACTION=cleanup                       node auth-admin.js  이관 잔여 필드 정리 (미리보기)
 //   ACTION=cleanup CONFIRM=OK                                실제 정리 실행
 //   ACTION=claims                        node auth-admin.js  관리자·서무 역할 클레임 부여
@@ -337,6 +338,133 @@ async function actionClaims() {
 }
 
 // ---------- reset: 비밀번호 초기화 ----------
+// ---------- testrules: 배포된 규칙을 시뮬레이터로 검증 ----------
+//
+// 비밀번호 없이 "이 사람이 이 경로를 읽을 수 있는가" 를 확인한다.
+// Rules API 의 :test 로 배포된 룰셋에 가상 토큰을 넣어 판정만 받는다.
+//
+// 규칙이 허용하는지만 본다 — 앱 코드가 실제로 그 읽기를 하는지는 검증하지 않는다.
+async function actionTestRules() {
+  const { JWT } = require('google-auth-library');
+  const sa = loadServiceAccount();
+  const client = new JWT({
+    email: sa.client_email,
+    key: sa.private_key,
+    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+  });
+  const base = `https://firebaserules.googleapis.com/v1/projects/${sa.project_id}`;
+
+  // 배포된 룰셋을 찾아 그것을 그대로 시험한다 (파일이 아니라 실제 운영본).
+  const rel = await client.request({ url: `${base}/releases` });
+  const releases = (rel.data && rel.data.releases) || [];
+  const fsRel = releases.find((r) => String(r.name).endsWith('cloud.firestore'));
+  if (!fsRel) throw new Error('cloud.firestore 릴리스를 찾지 못했습니다.');
+
+  console.log('===== 배포된 규칙 시뮬레이션 =====');
+  console.log(`룰셋  ${fsRel.rulesetName}`);
+  console.log(`갱신  ${fsRel.updateTime}`);
+
+  const WORKER = '122240023';   // 김수은 — 일반 작업자
+  const OTHER = '122240096';    // 김가영 — 남의 문서 대조용
+  const LEADER = '122240096';   // 서무
+  const ADMIN = '122210202';    // 관리자
+  const doc = (p) => `/databases/(default)/documents/${p}`;
+
+  // 가상 토큰. 규칙이 보는 값은 email(사번 추출) · role 클레임 ·
+  // firebase.sign_in_provider(익명 판별) 세 가지다.
+  function tok(empId, role, provider) {
+    const token = {
+      email: `${empId}@vacation.local`,
+      firebase: { sign_in_provider: provider || 'password' },
+    };
+    if (role) token.role = role;
+    return { uid: 'uid_' + empId, token: token };
+  }
+
+  const cases = [
+    ['일반 작업자 → 본인 users 읽기', 'ALLOW',
+      { auth: tok(WORKER), path: doc(`users/${WORKER}`), method: 'get' }],
+    ['일반 작업자 → 남의 users 읽기', 'DENY',
+      { auth: tok(WORKER), path: doc(`users/${OTHER}`), method: 'get' }],
+    ['일반 작업자 → users 전체 조회', 'DENY',
+      { auth: tok(WORKER), path: doc(`users/${OTHER}`), method: 'list' }],
+    ['일반 작업자 → workers 전체 조회', 'DENY',
+      { auth: tok(WORKER), path: doc('workers/anydoc'), method: 'list' }],
+    ['일반 작업자 → leaves 읽기', 'ALLOW',
+      { auth: tok(WORKER), path: doc('leaves/lv_x'), method: 'get' }],
+    ['일반 작업자 → leaves 삭제', 'DENY',
+      { auth: tok(WORKER), path: doc('leaves/lv_x'), method: 'delete' }],
+    ['서무 → workers 전체 조회', 'ALLOW',
+      { auth: tok(LEADER, 'leader'), path: doc('workers/anydoc'), method: 'list' }],
+    ['서무 → users 전체 조회', 'ALLOW',
+      { auth: tok(LEADER, 'leader'), path: doc(`users/${WORKER}`), method: 'list' }],
+    ['서무 → users 삭제', 'DENY',
+      { auth: tok(LEADER, 'leader'), path: doc(`users/${WORKER}`), method: 'delete' }],
+    ['관리자 → users 삭제', 'ALLOW',
+      { auth: tok(ADMIN, 'admin'), path: doc(`users/${WORKER}`), method: 'delete' }],
+    ['익명 → 본인 users 읽기', 'DENY',
+      { auth: tok(WORKER, null, 'anonymous'), path: doc(`users/${WORKER}`), method: 'get' }],
+    ['익명 → workers 읽기', 'DENY',
+      { auth: tok(WORKER, null, 'anonymous'), path: doc('workers/anydoc'), method: 'get' }],
+    ['미인증 → users 읽기', 'DENY',
+      { auth: null, path: doc(`users/${WORKER}`), method: 'get' }],
+    ['미인증 → leaves 읽기', 'DENY',
+      { auth: null, path: doc('leaves/lv_x'), method: 'get' }],
+  ];
+
+  // 본인 문서 수정 범위 — 인증 관련 필드만 허용, 잔여휴가는 금지
+  const existing = { data: { name: '김수은', team: '화성', balanceAnnual: 15 } };
+  const writeCases = [
+    ['일반 작업자 → 본인 authMigrated 갱신', 'ALLOW', {
+      auth: tok(WORKER), path: doc(`users/${WORKER}`), method: 'update',
+      resource: { data: { name: '김수은', team: '화성', balanceAnnual: 15, authMigrated: true } },
+    }],
+    ['일반 작업자 → 본인 잔여휴가 변경', 'DENY', {
+      auth: tok(WORKER), path: doc(`users/${WORKER}`), method: 'update',
+      resource: { data: { name: '김수은', team: '화성', balanceAnnual: 99 } },
+    }],
+  ];
+
+  const testCases = cases.map(function(c) {
+    return { expectation: c[1], request: c[2] };
+  }).concat(writeCases.map(function(c) {
+    return { expectation: c[1], request: c[2], resource: existing };
+  }));
+
+  const res = await client.request({
+    url: `https://firebaserules.googleapis.com/v1/${fsRel.rulesetName}:test`,
+    method: 'POST',
+    data: { testSuite: { testCases } },
+  });
+
+  const results = (res.data && res.data.testResults) || [];
+  const labels = cases.map((c) => c[0]).concat(writeCases.map((c) => c[0]));
+  const expects = cases.map((c) => c[1]).concat(writeCases.map((c) => c[1]));
+
+  console.log('');
+  let fail = 0;
+  results.forEach(function(r, i) {
+    const ok = r.state === 'SUCCESS';
+    if (!ok) fail++;
+    console.log(`  ${ok ? 'OK  ' : '!! '} ${expects[i].padEnd(5)} ${labels[i]}`);
+    if (!ok && r.debugMessages) {
+      r.debugMessages.slice(0, 3).forEach((m) => console.log(`        ${m}`));
+    }
+  });
+
+  console.log('');
+  console.log(`${results.length}건 중 ${results.length - fail}건 기대와 일치` +
+    (fail ? `, ${fail}건 불일치` : ''));
+  if (fail) {
+    console.log('');
+    console.log('>>> 규칙이 의도와 다릅니다. 배포 전 상태로 되돌릴지 검토하세요.');
+    process.exitCode = 1;
+  } else {
+    console.log('>>> 규칙은 의도대로 동작합니다.');
+    console.log('    (규칙 판정만 확인했습니다. 앱 코드가 실제로 이 경로를 쓰는지는 별개입니다.)');
+  }
+}
+
 // ---------- syncprofile: users 문서에 이름·팀·휴대폰 채우기 ----------
 //
 // 로그인은 이름·팀·휴대폰이 필요한데, 예전에는 workers 명단 전체를 받아 거기서
@@ -783,10 +911,11 @@ async function main() {
   if (action === 'premigrate') return actionPremigrate(db);
   if (action === 'syncprofile') return actionSyncProfile(db);
   if (action === 'deployrules') return actionDeployRules();
+  if (action === 'testrules') return actionTestRules();
   if (action === 'reset') return actionReset(db);
   if (action === 'remove') return actionRemove(db);
   throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | deployrules `
-    + `| cleanup | claims | premigrate | syncprofile | reset | remove)`);
+    + `| testrules | cleanup | claims | premigrate | syncprofile | reset | remove)`);
 }
 
 main().catch((e) => {
