@@ -338,6 +338,102 @@ async function actionClaims() {
 }
 
 // ---------- reset: 비밀번호 초기화 ----------
+// ---------- testaccount: 일반 작업자 경로 확인용 임시 계정 ----------
+//
+// 규칙 배포 후 "일반 작업자가 새 기기에서 로그인되는가" 를 사람이 직접 확인하려면
+// 일반 사번이 필요하다. 관리자·서무 사번은 STAFF_ROLES 에 박혀 있어 본인 문서
+// 읽기가 실패해도 거기서 이름을 가져와 통과한다 — 판별이 안 된다.
+//
+// **users 문서만 만들고 workers 명단에는 넣지 않는다.**
+//   - STAFF_ROLES 에 없으니 순수 일반 작업자 경로를 탄다
+//   - 명단(workers) 기준인 서무 화면에는 보이지 않는다
+//   - syncprofile 의 '명단에 없는 users 문서' 경고에는 잡힌다 (의도된 것)
+//
+// 확인이 끝나면 CONFIRM=DELETE 로 반드시 지운다.
+const TEST_ACCOUNT = {
+  empId: '999000001',
+  name: '테스트계정',
+  team: '화성',
+  phone: '010-0000-0000',
+};
+
+async function actionTestAccount(db) {
+  const confirm = String(process.env.CONFIRM || '').trim();
+  const t = TEST_ACCOUNT;
+  const email = emailFor(t.empId);
+  const userRef = db.collection('users').doc(t.empId);
+
+  console.log('===== 확인용 임시 계정 =====');
+  console.log(`사번      ${t.empId}`);
+  console.log(`이메일     ${email}`);
+
+  let authUid = null;
+  try {
+    authUid = (await admin.auth().getUserByEmail(email)).uid;
+  } catch (e) {
+    if (e.code !== 'auth/user-not-found') throw e;
+  }
+  const userSnap = await userRef.get();
+  console.log(`현재 상태   Auth ${authUid ? '있음' : '없음'} / users 문서 ${userSnap.exists ? '있음' : '없음'}`);
+
+  if (confirm === 'DELETE') {
+    console.log('');
+    console.log('[삭제]');
+    if (authUid) {
+      await admin.auth().deleteUser(authUid);
+      console.log('  Auth 계정 삭제');
+    }
+    if (userSnap.exists) {
+      await userRef.delete();
+      console.log('  users 문서 삭제');
+    }
+    console.log('');
+    console.log('>>> 임시 계정을 정리했습니다.');
+    return;
+  }
+
+  if (confirm !== 'OK') {
+    console.log('');
+    console.log('만들려면  confirm 입력란에 OK');
+    console.log('지우려면  confirm 입력란에 DELETE');
+    return;
+  }
+
+  console.log('');
+  console.log('[생성]');
+  if (!authUid) {
+    await admin.auth().createUser({
+      email: email,
+      password: authPasswordFor(DEFAULT_PASSWORD),
+    });
+    console.log(`  Auth 계정 생성 (비밀번호 ${DEFAULT_PASSWORD})`);
+  } else {
+    await admin.auth().updateUser(authUid, { password: authPasswordFor(DEFAULT_PASSWORD) });
+    console.log(`  Auth 계정이 이미 있어 비밀번호만 ${DEFAULT_PASSWORD} 로 맞춤`);
+  }
+
+  await userRef.set({
+    name: t.name,
+    team: t.team,
+    phone: t.phone,
+    authMigrated: true,
+    authMigratedAt: admin.firestore.FieldValue.serverTimestamp(),
+    balanceAnnual: 0,
+    balanceBirth: 0,
+    balanceSummer: 0,
+  }, { merge: true });
+  console.log('  users 문서 생성 (이름·팀·휴대폰, 잔여휴가 0)');
+
+  console.log('');
+  console.log('>>> 시크릿 창에서 아래로 로그인해 보세요.');
+  console.log(`      사번      ${t.empId}`);
+  console.log(`      비밀번호   ${DEFAULT_PASSWORD}`);
+  console.log('');
+  console.log('    이 계정은 명단(workers)에 없으므로 서무 화면에는 보이지 않습니다.');
+  console.log('    휴가증은 작성하지 마세요 — 실제 leaves 문서가 생깁니다.');
+  console.log('    확인이 끝나면 confirm=DELETE 로 지우세요.');
+}
+
 // ---------- testrules: 실제 토큰으로 배포된 규칙 검증 ----------
 //
 // 비밀번호 없이 "이 사람이 이 경로를 읽을 수 있는가" 를 확인한다.
@@ -936,6 +1032,7 @@ async function main() {
   if (action === 'syncprofile') return actionSyncProfile(db);
   if (action === 'deployrules') return actionDeployRules();
   if (action === 'testrules') return actionTestRules();
+  if (action === 'testaccount') return actionTestAccount(db);
   if (action === 'reset') return actionReset(db);
   if (action === 'remove') return actionRemove(db);
   throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | deployrules `
