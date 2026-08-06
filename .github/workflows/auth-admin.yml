@@ -22,6 +22,7 @@ on:
           - reset
           - claims
           - premigrate
+          - syncprofile
           - deployrules
           - remove
       emp_id:

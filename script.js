@@ -193,6 +193,46 @@ function getUrlMode() {
   return 'worker';
 }
 
+// 로그인에 필요한 본인 정보 — 이름·팀·휴대폰.
+//
+// **본인 users 문서에서 읽는다.** 규칙이 본인 문서 읽기는 허용한다
+// (`allow get: if signedIn() && (empId == myEmpId() || isStaff())`).
+//
+// 예전에는 workers 명단 전체를 받아 거기서 찾았다. 보안 규칙 배포(2026-08-06)
+// 후 workers 의 list 는 서무·관리자만 허용되므로 일반 작업자는 명단을 받을 수
+// 없고, 로컬 캐시에 의존하면 캐시가 빈 새 기기·시크릿 창에서 로그인이 막힌다.
+//
+// users 의 이름·팀·휴대폰은 `ACTION=syncprofile` 이 workers 기준으로 채운다.
+// 아직 안 채워진 경우를 대비해 명단 캐시 → STAFF_ROLES 로 내려간다.
+//
+// 반환: { name, team, phone } 또는 null(명단에 없는 사번)
+function profileFor(empId, staff) {
+  var cached = workers.find(function(w) {
+    return String(w.employeeId || '').trim() === empId;
+  });
+
+  function fallback() {
+    if (cached) return { name: cached.name, team: cached.team || '', phone: cached.phone || '' };
+    if (staff) return { name: staff.name, team: '', phone: '' };
+    return null;
+  }
+
+  if (!FB_DB) return Promise.resolve(fallback());
+
+  return FB_DB.collection('users').doc(empId).get()
+    .then(function(doc) {
+      // 문서 자체가 없으면 퇴직·전출 처리된 사번이다.
+      if (!doc.exists) return null;
+      var d = doc.data() || {};
+      if (d.name) return { name: d.name, team: d.team || '', phone: d.phone || '' };
+      return fallback();   // 동기화 전 — 이름이 아직 안 들어간 문서
+    })
+    .catch(function(e) {
+      console.warn('본인 정보 조회 실패:', (e && e.code) || e);
+      return fallback();
+    });
+}
+
 function login() {
   var empId = document.getElementById('loginEmpId').value.trim();
   var pw = document.getElementById('loginPw').value;
@@ -226,19 +266,9 @@ function login() {
   //
   // 로컬 캐시로 판정하지 않는다 — 퇴직·전출 처리된 사람이 옛 캐시로 통과한다.
   function finishLogin() {
-    ensureWorkers().then(function() {
-      var worker = workers.find(function(w) {
-        return String(w.employeeId || '').trim() === empId;
-      });
-      var name, team;
-      if (staff) {
-        name = (worker && worker.name) || staff.name;
-        team = (worker && worker.team) || '';
-      } else if (worker) {
-        name = worker.name;
-        team = worker.team || '';
-      } else {
-        // 인증은 통과했지만 명단에 없다 = 퇴직·전출 처리된 계정.
+    profileFor(empId, staff).then(function(p) {
+      if (!p) {
+        // 인증은 통과했지만 본인 문서가 없다 = 퇴직·전출 처리된 계정.
         // 인증 상태를 남겨두면 안 되므로 되돌린다.
         showToast('등록되지 않은 사번입니다.', 'error');
         if (typeof firebase !== 'undefined' && firebase.auth) {
@@ -247,7 +277,7 @@ function login() {
         return;
       }
       // role 은 "선택한 모드" 기준 — 관리자도 작업자 모드 선택 시 worker 로 동작
-      doLoginSuccess(empId, name, selectedMode, team, worker, isInitialPw);
+      doLoginSuccess(empId, p.name, selectedMode, p.team, { phone: p.phone }, isInitialPw);
     });
   }
 

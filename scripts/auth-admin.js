@@ -13,6 +13,8 @@
 //   ACTION=claims                        node auth-admin.js  관리자·서무 역할 클레임 부여
 //   ACTION=premigrate EMP_ID=12224xxxx   node auth-admin.js  로그인 못 하는 사람 서버 이관
 //   ACTION=premigrate EMP_ID=... CONFIRM=RESETPW             비밀번호 바꿔 쓰던 사람까지
+//   ACTION=syncprofile                   node auth-admin.js  users 에 이름·팀·휴대폰 채우기
+//   ACTION=syncprofile CONFIRM=OK                            실제 쓰기 (명단 수정 후 필수)
 //   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호 초기화 (계정 삭제)
 //   ACTION=remove EMP_ID=12224xxxx       node auth-admin.js  퇴직자 완전 삭제 (미리보기)
 //   ACTION=remove EMP_ID=... CONFIRM=DELETE  실제 삭제 실행
@@ -335,6 +337,100 @@ async function actionClaims() {
 }
 
 // ---------- reset: 비밀번호 초기화 ----------
+// ---------- syncprofile: users 문서에 이름·팀·휴대폰 채우기 ----------
+//
+// 로그인은 이름·팀·휴대폰이 필요한데, 예전에는 workers 명단 전체를 받아 거기서
+// 찾았다. 보안 규칙 배포(2026-08-06) 후 `workers` 의 list 는 서무·관리자만
+// 허용되므로 일반 작업자는 명단을 받을 수 없다. 로컬 캐시에 의존하면 캐시가
+// 빈 새 기기·시크릿 창에서 로그인이 막힌다.
+//
+// 그래서 본인 정보를 본인 users 문서에 둔다 — 규칙이 본인 문서 읽기는 허용한다.
+// 규칙을 느슨하게 하지 않고, 로그인이 필요한 최소 권한으로 완결된다.
+//
+// **명단(workers)을 고친 뒤에는 이걸 다시 돌려야 한다.** 앱은 Firestore workers 를
+// 읽기만 하므로(명단 편집은 로컬 캐시) 자동 동기화 지점이 없다.
+async function actionSyncProfile(db) {
+  const confirmed = String(process.env.CONFIRM || '').trim() === 'OK';
+  console.log(`===== users 이름·팀·휴대폰 동기화${confirmed ? '' : ' (미리보기)'} =====`);
+
+  const [workersSnap, usersSnap] = await Promise.all([
+    db.collection('workers').get(),
+    db.collection('users').get(),
+  ]);
+
+  const users = new Map();
+  usersSnap.forEach((d) => users.set(d.id, d.data() || {}));
+
+  const toWrite = [];
+  const same = [];
+  const missingDoc = [];
+  workersSnap.forEach((d) => {
+    const w = d.data() || {};
+    const empId = String(w.employeeId || '').trim();
+    if (!empId) return;
+    const want = {
+      name: w.name || '',
+      team: w.team || '',
+      phone: w.phone || '',
+    };
+    const cur = users.get(empId);
+    if (!cur) { missingDoc.push({ empId, want }); toWrite.push({ empId, want }); return; }
+    if (cur.name === want.name && cur.team === want.team && cur.phone === want.phone) {
+      same.push(empId);
+      return;
+    }
+    toWrite.push({ empId, want, from: { name: cur.name, team: cur.team, phone: cur.phone } });
+  });
+
+  console.log(`작업자 명단   ${workersSnap.size}명`);
+  console.log(`이미 일치     ${same.length}명`);
+  console.log(`갱신 대상     ${toWrite.length}명` +
+    (missingDoc.length ? `  (users 문서 없어 새로 만드는 건 ${missingDoc.length}명)` : ''));
+
+  toWrite.slice(0, 20).forEach((t) => {
+    const f = t.from;
+    console.log(`  ${t.empId}  ${t.want.name} / ${t.want.team || '-'}` +
+      (f ? `   (이전: ${f.name || '-'} / ${f.team || '-'})` : '   ← 문서 생성'));
+  });
+  if (toWrite.length > 20) console.log(`  ... 외 ${toWrite.length - 20}명`);
+
+  // 명단에 없는 users 문서 — 퇴직 처리가 덜 된 흔적일 수 있다.
+  const workerIds = new Set();
+  workersSnap.forEach((d) => {
+    const id = String((d.data() || {}).employeeId || '').trim();
+    if (id) workerIds.add(id);
+  });
+  const orphan = [];
+  users.forEach((v, id) => { if (!workerIds.has(id)) orphan.push(id); });
+  if (orphan.length) {
+    console.log('');
+    console.log(`※ 명단에 없는 users 문서 ${orphan.length}건 — 퇴직 처리 확인 필요`);
+    orphan.slice(0, 20).forEach((id) => console.log(`   ${id}`));
+  }
+
+  if (!confirmed) {
+    console.log('');
+    console.log('>>> 미리보기입니다. 실제로 쓰려면 confirm 입력란에 OK 를 넣고 다시 실행하세요.');
+    return;
+  }
+
+  console.log('');
+  console.log('[쓰기 실행]');
+  let n = 0;
+  for (let i = 0; i < toWrite.length; i += 400) {
+    const batch = db.batch();
+    toWrite.slice(i, i + 400).forEach((t) => {
+      batch.set(db.collection('users').doc(t.empId), t.want, { merge: true });
+      n++;
+    });
+    await batch.commit();
+  }
+  console.log(`  ${n}명 갱신 완료`);
+  console.log('');
+  console.log('>>> 이제 일반 작업자도 새 기기에서 로그인할 수 있습니다.');
+  console.log('    명단을 고친 뒤에는 이 작업을 다시 실행하세요.');
+}
+
 // ---------- deployrules: firestore.rules 배포 ----------
 //
 // firebase CLI 를 쓰지 않는다 (이 저장소에 firebase.json 이 없고 CLI 로그인도
@@ -671,11 +767,12 @@ async function main() {
   if (action === 'cleanup') return actionCleanup(db);
   if (action === 'claims') return actionClaims();
   if (action === 'premigrate') return actionPremigrate(db);
+  if (action === 'syncprofile') return actionSyncProfile(db);
   if (action === 'deployrules') return actionDeployRules();
   if (action === 'reset') return actionReset(db);
   if (action === 'remove') return actionRemove(db);
   throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | deployrules `
-    + `| cleanup | claims | premigrate | reset | remove)`);
+    + `| cleanup | claims | premigrate | syncprofile | reset | remove)`);
 }
 
 main().catch((e) => {
