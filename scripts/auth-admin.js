@@ -9,6 +9,8 @@
 //   ACTION=cleanup                       node auth-admin.js  이관 잔여 필드 정리 (미리보기)
 //   ACTION=cleanup CONFIRM=OK                                실제 정리 실행
 //   ACTION=claims                        node auth-admin.js  관리자·서무 역할 클레임 부여
+//   ACTION=premigrate EMP_ID=12224xxxx   node auth-admin.js  로그인 못 하는 사람 서버 이관
+//   ACTION=premigrate EMP_ID=... CONFIRM=RESETPW             비밀번호 바꿔 쓰던 사람까지
 //   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호 초기화 (계정 삭제)
 //   ACTION=remove EMP_ID=12224xxxx       node auth-admin.js  퇴직자 완전 삭제 (미리보기)
 //   ACTION=remove EMP_ID=... CONFIRM=DELETE  실제 삭제 실행
@@ -28,6 +30,15 @@ const STAFF_ROLES = {
 const AUTH_EMAIL_DOMAIN = 'vacation.local';
 const emailFor = (empId) => `${String(empId).trim()}@${AUTH_EMAIL_DOMAIN}`;
 const empIdFromEmail = (email) => String(email || '').split('@')[0];
+
+// script.js 의 DEFAULT_PASSWORD · authPasswordFor 와 동기화할 것.
+// Firebase Auth 가 6자 이상을 요구해 기본 비밀번호 '1234' 는 패딩해서 저장한다.
+// 사용자는 계속 '1234' 를 입력한다. 이 규칙이 어긋나면 로그인이 안 된다.
+const DEFAULT_PASSWORD = '1234';
+const authPasswordFor = (pw) => {
+  const p = String(pw == null ? '' : pw);
+  return p.length >= 6 ? p : (p + '______').slice(0, 6);
+};
 
 function loadServiceAccount() {
   const raw = process.env.FIREBASE_SA_KEY;
@@ -322,6 +333,91 @@ async function actionClaims() {
 }
 
 // ---------- reset: 비밀번호 초기화 ----------
+// ---------- premigrate: 로그인할 수 없는 사람을 서버에서 미리 이관 ----------
+//
+// 이관은 원래 자가 진행이다 — 로그인하는 순간(평문 비밀번호를 아는 유일한 시점)
+// 브라우저가 Auth 계정을 만든다. 그런데 휴직처럼 한동안 로그인할 수 없는 사람이
+// 있으면 전원 이관이 끝나지 않아 보안 규칙을 배포할 수 없다.
+//
+// 규칙을 배포하면 자가 이관 경로가 막힌다 — 이관 전 로그인은 익명 인증으로
+// users 문서를 읽어 비밀번호를 확인하는데, 새 규칙이 익명을 사용자로 인정하지
+// 않는다. 그래서 복직 후에도 로그인이 안 된다.
+//
+// **기본 비밀번호(1234) 상태인 사람만** 대상으로 한다. 그 경우 서버가 만드는
+// 계정의 비밀번호가 어차피 1234 라서 본인 입장에서 달라지는 게 없다.
+// 비밀번호를 바꿔 쓰던 사람은 해시만 있어 평문을 알 수 없으므로, 미리 이관하면
+// 비밀번호가 1234 로 바뀌어 버린다. 그건 본인 모르게 할 일이 아니라서
+// CONFIRM=RESETPW 를 요구한다.
+async function actionPremigrate(db) {
+  const empId = String(process.env.EMP_ID || '').trim();
+  if (!empId) throw new Error('EMP_ID 가 필요합니다. (미리 이관할 작업자 사번)');
+  const allowPwReset = String(process.env.CONFIRM || '').trim() === 'RESETPW';
+
+  console.log(`===== 서버 이관: ${empId} =====`);
+
+  const wSnap = await db.collection('workers').where('employeeId', '==', empId).get();
+  if (wSnap.empty) {
+    console.log('※ 작업자 명단에서 찾지 못했습니다. 사번을 다시 확인하세요.');
+    process.exitCode = 1;
+    return;
+  }
+  const w = wSnap.docs[0].data() || {};
+  const name = w.name || empId;
+  console.log(`  이름: ${name} / 팀: ${w.team || '-'} / 부서: ${w.department || '-'}`);
+
+  // 이미 Auth 계정이 있으면 손대지 않는다.
+  try {
+    await admin.auth().getUserByEmail(emailFor(empId));
+    console.log(`  이미 Auth 계정이 있습니다 — 이관 완료 상태입니다. 아무것도 하지 않습니다.`);
+    return;
+  } catch (e) {
+    if (e.code !== 'auth/user-not-found') throw e;
+  }
+
+  const userRef = db.collection('users').doc(empId);
+  const userSnap = await userRef.get();
+  const u = userSnap.exists ? (userSnap.data() || {}) : {};
+
+  if (u.password !== undefined && !allowPwReset) {
+    console.log('');
+    console.log('※ 이 분은 비밀번호를 직접 바꿔 쓰고 있습니다 (password 필드 존재).');
+    console.log('  해시만 있어 평문을 알 수 없으므로, 지금 미리 이관하면 비밀번호가');
+    console.log(`  ${DEFAULT_PASSWORD} 로 바뀝니다. 본인 동의 없이 할 일이 아닙니다.`);
+    console.log('');
+    console.log('  선택:');
+    console.log('   1) 본인이 직접 로그인할 때까지 기다린다 (권장)');
+    console.log('   2) 본인에게 알린 뒤 confirm 입력란에 RESETPW 를 넣고 다시 실행한다');
+    process.exitCode = 1;
+    return;
+  }
+
+  const pwChanged = u.password !== undefined;
+  await admin.auth().createUser({
+    email: emailFor(empId),
+    password: authPasswordFor(DEFAULT_PASSWORD),
+  });
+  console.log(`  Auth 계정 생성 완료 (${emailFor(empId)})`);
+
+  // 브라우저 자가 이관과 같은 뒷정리를 한다.
+  await userRef.set({
+    authMigrated: true,
+    authMigratedAt: admin.firestore.FieldValue.serverTimestamp(),
+    password: admin.firestore.FieldValue.delete(),
+    securityQuestion: admin.firestore.FieldValue.delete(),
+    securityAnswer: admin.firestore.FieldValue.delete(),
+  }, { merge: true });
+  console.log('  users 문서 정리 완료 (authMigrated=true, 인증 잔여 필드 제거)');
+
+  console.log('');
+  console.log(`>>> ${name}(${empId}) 님 이관 완료. 사번 + ${DEFAULT_PASSWORD} 로 로그인됩니다.`);
+  if (pwChanged) {
+    console.log(`    ⚠️ 기존 비밀번호는 무효가 됐습니다. 본인에게 ${DEFAULT_PASSWORD} 를 알려주세요.`);
+  } else {
+    console.log('    원래 기본 비밀번호 상태였으므로 본인 입장에서 달라지는 것은 없습니다.');
+  }
+  console.log('    로그인 직후 새 비밀번호 등록 안내가 자동으로 표시됩니다.');
+}
+
 async function actionReset(db) {
   const empId = String(process.env.EMP_ID || '').trim();
   if (!empId) throw new Error('EMP_ID 가 필요합니다. (초기화할 작업자 사번)');
@@ -467,9 +563,11 @@ async function main() {
   if (action === 'rules') return actionRules();
   if (action === 'cleanup') return actionCleanup(db);
   if (action === 'claims') return actionClaims();
+  if (action === 'premigrate') return actionPremigrate(db);
   if (action === 'reset') return actionReset(db);
   if (action === 'remove') return actionRemove(db);
-  throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | cleanup | claims | reset | remove)`);
+  throw new Error(`알 수 없는 ACTION: ${action} `
+    + `(status | inspect | rules | cleanup | claims | premigrate | reset | remove)`);
 }
 
 main().catch((e) => {

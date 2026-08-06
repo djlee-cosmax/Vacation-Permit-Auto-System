@@ -21,13 +21,14 @@ on:
           - cleanup
           - reset
           - claims
+          - premigrate
           - remove
       emp_id:
-        description: '사번 (비밀번호 초기화 / 퇴직자 삭제 시 입력)'
+        description: '사번 (비밀번호 초기화 / 서버 이관 / 퇴직자 삭제 시 입력)'
         required: false
         type: string
       confirm:
-        description: '퇴직자 삭제를 실제로 실행하려면 DELETE 입력 (비워두면 미리보기)'
+        description: '퇴직자 삭제는 DELETE · 서버 이관에서 비밀번호까지 초기화하려면 RESETPW (비워두면 미리보기/거부)'
         required: false
         type: string
 
@@ -52,7 +53,7 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: 입력 확인
-        if: (inputs.action == 'reset' || inputs.action == 'remove' || inputs.action == 'inspect') && inputs.emp_id == ''
+        if: (inputs.action == 'reset' || inputs.action == 'remove' || inputs.action == 'inspect' || inputs.action == 'premigrate') && inputs.emp_id == ''
         run: |
           echo "::error::${{ inputs.action }} 작업에는 사번(emp_id) 입력이 필요합니다."
           exit 1
