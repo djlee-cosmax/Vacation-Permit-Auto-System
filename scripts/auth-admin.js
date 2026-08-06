@@ -676,13 +676,27 @@ async function actionRemove(db) {
 
   // 1) 대상 확인
   const wSnap = await db.collection('workers').where('employeeId', '==', empId).get();
+  const w = wSnap.empty ? {} : (wSnap.docs[0].data() || {});
+  let name = w.name || '';
+
   if (wSnap.empty) {
-    console.log('※ 작업자 명단에서 찾지 못했습니다. 사번을 확인하세요.');
-    process.exitCode = 1;
-    return;
+    // 명단에 없어도 users·leaves 가 남아 있으면 지울 수 있게 한다 —
+    // 이미 퇴직 처리한 사람의 유령 문서 정리용이다.
+    // 2026-08-06 실측: 생휴 월 리셋이 서무 기기의 옛 캐시 명단으로 돌면서
+    // 삭제한 사번의 users 문서를 set(merge) 로 되살렸다.
+    const leftoverUser = await db.collection('users').doc(empId).get();
+    const leftoverLeaves = await db.collection('leaves')
+      .where('employeeId', '==', empId).limit(1).get();
+    if (!leftoverUser.exists && leftoverLeaves.empty) {
+      console.log('※ 작업자 명단에도, 남은 문서에도 없습니다. 사번을 확인하세요.');
+      process.exitCode = 1;
+      return;
+    }
+    name = (leftoverUser.exists && (leftoverUser.data() || {}).name) || empId;
+    console.log(`  ※ 명단에는 없습니다 — 이미 퇴직 처리된 사번의 잔여 문서 정리입니다.`);
   }
-  const w = wSnap.docs[0].data() || {};
-  const name = w.name || empId;
+
+  name = name || empId;
   console.log(`  이름: ${name} / 팀: ${w.team || '-'} / 부서: ${w.department || '-'}`);
 
   // 2) 삭제 대상 수집

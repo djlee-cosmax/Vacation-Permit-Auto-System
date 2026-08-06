@@ -1913,14 +1913,28 @@ function revertDeductionForLeave(leave) {
 // (생휴는 매월 1개씩 새로 발생, 안 쓰면 다음 달 시작과 함께 사라짐)
 function maybeMonthlyBirthLeaveReset() {
   if (!FB_DB || !LEADER_MODE) return; // 서무·관리자가 사이트 들어왔을 때만
+  // 명단 동기화가 끝난 뒤에 돈다. 로컬 캐시로 대상을 정하면 안 된다 —
+  // 2026-08-06 실측: 퇴직 처리로 지운 사번이 서무 기기 캐시에 남아 있어
+  // set(merge) 가 users 문서를 되살렸다(balanceBirth 만 있는 유령 문서).
+  ensureWorkers().then(function() { runMonthlyBirthLeaveReset(); });
+}
+
+function runMonthlyBirthLeaveReset() {
   var now = new Date();
   var currentYM = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
   FB_DB.collection('system').doc('balanceReset').get()
     .then(function(doc) {
       var last = doc.exists ? (doc.data().lastBirthResetYearMonth || '') : '';
       if (last === currentYM) return null; // 이미 이번 달 리셋됨
-      // 여자 작업자 사번 목록 (관리자·서무는 제외)
-      var femaleIds = workers
+      // 여자 작업자 사번 목록 (관리자·서무는 제외).
+      // **서버 명단(DEFAULT_WORKERS) 기준이다** — 로컬 캐시(workers)는 사용자가
+      // 편집할 수 있고 서버에서 지운 사람이 남아 있을 수 있다.
+      var source = DEFAULT_WORKERS.length ? DEFAULT_WORKERS : [];
+      if (!source.length) {
+        console.warn('생휴 리셋 건너뜀 — 서버 명단을 받지 못했습니다.');
+        return null;
+      }
+      var femaleIds = source
         .filter(function(w) {
           if (!w.employeeId || w.gender === 'M') return false;
           if (STAFF_ROLES[String(w.employeeId).trim()]) return false;
