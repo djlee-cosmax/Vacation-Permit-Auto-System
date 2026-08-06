@@ -364,6 +364,18 @@ async function actionTestRules() {
   console.log(`룰셋  ${fsRel.rulesetName}`);
   console.log(`갱신  ${fsRel.updateTime}`);
 
+  // 룰셋 리소스에 직접 :test 를 걸면 'caller does not have permission' 이 난다.
+  // 프로젝트 레벨 :test 는 source 를 함께 받으므로, 배포된 룰셋의 내용을 꺼내
+  // 그것으로 시험한다 — 검증 대상은 실제 운영본과 동일하다.
+  const rsGet = await client.request({
+    url: `https://firebaserules.googleapis.com/v1/${fsRel.rulesetName}`,
+  });
+  const source = (rsGet.data || {}).source;
+  if (!source || !source.files || !source.files.length) {
+    throw new Error('배포된 룰셋 내용을 읽지 못했습니다.');
+  }
+  console.log(`내용  ${source.files[0].name} ${source.files[0].content.length.toLocaleString()}자`);
+
   const WORKER = '122240023';   // 김수은 — 일반 작업자
   const OTHER = '122240096';    // 김가영 — 남의 문서 대조용
   const LEADER = '122240096';   // 서무
@@ -432,9 +444,9 @@ async function actionTestRules() {
   }));
 
   const res = await client.request({
-    url: `https://firebaserules.googleapis.com/v1/${fsRel.rulesetName}:test`,
+    url: `${base}:test`,
     method: 'POST',
-    data: { testSuite: { testCases } },
+    data: { source: source, testSuite: { testCases } },
   });
 
   const results = (res.data && res.data.testResults) || [];
