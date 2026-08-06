@@ -201,17 +201,6 @@ function login() {
   if (!empId) { showToast('사번을 입력해 주세요.', 'error'); return; }
   if (!pw) { showToast('비밀번호를 입력해 주세요.', 'error'); return; }
 
-  // 명단 동기화가 끝난 뒤에 자격을 판정한다.
-  // 로컬 캐시만 믿으면, 퇴직 처리된 사람이 동기화 전(1~2초)에 로그인해
-  // 기본 비밀번호로 계정을 되살릴 수 있다.
-  if (_workersReady) {
-    var readyPromise = _workersReady;
-    _workersReady = null;              // 중복 대기 방지 — 이후 호출은 바로 진행
-    showToast('명단을 확인하는 중입니다...', '');
-    readyPromise.then(function() { login(); });
-    return;
-  }
-
   // 모드 자격 검증 (서무 URL: leader/admin만 / 관리자 URL: admin만)
   var staff = STAFF_ROLES[empId];
   var actualRole = staff ? staff.role : 'worker';
@@ -224,21 +213,43 @@ function login() {
     return;
   }
 
-  // 사용자 정보 결정 (사번이 staff여도 worker 명단에 있으면 명단 정보 사용)
-  var name, role, team, worker;
-  worker = workers.find(function(w) { return String(w.employeeId || '').trim() === empId; });
-  if (staff) {
-    name = (worker && worker.name) || staff.name;
-    team = (worker && worker.team) || '';
-  } else {
-    if (!worker) { showToast('등록되지 않은 사번입니다.', 'error'); return; }
-    name = worker.name;
-    team = worker.team || '';
-  }
-  // role은 "선택한 모드" 기준 — 관리자도 작업자 모드 선택 시 worker로 동작
-  role = selectedMode;
-
   var isInitialPw = (pw === DEFAULT_PASSWORD);
+
+  // 자격 판정은 인증 뒤에 한다.
+  //
+  // 보안 규칙 배포(2026-08-06) 전에는 익명 인증으로 로그인 전에 명단을 받아
+  // 대조했다. 규칙이 익명을 사용자로 인정하지 않게 되면서 그 경로가 닫혔다.
+  // 그대로 두면 두 가지가 깨진다.
+  //   1) 명단 동기화 대기가 영원히 안 풀려 로그인 버튼을 두 번 눌러야 한다
+  //   2) 캐시가 빈 새 기기에서는 명단을 못 받아 아예 로그인이 막힌다
+  // 그래서 인증 → 명단 → 자격 판정 순서로 뒤집었다.
+  //
+  // 로컬 캐시로 판정하지 않는다 — 퇴직·전출 처리된 사람이 옛 캐시로 통과한다.
+  function finishLogin() {
+    ensureWorkers().then(function() {
+      var worker = workers.find(function(w) {
+        return String(w.employeeId || '').trim() === empId;
+      });
+      var name, team;
+      if (staff) {
+        name = (worker && worker.name) || staff.name;
+        team = (worker && worker.team) || '';
+      } else if (worker) {
+        name = worker.name;
+        team = worker.team || '';
+      } else {
+        // 인증은 통과했지만 명단에 없다 = 퇴직·전출 처리된 계정.
+        // 인증 상태를 남겨두면 안 되므로 되돌린다.
+        showToast('등록되지 않은 사번입니다.', 'error');
+        if (typeof firebase !== 'undefined' && firebase.auth) {
+          firebase.auth().signOut().catch(function() {});
+        }
+        return;
+      }
+      // role 은 "선택한 모드" 기준 — 관리자도 작업자 모드 선택 시 worker 로 동작
+      doLoginSuccess(empId, name, selectedMode, team, worker, isInitialPw);
+    });
+  }
 
   // Firebase Auth 를 못 쓰는 환경(SDK 로드 실패 등)에서는 기존 방식으로 폴백
   if (typeof firebase === 'undefined' || !firebase.auth || !FB_DB) {
@@ -252,7 +263,7 @@ function login() {
       // 이관 당시 필드 정리에 실패했을 수 있다(네트워크 순단 등).
       // 그대로 두면 평문 보안답변·해시가 계속 남으므로 로그인마다 확인해 보정한다.
       ensureMigrationCleanup(empId);
-      doLoginSuccess(empId, name, role, team, worker, isInitialPw);
+      finishLogin();
     })
     .catch(function(err) {
       if (isNoAccountError(err && err.code)) {
@@ -316,7 +327,7 @@ function login() {
               });
             })
             .then(function() {
-              doLoginSuccess(empId, name, role, team, worker, isInitialPw);
+              finishLogin();
             })
             .catch(function(err) {
               if (err && err.code === 'auth/email-already-in-use') {
@@ -335,6 +346,19 @@ function login() {
         });
       })
       .catch(function(err) {
+        // 2026-08-06 전원 이관 후 보안 규칙을 배포하면서 이 경로는 사실상 닫혔다.
+        // 이관 전 로그인은 익명 인증으로 users 문서를 읽어야 하는데 규칙이
+        // 익명을 사용자로 인정하지 않는다. 그래서 여기 오는 건 두 경우다.
+        //   - 비밀번호가 틀렸다 (대부분)
+        //   - 아직 Auth 계정이 없다 (신규 입사자 — 관리자가 premigrate 로 만들어야 한다)
+        // 이메일 열거 보호가 켜져 있어 Auth 단계에서 둘을 구분할 수 없으므로
+        // 함께 안내한다. 내부 오류 문구를 그대로 보여주면 안 된다.
+        if (err && err.code === 'permission-denied') {
+          console.warn('자가 이관 경로 차단됨(규칙 배포 후 정상):', err.code);
+          showToast('비밀번호가 일치하지 않습니다.\n'
+            + '처음 로그인하는 경우 관리자에게 계정 생성을 요청해 주세요.', 'error');
+          return;
+        }
         console.error('사용자 조회 실패:', err);
         showToast('로그인 실패: ' + ((err && err.message) || err), 'error');
       });
@@ -342,7 +366,7 @@ function login() {
 
   // ---- 폴백: Auth 자체를 못 쓰는 환경 ----
   function legacyVerifyOnly() {
-    if (!FB_DB) { doLoginSuccess(empId, name, role, team, worker, isInitialPw); return; }
+    if (!FB_DB) { finishLogin(); return; }
     FB_DB.collection('users').doc(empId).get()
       .then(function(doc) {
         var d = doc.exists ? doc.data() : {};
@@ -350,7 +374,7 @@ function login() {
       })
       .then(function(ok) {
         if (!ok) { showToast('비밀번호가 일치하지 않습니다.', 'error'); return; }
-        doLoginSuccess(empId, name, role, team, worker, isInitialPw);
+        finishLogin();
       })
       .catch(function() {
         showToast('로그인 실패: 서버에 연결할 수 없습니다.', 'error');
@@ -638,18 +662,16 @@ try {
     firebase.initializeApp(firebaseConfig);
     FB_DB = firebase.firestore();
 
-    // 인증이 확립될 때마다 Firestore 의존 작업을 시작한다.
-    // 익명 → 실제 사용자로 승격되면 한 번 더 돌려서, 규칙을 조인 뒤에도
-    // (익명이 읽지 못하는) 작업자 명단이 로그인 후 정상적으로 채워지게 한다.
+    // 인증이 확립되면 Firestore 의존 작업을 시작한다.
+    //
+    // 익명 인증은 쓰지 않는다. 2026-08-06 전원 이관 후 보안 규칙을 배포하고
+    // Console 에서 익명 로그인을 껐다 — 규칙이 익명을 사용자로 인정하지 않으므로
+    // 로그인 전에는 Firestore 를 읽을 수 없다. 명단은 인증 후에 받는다.
     var _lastAuthKind = null;
     firebase.auth().onAuthStateChanged(function(user) {
       if (!user) {
         _lastAuthKind = null;
-        // 로그인 전 상태 — 이관 기간에는 익명 인증으로 레거시 검증 경로를 유지한다.
-        // 전원 이관 후 Console 에서 익명 로그인을 끄면 이 경로는 자연히 닫힌다.
-        firebase.auth().signInAnonymously()
-          .catch(function(err) { console.warn('익명 인증 실패:', err); });
-        return;
+        return;   // 로그인 전 — Firestore 를 읽을 수 없다
       }
       FB_UID = user.uid;
       var kind = user.isAnonymous ? 'anon' : 'user';
@@ -657,7 +679,7 @@ try {
       _lastAuthKind = kind;
 
       // 작업자 명단 Firestore에서 로드 (workers.json 대체)
-      loadDefaultWorkers();
+      ensureWorkers();
       // 본인이 작성하고 서버에서 처리 완료된 휴가증은 우측 카드에서 자동 제거
       setTimeout(cleanupProcessedLeavesFromCloud, 200);
       // 외부에서 삭제된 휴가증의 차감 자동 환원 (서무·관리자 모드만)
@@ -766,11 +788,23 @@ var workers = JSON.parse(localStorage.getItem('p5_workers') || '[]');
 
 // 작업자 기본 명단 — Firestore 'workers' 컬렉션에서 가져옴 (인증 후 loadDefaultWorkers 호출)
 var DEFAULT_WORKERS = [];
-// 첫 명단 동기화가 끝날 때까지 로그인 판정을 미루기 위한 신호.
-// 성공·실패 어느 쪽이든 resolve 한다 (실패 시엔 아래 서버 대조에서 막힌다).
+// 명단 동기화 신호. 성공·실패 어느 쪽이든 resolve 한다.
 var _workersReady = null;
 var _workersReadyResolve = null;
-_workersReady = new Promise(function(res) { _workersReadyResolve = res; });
+
+// 명단을 한 번 받아온다. 이미 받았거나 받는 중이면 그걸 기다린다.
+//
+// **인증 후에만 성공한다** — 보안 규칙이 익명 읽기를 막는다(2026-08-06 배포).
+// 그래서 페이지 로드 시점에 미리 부르면 안 되고, 인증이 확립된 뒤에 불러야 한다.
+// 호출 지점은 두 곳이다: onAuthStateChanged(세션 복원) 과 login() 의 finishLogin.
+// 어느 쪽이 먼저 와도 읽기는 한 번만 일어난다.
+function ensureWorkers() {
+  if (!_workersReady) {
+    _workersReady = new Promise(function(res) { _workersReadyResolve = res; });
+    loadDefaultWorkers();
+  }
+  return _workersReady;
+}
 
 function loadDefaultWorkers() {
   if (!FB_DB) { if (_workersReadyResolve) _workersReadyResolve(); return; }
