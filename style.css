@@ -963,6 +963,9 @@ input, select, textarea { font-family: inherit; }
   border-radius: 4px;
 }
 .worker-row-del:hover { background: #fff5f5; }
+/* 「초기화 요청」 — 예전 라벨은 'PW' 였다. 눌러도 초기화가 끝나지 않고
+   관리자 처리가 남는데 그렇게 읽히지 않아 이름을 바꿨다.
+   자간은 0 이다 — 'PW' 두 글자에 맞춰 벌려 둔 값이라 한글에서는 성기다. */
 .worker-row-pw {
   background: #fff;
   border: 1px solid #c8102e;
@@ -973,7 +976,7 @@ input, select, textarea { font-family: inherit; }
   padding: 4px 9px;
   border-radius: 12px;
   margin-right: 6px;
-  letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 .worker-row-pw:hover { background: #c8102e; color: #fff; }
 

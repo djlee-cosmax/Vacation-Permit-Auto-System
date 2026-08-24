@@ -2588,7 +2588,7 @@ function renderWorkerTable() {
     if (ADMIN_MODE) {
       var empIdSafe = String(w.employeeId || '').trim();
       var pwBtn = empIdSafe
-        ? '<button class="worker-row-pw" onclick="resetWorkerPassword(\'' + empIdSafe + '\')" title="비밀번호를 1234로 초기화">PW</button>'
+        ? '<button class="worker-row-pw" onclick="resetWorkerPassword(\'' + empIdSafe + '\')" title="비밀번호 초기화를 요청합니다. 관리자가 처리해야 완료됩니다.">초기화 요청</button>'
         : '';
       return '<tr' + trCls + '>' +
         '<td><input type="text" value="' + escapeHtml(w.name || '') + '" oninput="updateWorker(' + i + ',\'name\',this.value)">' + roleBadge + '</td>' +
@@ -2604,7 +2604,7 @@ function renderWorkerTable() {
       // 서무: 이름·사번·근무지·연락처는 읽기 전용, 잔여 3종·PW 초기화만 가능
       var leaderEmpIdSafe = String(w.employeeId || '').trim();
       var leaderPwBtn = leaderEmpIdSafe
-        ? '<button class="worker-row-pw" onclick="resetWorkerPassword(\'' + leaderEmpIdSafe + '\')" title="비밀번호를 1234로 초기화">PW</button>'
+        ? '<button class="worker-row-pw" onclick="resetWorkerPassword(\'' + leaderEmpIdSafe + '\')" title="비밀번호 초기화를 요청합니다. 관리자가 처리해야 완료됩니다.">초기화 요청</button>'
         : '';
       return '<tr' + trCls + '>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.name || '') + roleBadge + '</td>' +
