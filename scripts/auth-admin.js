@@ -16,6 +16,7 @@
 //   ACTION=premigrate EMP_ID=... CONFIRM=RESETPW             비밀번호 바꿔 쓰던 사람까지
 //   ACTION=syncprofile                   node auth-admin.js  users 에 이름·팀·휴대폰 채우기
 //   ACTION=syncprofile CONFIRM=OK                            실제 쓰기 (명단 수정 후 필수)
+//   ACTION=stats                         node auth-admin.js  휴가증 이용 실적 집계 (읽기 전용)
 //   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호 초기화 (계정 삭제)
 //   ACTION=remove EMP_ID=12224xxxx       node auth-admin.js  퇴직자 완전 삭제 (미리보기)
 //   ACTION=remove EMP_ID=... CONFIRM=DELETE  실제 삭제 실행
@@ -1018,6 +1019,84 @@ async function actionRemove(db) {
   console.log('    각 기기는 다음 접속 시 명단에서 자동으로 사라집니다.');
 }
 
+// 휴가증 이용 실적 집계 — 제안 보고의 효과금액 산출에 쓴다.
+//
+// **읽기 전용이고 이름·사번은 찍지 않는다.** 개인정보 시스템이라 집계 숫자만 낸다.
+//
+// 두 곳을 함께 센다.
+//   leaves      휴가증 원본. expiresAt(30일) 이 걸려 있어 TTL 정책이 켜져 있으면
+//               오래된 건이 지워진다 — 실제 남은 기간을 함께 찍어 확인한다.
+//   balanceLogs 차감 이력. TTL 이 없어 오픈 이후가 다 남아 있다.
+//               type='deduct' 한 건이 휴가증 한 건이다.
+async function actionStats(db) {
+  const ym = (d) => (d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : '(날짜없음)');
+  const toDate = (v) => {
+    if (!v) return null;
+    if (typeof v.toDate === 'function') return v.toDate();
+    if (v instanceof Date) return v;
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return new Date(v);
+    return null;
+  };
+  const bump = (m, k) => m.set(k, (m.get(k) || 0) + 1);
+  const table = (m) => [...m.entries()].sort().map(([k, v]) => `    ${k}  ${String(v).padStart(5)}`).join('\n');
+
+  console.log('===== 휴가증 이용 실적 =====');
+  console.log('(집계 전용 — 이름·사번은 출력하지 않습니다)');
+
+  // ── leaves ────────────────────────────────────────────────
+  const lv = await db.collection('leaves').get();
+  const byMonth = new Map(), byType = new Map();
+  let processed = 0, days = 0, minD = null, maxD = null;
+  const writers = new Set();
+  lv.forEach((doc) => {
+    const d = doc.data() || {};
+    const created = toDate(d.serverCreatedAt) || toDate(d.start);
+    bump(byMonth, ym(created));
+    bump(byType, d.type || '(구분없음)');
+    if (d.processed === true) processed++;
+    days += Number(d.count) || 0;
+    if (d.submittedBy) writers.add(d.submittedBy);
+    if (created) {
+      if (!minD || created < minD) minD = created;
+      if (!maxD || created > maxD) maxD = created;
+    }
+  });
+  console.log(`\n[leaves] 총 ${lv.size}건 · 처리완료 ${processed}건 · 작성자 ${writers.size}명`);
+  if (minD) console.log(`  남아 있는 기간: ${minD.toISOString().slice(0, 10)} ~ ${maxD.toISOString().slice(0, 10)}`);
+  console.log('  월별');
+  console.log(table(byMonth));
+  console.log('  구분별');
+  console.log(table(byType));
+
+  // ── balanceLogs ───────────────────────────────────────────
+  const bl = await db.collection('balanceLogs').get();
+  const logMonth = new Map(), logType = new Map(), deductMonth = new Map();
+  bl.forEach((doc) => {
+    const d = doc.data() || {};
+    const at = toDate(d.at);
+    bump(logMonth, ym(at));
+    bump(logType, d.type || '(없음)');
+    if (d.type === 'deduct') bump(deductMonth, ym(at));
+  });
+  console.log(`\n[balanceLogs] 총 ${bl.size}건 (TTL 없음 — 오픈 이후 누적)`);
+  console.log('  기록 유형별');
+  console.log(table(logType));
+  console.log('  월별 차감(deduct) = 휴가증 처리 건수');
+  console.log(table(deductMonth));
+
+  // ── 월평균 ────────────────────────────────────────────────
+  // 첫 달과 마지막 달은 온전하지 않을 수 있어 따로 표시한다.
+  const ded = [...deductMonth.entries()].sort();
+  if (ded.length >= 3) {
+    const mid = ded.slice(1, -1);
+    const sum = mid.reduce((s, [, v]) => s + v, 0);
+    console.log(`\n  월평균 (${mid[0][0]} ~ ${mid[mid.length - 1][0]}, 온전한 달만): `
+      + `${(sum / mid.length).toFixed(1)}건/월`);
+  }
+  console.log(`  전체 평균: ${ded.length ? (ded.reduce((s, [, v]) => s + v, 0) / ded.length).toFixed(1) : 0}건/월`);
+  console.log(`\n  휴가 일수 합계(leaves 잔여분): ${days}일`);
+}
+
 async function main() {
   const action = String(process.env.ACTION || 'status').trim();
   admin.initializeApp({ credential: admin.credential.cert(loadServiceAccount()) });
@@ -1035,8 +1114,9 @@ async function main() {
   if (action === 'testaccount') return actionTestAccount(db);
   if (action === 'reset') return actionReset(db);
   if (action === 'remove') return actionRemove(db);
+  if (action === 'stats') return actionStats(db);
   throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | deployrules `
-    + `| testrules | cleanup | claims | premigrate | syncprofile | reset | remove)`);
+    + `| testrules | cleanup | claims | premigrate | syncprofile | stats | reset | remove)`);
 }
 
 main().catch((e) => {

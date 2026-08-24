@@ -16,6 +16,7 @@ on:
         type: choice
         options:
           - status
+          - stats
           - inspect
           - rules
           - cleanup
