@@ -1044,29 +1044,44 @@ async function actionStats(db) {
   console.log('(집계 전용 — 이름·사번은 출력하지 않습니다)');
 
   // ── leaves ────────────────────────────────────────────────
+  // 구분·개수는 items[] 안에 있다. 휴가증 한 장에 여러 줄이 들어갈 수 있다.
   const lv = await db.collection('leaves').get();
   const byMonth = new Map(), byType = new Map();
-  let processed = 0, days = 0, minD = null, maxD = null;
-  const writers = new Set();
+  let processed = 0, days = 0, items = 0, minD = null, maxD = null;
+  const people = new Set();
   lv.forEach((doc) => {
     const d = doc.data() || {};
-    const created = toDate(d.serverCreatedAt) || toDate(d.start);
+    const created = toDate(d.serverCreatedAt) || toDate(d.createdAt) || toDate(d.start);
     bump(byMonth, ym(created));
-    bump(byType, d.type || '(구분없음)');
+    (Array.isArray(d.items) ? d.items : []).forEach((it) => {
+      items++;
+      bump(byType, (it && it.type) || '(구분없음)');
+    });
     if (d.processed === true) processed++;
-    days += Number(d.count) || 0;
-    if (d.submittedBy) writers.add(d.submittedBy);
+    days += Number(d.days) || 0;
+    // 사번으로 센다. submittedBy 는 익명 인증 시절 세션마다 달라져 인원수가 아니다.
+    if (d.employeeId) people.add(String(d.employeeId).trim());
     if (created) {
       if (!minD || created < minD) minD = created;
       if (!maxD || created > maxD) maxD = created;
     }
   });
-  console.log(`\n[leaves] 총 ${lv.size}건 · 처리완료 ${processed}건 · 작성자 ${writers.size}명`);
+  console.log(`\n[leaves] 휴가증 ${lv.size}장 · 항목 ${items}줄 · 처리완료 ${processed}장`);
+  console.log(`  작성 인원 ${people.size}명 (사번 기준) · 휴가 일수 합계 ${days}일`);
   if (minD) console.log(`  남아 있는 기간: ${minD.toISOString().slice(0, 10)} ~ ${maxD.toISOString().slice(0, 10)}`);
-  console.log('  월별');
+  console.log('  월별 (휴가증 장 수)');
   console.log(table(byMonth));
-  console.log('  구분별');
+  console.log('  구분별 (항목 줄 수)');
   console.log(table(byType));
+
+  // 월평균은 온전한 달만 쓴다 — 첫 달·마지막 달은 잘려 있다
+  const mo = [...byMonth.entries()].sort().filter(([k]) => k !== '(날짜없음)');
+  if (mo.length >= 3) {
+    const mid = mo.slice(1, -1);
+    const sum = mid.reduce((s, [, v]) => s + v, 0);
+    console.log(`\n  ▶ 월평균 ${(sum / mid.length).toFixed(1)}장/월 `
+      + `(${mid[0][0]} ~ ${mid[mid.length - 1][0]} · 온전한 달만)`);
+  }
 
   // ── balanceLogs ───────────────────────────────────────────
   const bl = await db.collection('balanceLogs').get();
@@ -1078,23 +1093,16 @@ async function actionStats(db) {
     bump(logType, d.type || '(없음)');
     if (d.type === 'deduct') bump(deductMonth, ym(at));
   });
-  console.log(`\n[balanceLogs] 총 ${bl.size}건 (TTL 없음 — 오픈 이후 누적)`);
+  console.log(`\n[balanceLogs] 총 ${bl.size}건 (TTL 없음)`);
   console.log('  기록 유형별');
   console.log(table(logType));
-  console.log('  월별 차감(deduct) = 휴가증 처리 건수');
-  console.log(table(deductMonth));
-
-  // ── 월평균 ────────────────────────────────────────────────
-  // 첫 달과 마지막 달은 온전하지 않을 수 있어 따로 표시한다.
-  const ded = [...deductMonth.entries()].sort();
-  if (ded.length >= 3) {
-    const mid = ded.slice(1, -1);
-    const sum = mid.reduce((s, [, v]) => s + v, 0);
-    console.log(`\n  월평균 (${mid[0][0]} ~ ${mid[mid.length - 1][0]}, 온전한 달만): `
-      + `${(sum / mid.length).toFixed(1)}건/월`);
+  if (deductMonth.size) {
+    console.log('  월별 차감(deduct)');
+    console.log(table(deductMonth));
+  } else {
+    console.log('  ※ deduct 기록 없음 — 잔여 차감이 수기(manual)로 이뤄지고 있습니다.');
+    console.log('     따라서 건수 근거는 leaves 쪽을 씁니다.');
   }
-  console.log(`  전체 평균: ${ded.length ? (ded.reduce((s, [, v]) => s + v, 0) / ded.length).toFixed(1) : 0}건/월`);
-  console.log(`\n  휴가 일수 합계(leaves 잔여분): ${days}일`);
 }
 
 async function main() {
