@@ -17,6 +17,8 @@
 //   ACTION=syncprofile                   node auth-admin.js  users 에 이름·팀·휴대폰 채우기
 //   ACTION=syncprofile CONFIRM=OK                            실제 쓰기 (명단 수정 후 필수)
 //   ACTION=stats                         node auth-admin.js  휴가증 이용 실적 집계 (읽기 전용)
+//   ACTION=anonoff                       node auth-admin.js  익명 로그인 제공자 끄기 (미리보기)
+//   ACTION=anonoff CONFIRM=ANONOFF                           실제로 끈다 (되돌리기 ANONON)
 //   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호 초기화 (계정 삭제)
 //   ACTION=remove EMP_ID=12224xxxx       node auth-admin.js  퇴직자 완전 삭제 (미리보기)
 //   ACTION=remove EMP_ID=... CONFIRM=DELETE  실제 삭제 실행
@@ -1134,6 +1136,54 @@ async function actionStats(db) {
   }
 }
 
+// ---------- anonoff: 익명 로그인 제공자 끄기 ----------
+// 2026-08-06 규칙 배포로 익명은 데이터를 못 읽지만, 제공자가 켜져 있으면
+// 계정은 계속 만들어진다. 쓰지 않는 인증 경로라 닫는다. Console 설정이지만
+// Identity Toolkit Admin API 로 같은 값을 바꿀 수 있다.
+//
+// 되돌리려면 Console 에서 다시 켜거나 CONFIRM=ANONON 으로 실행한다.
+async function actionAnonOff() {
+  const { JWT } = require('google-auth-library');
+  const sa = loadServiceAccount();
+  const client = new JWT({
+    email: sa.client_email,
+    key: sa.private_key,
+    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+  });
+  const url = `https://identitytoolkit.googleapis.com/admin/v2/projects/${sa.project_id}/config`;
+
+  const cur = await client.request({ url });
+  const now = !!(((cur.data || {}).signIn || {}).anonymous || {}).enabled;
+  console.log('===== 익명 로그인 제공자 =====');
+  console.log(`현재 상태  ${now ? '켜짐' : '꺼짐'}`);
+
+  const confirm = String(process.env.CONFIRM || '').trim();
+  const want = confirm === 'ANONON' ? true : false;
+
+  if (now === want) {
+    console.log(`이미 ${want ? '켜져' : '꺼져'} 있습니다 — 바꿀 것이 없습니다.`);
+    return;
+  }
+  if (confirm !== 'ANONOFF' && confirm !== 'ANONON') {
+    console.log('');
+    console.log(`[모의 실행] 익명 로그인을 ${now ? '끕니다' : '켭니다'}.`);
+    console.log('실제로 바꾸려면 CONFIRM=ANONOFF (되돌리려면 CONFIRM=ANONON) 로 다시 실행하세요.');
+    return;
+  }
+
+  await client.request({
+    url: `${url}?updateMask=signIn.anonymous.enabled`,
+    method: 'PATCH',
+    data: { signIn: { anonymous: { enabled: want } } },
+  });
+
+  const after = await client.request({ url });
+  const val = !!(((after.data || {}).signIn || {}).anonymous || {}).enabled;
+  console.log('');
+  console.log(`바꾼 뒤 상태  ${val ? '켜짐' : '꺼짐'}`);
+  console.log(val === want ? '>>> 반영됐습니다.' : '>>> 반영되지 않았습니다 — 권한을 확인하세요.');
+}
+
 async function main() {
   const action = String(process.env.ACTION || 'status').trim();
   admin.initializeApp({ credential: admin.credential.cert(loadServiceAccount()) });
@@ -1152,8 +1202,9 @@ async function main() {
   if (action === 'reset') return actionReset(db);
   if (action === 'remove') return actionRemove(db);
   if (action === 'stats') return actionStats(db);
+  if (action === 'anonoff') return actionAnonOff();
   throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | deployrules `
-    + `| testrules | cleanup | claims | premigrate | syncprofile | stats | reset | remove)`);
+    + `| testrules | cleanup | claims | premigrate | syncprofile | stats | anonoff | reset | remove)`);
 }
 
 main().catch((e) => {
