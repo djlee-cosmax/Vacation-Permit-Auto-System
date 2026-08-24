@@ -1093,6 +1093,35 @@ async function actionStats(db) {
     bump(logType, d.type || '(없음)');
     if (d.type === 'deduct') bump(deductMonth, ym(at));
   });
+  // ── 익명 계정 ─────────────────────────────────────────────
+  // 2026-08-06 규칙 배포로 익명은 데이터를 못 읽는다. 다만 Console 의 익명
+  // 제공자가 아직 켜져 있어 계정 자체는 계속 만들어질 수 있다. 몇 개나
+  // 쌓였는지 보이면 끄는 판단이 쉬워진다.
+  const all = await listAuthUsers();
+  const anon = all.filter((u) => !u.email && (!u.providerData || !u.providerData.length));
+  const real = all.length - anon.length;
+  console.log(`\n[Auth 계정] 총 ${all.length}개 · 사번 계정 ${real}개 · 익명 ${anon.length}개`);
+  if (anon.length) {
+    const byMonth = new Map();
+    let last = null;
+    anon.forEach((u) => {
+      const c = u.metadata && u.metadata.creationTime ? new Date(u.metadata.creationTime) : null;
+      bump(byMonth, ym(c));
+      if (c && (!last || c > last)) last = c;
+    });
+    console.log('  생성 월별');
+    console.log(table(byMonth));
+    if (last) {
+      console.log(`  마지막 생성: ${last.toISOString().slice(0, 10)}`);
+      const days = Math.floor((Date.now() - last.getTime()) / 86400000);
+      console.log(days >= 7
+        ? `  → ${days}일째 새로 안 생겼습니다. 익명 제공자를 꺼도 영향 없습니다.`
+        : `  → ${days}일 전에도 만들어졌습니다. 옛 화면을 열어 둔 사용자가 있을 수 있습니다.`);
+    }
+  } else {
+    console.log('  → 익명 계정이 없습니다.');
+  }
+
   console.log(`\n[balanceLogs] 총 ${bl.size}건 (TTL 없음)`);
   console.log('  기록 유형별');
   console.log(table(logType));
