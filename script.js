@@ -2427,11 +2427,18 @@ function openWorkerModal() {
   }
 }
 
+// 비밀번호 초기화 요청이 접수됐지만 아직 처리되지 않은 사번.
+// 서무가 PW 를 눌러도 브라우저는 남의 Auth 비밀번호를 못 바꾼다. 실제 초기화는
+// 관리자가 GitHub Actions 로 해야 끝난다. 그 사이를 눈에 남겨두지 않으면
+// "눌렀으니 됐다" 고 여기고 넘어간다 — 실제로 그렇게 한 건이 하루 묵었다.
+var pwResetPending = {};
+
 // Firestore users 컬렉션에서 모든 사번의 잔여 정보 페치 → balanceCache + workerModalState 갱신
 function fetchAllBalances() {
   if (!FB_DB) return Promise.resolve();
   return FB_DB.collection('users').get().then(function(snapshot) {
     balanceCache = {};
+    pwResetPending = {};
     snapshot.forEach(function(doc) {
       var d = doc.data() || {};
       balanceCache[doc.id] = {
@@ -2439,6 +2446,10 @@ function fetchAllBalances() {
         birth: d.balanceBirth,
         summer: d.balanceSummer
       };
+      // 같은 조회에서 함께 집는다 — 따로 쿼리를 더 던질 이유가 없다
+      if (d.pwResetRequested === true) {
+        pwResetPending[doc.id] = d.pwResetRequestedAt || null;
+      }
     });
     workerModalState.forEach(function(w) {
       var b = balanceCache[String(w.employeeId || '').trim()] || {};
@@ -2449,6 +2460,24 @@ function fetchAllBalances() {
   }).catch(function(err) {
     console.warn('잔여 정보 페치 실패:', err);
   });
+}
+
+// 「초기화 대기」 배지 — 요청은 접수됐고 관리자 처리를 기다리는 사람.
+// 요청 시각을 함께 띄운다. 며칠 묵었는지가 보여야 재촉할 수 있다.
+function pwPendingBadge(w) {
+  var empId = String(w.employeeId || '').trim();
+  if (!empId || !(empId in pwResetPending)) return '';
+  var at = pwResetPending[empId];
+  var when = '';
+  try {
+    if (at && typeof at.toDate === 'function') {
+      var d = at.toDate();
+      when = ' ' + (d.getMonth() + 1) + '/' + d.getDate();
+    }
+  } catch (e) { /* 시각을 못 읽어도 배지는 띄운다 */ }
+  return '<span class="worker-pwreset-badge" title="비밀번호 초기화 요청이 접수됐습니다.'
+    + ' 관리자가 GitHub Actions 의 [계정 관리] → reset 을 실행해야 완료됩니다.">'
+    + '초기화 대기' + escapeHtml(when) + '</span>';
 }
 
 // 잔여 입력 시 Firestore 저장 (debounce)
@@ -2545,7 +2574,7 @@ function renderWorkerTable() {
     var i = item.idx;  // 원본 workerModalState 인덱스 (편집·삭제 시 사용)
     var adminBadge = isAdminWorker(w) ? '<span class="worker-admin-badge">관리자</span>' : '';
     var leaderBadge = (!isAdminWorker(w) && isLeaderWorker(w)) ? '<span class="worker-leader-badge">서무</span>' : '';
-    var roleBadge = adminBadge + leaderBadge;
+    var roleBadge = adminBadge + leaderBadge + pwPendingBadge(w);
     var trCls = isAdminWorker(w) ? ' class="worker-row-admin"' : (isLeaderWorker(w) ? ' class="worker-row-leader"' : '');
     // 잔여 셀 — 서무·관리자에게만 보이는 input (leader-only 클래스)
     var balAnnual = (w.balanceAnnual != null && w.balanceAnnual !== '') ? w.balanceAnnual : '';
@@ -2655,10 +2684,16 @@ function resetWorkerPassword(empId) {
       }, { merge: true }).then(function() {
         alert(
           name + '님의 초기화 요청이 접수됐습니다.\n\n' +
-          '관리자가 GitHub Actions 의 [비밀번호 초기화] 워크플로를 실행하면\n' +
-          '해당 작업자는 사번 + 1234 로 다시 로그인할 수 있습니다.'
+          '※ 아직 초기화된 것이 아닙니다.\n' +
+          '관리자가 GitHub Actions 의 [비밀번호 초기화] 워크플로를 실행해야\n' +
+          '해당 작업자가 사번 + 1234 로 다시 로그인할 수 있습니다.\n\n' +
+          '명단에 [초기화 대기] 표시가 남아 있으면 아직 처리 전입니다.'
         );
-        showToast(name + '님 초기화 요청 접수됨', 'success');
+        // '접수됨' 만 띄우면 다 끝난 것으로 읽힌다. 무엇이 남았는지까지 적는다.
+        showToast(name + '님 요청 접수 — 관리자 처리 대기 중', '');
+        // 배지를 바로 띄운다. 다시 열 때까지 표시가 없으면 방금 누른 걸 잊는다.
+        pwResetPending[empId] = null;
+        renderWorkerTable();
       });
     })
     .catch(function(err) {

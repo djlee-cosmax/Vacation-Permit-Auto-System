@@ -1077,8 +1077,10 @@ input, select, textarea { font-family: inherit; }
   }
   html.role-leader #workerModal .worker-admin-badge,
   html.role-leader #workerModal .worker-leader-badge,
+  html.role-leader #workerModal .worker-pwreset-badge,
   html.role-admin #workerModal .worker-admin-badge,
-  html.role-admin #workerModal .worker-leader-badge { font-size: 12px; padding: 3px 10px; }
+  html.role-admin #workerModal .worker-leader-badge,
+  html.role-admin #workerModal .worker-pwreset-badge { font-size: 12px; padding: 3px 10px; }
 }
 
 .modal-actions {
@@ -1200,7 +1202,8 @@ html.leader-mode .not-leader-only { display: none !important; }
 
 /* 관리자/서무 행 강조 + 배지 */
 .worker-admin-badge,
-.worker-leader-badge {
+.worker-leader-badge,
+.worker-pwreset-badge {
   display: inline-block;
   margin-left: 6px;
   padding: 2px 8px;
@@ -1213,6 +1216,15 @@ html.leader-mode .not-leader-only { display: none !important; }
 }
 .worker-admin-badge { background: #c8102e; }
 .worker-leader-badge { background: #ff7043; }
+
+/* 초기화 대기 — 요청만 접수되고 관리자 처리가 남은 상태.
+   역할 배지와 색이 겹치면 안 된다. 이건 신분이 아니라 "할 일" 이다. */
+.worker-pwreset-badge {
+  background: #fff3cd;
+  color: #8a6100;
+  border: 1px solid #ffe08a;
+  cursor: help;
+}
 .worker-row-admin > td { background: #fff5f5; }
 .worker-row-admin > td:first-child { border-left: 3px solid #c8102e; padding-left: 9px !important; }
 .worker-row-leader > td { background: #fff7f0; }
