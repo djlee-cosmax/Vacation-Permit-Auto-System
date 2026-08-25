@@ -1196,7 +1196,7 @@ async function actionSettle(db) {
 
   const snap = await db.collection('leaves').get();
   const byEmp = new Map();   // empId -> { annual, birth, summer, refs[], lines[] }
-  let skippedNoId = 0, notProcessed = 0, already = 0, beforeManual = 0;
+  let skippedNoId = 0, notProcessed = 0, already = 0, beforeManual = 0, future = 0;
 
   snap.forEach((d) => {
     const v = d.data() || {};
@@ -1215,6 +1215,13 @@ async function actionSettle(db) {
       beforeManual++;
       if (String(process.env.ONLY_AFTER_MANUAL || '').trim() === '1') return;
     }
+
+    // 아직 오지 않은 휴가는 차감하지 않는다.
+    // 생휴는 매달 1일 1개로 리셋된다(reset-birth). 9월 생휴를 8월에 빼 두면
+    // 9/1 리셋이 1로 되돌리고, 그 휴가증은 이미 deductedAt 이 찍혀 다시는
+    // 차감되지 않는다 — 9월 내내 1개가 남는다.
+    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    if (v.start && String(v.start) > today) { future++; return; }
 
     if (!byEmp.has(empId)) {
       byEmp.set(empId, { annual: 0, birth: 0, summer: 0, refs: [], lines: [] });
@@ -1242,6 +1249,7 @@ async function actionSettle(db) {
     + ` · 사번없음 ${skippedNoId}`);
   console.log(`서무가 잔여를 손으로 넣기 전에 처리된 것 ${beforeManual}장`
     + (onlyAfter ? '  → 이번 정산에서 제외' : '  → 이번 정산에 포함'));
+  console.log(`아직 오지 않은 휴가 ${future}장  → 제외 (생휴 월 리셋과 어긋남)`);
   console.log(`모드  ${onlyAfter ? 'ONLY_AFTER_MANUAL=1 (수기 입력 이후만)' : '전체'}`);
   console.log(`정산 대상 ${targets.length}명`);
 
