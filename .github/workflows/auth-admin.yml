@@ -74,7 +74,6 @@ jobs:
         env:
           FIREBASE_SA_KEY: ${{ secrets.FIREBASE_SA_KEY }}
           ACTION: ${{ inputs.action }}
-          ONLY_AFTER_MANUAL: ${{ inputs.confirm == 'AFTERMANUAL' && '1' || '' }}
           EMP_ID: ${{ inputs.emp_id }}
           CONFIRM: ${{ inputs.confirm }}
         run: node auth-admin.js

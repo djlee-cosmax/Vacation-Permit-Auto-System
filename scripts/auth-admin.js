@@ -1181,22 +1181,35 @@ async function actionSettle(db) {
   const confirmed = String(process.env.CONFIRM || '').trim() === 'OK';
   console.log(`===== 차감 정산${confirmed ? '' : ' (미리보기)'} =====`);
 
-  // 서무가 잔여를 손으로 입력한 마지막 시각. manual 기록의 값이 현재 잔여와
-  // 일치하는 것으로 보아 증감이 아니라 "입력한 값" 이다. 그 시점 이전에 처리된
-  // 휴가증은 이미 반영됐을 수 있어 따로 센다.
-  const lastManual = new Map();
-  const blSnap = await db.collection('balanceLogs').where('type', '==', 'manual').get();
+  // 항목마다 "언제부터 안 빠졌는가" 가 다르다. 하나로 자르면 틀린다.
+  //
+  //   연차     서무가 2026-08-11 에 그룹웨어 실제 잔여와 대조해 손으로 맞췄다.
+  //            그 시점 값은 그때까지 쓴 것이 반영된 값이다 → 그 뒤 것만 차감.
+  //   생휴     서무는 손대지 않았다. 대신 매달 1일 1개로 리셋된다
+  //            → 마지막 리셋 뒤에 쓴 것만 차감. 지난달 것을 지금 빼면 안 된다.
+  //   하기휴가  서무도 안 건드렸고 리셋도 없다 → 개시 이후 전부 차감.
+  //
+  // manual 로그의 changes 에 birth·summer 가 같이 찍혀 있지만, 그건
+  // saveWorkerBalances 가 행 전체를 기록하기 때문이지 건드렸다는 뜻이 아니다.
+  const lastManual = new Map();   // 연차 기준
+  const lastReset = new Map();    // 생휴 기준
+  const blSnap = await db.collection('balanceLogs').get();
   blSnap.forEach((d) => {
     const v = d.data() || {};
     const id = String(v.empId || '').trim();
     const at = v.at && typeof v.at.toDate === 'function' ? v.at.toDate() : null;
     if (!id || !at) return;
-    if (!lastManual.has(id) || at > lastManual.get(id)) lastManual.set(id, at);
+    if (v.type === 'manual') {
+      if (!lastManual.has(id) || at > lastManual.get(id)) lastManual.set(id, at);
+    } else if (v.type === 'reset') {
+      if (!lastReset.has(id) || at > lastReset.get(id)) lastReset.set(id, at);
+    }
   });
 
   const snap = await db.collection('leaves').get();
   const byEmp = new Map();   // empId -> { annual, birth, summer, refs[], lines[] }
-  let skippedNoId = 0, notProcessed = 0, already = 0, beforeManual = 0, future = 0;
+  let skippedNoId = 0, notProcessed = 0, already = 0, future = 0;
+  let beforeManual = 0, beforeReset = 0;
 
   snap.forEach((d) => {
     const v = d.data() || {};
@@ -1205,23 +1218,19 @@ async function actionSettle(db) {
     const empId = String(v.employeeId || '').trim();
     if (!empId) { skippedNoId++; return; }
 
-    // 서무가 손으로 값을 넣기 전에 이미 처리된 휴가증은 그 값에 반영돼 있을
-    // 수 있다. ONLY_AFTER_MANUAL=1 이면 건너뛴다.
-    const cut = lastManual.get(empId);
-    const pAt = v.processedAt && typeof v.processedAt.toDate === 'function'
-      ? v.processedAt.toDate() : null;
-    const isBefore = cut && pAt && pAt <= cut;
-    if (isBefore) {
-      beforeManual++;
-      if (String(process.env.ONLY_AFTER_MANUAL || '').trim() === '1') return;
-    }
-
     // 아직 오지 않은 휴가는 차감하지 않는다.
     // 생휴는 매달 1일 1개로 리셋된다(reset-birth). 9월 생휴를 8월에 빼 두면
     // 9/1 리셋이 1로 되돌리고, 그 휴가증은 이미 deductedAt 이 찍혀 다시는
     // 차감되지 않는다 — 9월 내내 1개가 남는다.
     const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
     if (v.start && String(v.start) > today) { future++; return; }
+
+    const pAt = v.processedAt && typeof v.processedAt.toDate === 'function'
+      ? v.processedAt.toDate() : null;
+    const cutAnnual = lastManual.get(empId);
+    const cutBirth = lastReset.get(empId);
+    const skipAnnual = cutAnnual && pAt && pAt <= cutAnnual;
+    const skipBirth = cutBirth && pAt && pAt <= cutBirth;
 
     if (!byEmp.has(empId)) {
       byEmp.set(empId, { annual: 0, birth: 0, summer: 0, refs: [], lines: [] });
@@ -1233,9 +1242,11 @@ async function actionSettle(db) {
       const count = parseFloat(it.count) || 0;
       if (count <= 0) return;
       if (type === '연차' || String(type).startsWith('반차') || String(type).startsWith('반반차')) {
+        if (skipAnnual) { beforeManual++; return; }
         const days = (TYPE_WEIGHT[type] || 0) * count;
         if (days > 0) { e.annual += days; e.lines.push(`${type} ${count}개(-${days})`); }
       } else if (type === '생휴') {
+        if (skipBirth) { beforeReset++; return; }
         e.birth += count; e.lines.push(`생휴 ${count}개`);
       } else if (type === '하기휴가') {
         e.summer += count; e.lines.push(`하기휴가 ${count}개`);
@@ -1244,13 +1255,15 @@ async function actionSettle(db) {
   });
 
   const targets = [...byEmp.entries()].filter(([, e]) => e.annual > 0 || e.birth > 0 || e.summer > 0);
-  const onlyAfter = String(process.env.ONLY_AFTER_MANUAL || '').trim() === '1';
   console.log(`휴가증 ${snap.size}장 · 미처리 ${notProcessed} · 이미 차감 ${already}`
     + ` · 사번없음 ${skippedNoId}`);
-  console.log(`서무가 잔여를 손으로 넣기 전에 처리된 것 ${beforeManual}장`
-    + (onlyAfter ? '  → 이번 정산에서 제외' : '  → 이번 정산에 포함'));
-  console.log(`아직 오지 않은 휴가 ${future}장  → 제외 (생휴 월 리셋과 어긋남)`);
-  console.log(`모드  ${onlyAfter ? 'ONLY_AFTER_MANUAL=1 (수기 입력 이후만)' : '전체'}`);
+  console.log('');
+  console.log('[제외한 것]');
+  console.log(`  아직 오지 않은 휴가            ${future}장`);
+  console.log(`  연차 — 서무 수기 조정 이전     ${beforeManual}건  (그룹웨어 대조로 이미 반영)`);
+  console.log(`  생휴 — 지난달 리셋 이전        ${beforeReset}건  (리셋으로 이미 되돌아감)`);
+  console.log(`  하기휴가                       제외 없음 (수기 조정·리셋 대상 아님)`);
+  console.log('');
   console.log(`정산 대상 ${targets.length}명`);
 
   if (!targets.length) {
