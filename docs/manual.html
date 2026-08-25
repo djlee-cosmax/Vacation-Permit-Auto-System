@@ -304,11 +304,11 @@
 
 <h3>1.2 역할별 권한 (사번 로그인 기반)</h3>
 <table>
-  <thead><tr><th>역할</th><th>사번</th><th>가능한 기능</th></tr></thead>
+  <thead><tr><th>역할</th><th>담당</th><th>가능한 기능</th></tr></thead>
   <tbody>
-    <tr><td>관리자</td><td>122210202 (이동준)</td><td>모든 기능</td></tr>
-    <tr><td>서무</td><td>122240096 (김가영)</td><td>서버 불러오기 / 파일 내보내기 / 처리 완료</td></tr>
-    <tr><td>작업자</td><td>각자 본인 사번</td><td>휴가증 작성 / 내 휴가증 조회·취소</td></tr>
+    <tr><td>관리자</td><td>이동준</td><td>모든 기능</td></tr>
+    <tr><td>서무</td><td>김가영</td><td>서버 불러오기 / 파일 내보내기 / 처리 완료</td></tr>
+    <tr><td>작업자</td><td>각자 본인</td><td>휴가증 작성 / 내 휴가증 조회·취소</td></tr>
   </tbody>
 </table>
 <p style="font-size:10pt;color:#666">※ 모바일은 어떤 사번이든 작업자 화면만 표시 (서무 작업은 PC 전용)</p>
@@ -417,7 +417,7 @@
 <h3>3.1 로그인</h3>
 <p>주소: <span class="mono">https://djlee-cosmax.github.io/Vacation-Permit-Auto-System/</span></p>
 <ul class="bullet">
-  <li>사번 <strong>122240096</strong> + <strong>본인 비밀번호</strong> 입력 (초기 <span class="mono">1234</span>는 첫 로그인 때 변경)</li>
+  <li><strong>서무 사번</strong> + <strong>본인 비밀번호</strong> 입력 (초기 <span class="mono">1234</span>는 첫 로그인 때 변경)</li>
   <li>로그인 시 자동으로 서무 권한 부여 → 추가 버튼 표시</li>
   <li>모바일에서는 서무 권한 비활성 — PC에서만 사용</li>
   <li>서무·관리자는 자동 로그아웃까지 <strong>8시간</strong> (작업자 10분과 다름)</li>
@@ -487,7 +487,7 @@
 <table>
   <thead><tr><th style="width:40%">증상</th><th>해결</th></tr></thead>
   <tbody>
-    <tr><td>[서버에서 불러오기] 버튼이 안 보임</td><td>서무 사번(122240096)으로 다시 로그인</td></tr>
+    <tr><td>[서버에서 불러오기] 버튼이 안 보임</td><td>서무 사번으로 다시 로그인</td></tr>
     <tr><td>작업자가 비밀번호를 잊음</td><td><strong>3.5 절차</strong>대로 초기화 요청 → 관리자가 처리 → 1234로 로그인</td></tr>
     <tr><td>자동화 에러 (setup/run.bat)</td><td>Python PATH 확인 / setup.bat 재실행</td></tr>
     <tr><td>실수로 [처리 완료] 일찍 클릭</td><td>관리자(이동준)에게 요청</td></tr>

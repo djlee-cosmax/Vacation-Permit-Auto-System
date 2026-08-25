@@ -29,9 +29,10 @@
 const admin = require('firebase-admin');
 
 // script.js 의 STAFF_ROLES 와 동기화할 것
+// 저장소가 공개라 사번 옆에 실명을 적지 않는다 — 이름은 Firestore 에서 온다.
 const STAFF_ROLES = {
-  '122210202': 'admin',   // 이동준
-  '122240096': 'leader',  // 김가영 (서무)
+  '122210202': 'admin',
+  '122240096': 'leader',
 };
 
 // script.js 의 AUTH_EMAIL_DOMAIN 과 동기화할 것
@@ -486,7 +487,9 @@ async function actionTestRules() {
 
   const TEST_EMP = '000000000';
   const testEmail = emailFor(TEST_EMP);
-  const REAL_OTHER = '122240023';   // 남의 문서 대조용 (읽지 못해야 한다)
+  // 남의 문서 대조용 (읽지 못해야 한다). 규칙이 존재 여부보다 먼저 평가되므로
+  // 실재하지 않는 사번이어도 permission-denied 가 나온다 — 실제 사번을 쓸 이유가 없다.
+  const REAL_OTHER = '900000002';
 
   console.log('===== 배포된 규칙 검증 (실제 토큰) =====');
   console.log(`프로젝트   ${project}`);

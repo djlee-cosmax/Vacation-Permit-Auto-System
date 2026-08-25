@@ -9,8 +9,8 @@ const admin = require('firebase-admin');
 
 // 관리자·서무는 리셋 대상에서 제외 (script.js:17 STAFF_ROLES 와 동기화)
 const SKIP_EMPLOYEE_IDS = new Set([
-  '122210202',  // 이동준 (관리자)
-  '122240096',  // 김가영 (서무)
+  '122210202',  // 관리자
+  '122240096',  // 서무
 ]);
 
 function loadServiceAccount() {

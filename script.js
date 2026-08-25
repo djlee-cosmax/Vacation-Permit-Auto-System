@@ -3,9 +3,13 @@
 // ----- 로그인 / 세션 -----
 var DEFAULT_PASSWORD = '1234';
 // 관리자 / 서무 사번 (workers.json 외 별도 권한 부여)
+//
+// name 은 표시용 최후 폴백이다 — users 문서에도 명단 캐시에도 이름이 없을 때만
+// 쓰인다(profileFor). 저장소가 공개라 실명을 적으면 사번과 이름이 함께 노출되므로
+// 역할명을 넣는다. 실제 이름은 Firestore users/workers 에서 온다.
 var STAFF_ROLES = {
-  '122210202': { role: 'admin', name: '이동준', department: '생산3팀' },
-  '122240096': { role: 'leader', name: '김가영', department: '생산3팀' }
+  '122210202': { role: 'admin', name: '관리자', department: '생산3팀' },
+  '122240096': { role: 'leader', name: '서무', department: '생산3팀' }
 };
 
 // ============================================================
