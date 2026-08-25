@@ -19,7 +19,7 @@
 //   ACTION=stats                         node auth-admin.js  휴가증 이용 실적 집계 (읽기 전용)
 //   ACTION=anonoff                       node auth-admin.js  익명 로그인 제공자 끄기 (미리보기)
 //   ACTION=anonoff CONFIRM=ANONOFF                           실제로 끈다 (되돌리기 ANONON)
-//   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호 초기화 (계정 삭제)
+//   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호를 1234 로 재설정
 //   ACTION=remove EMP_ID=12224xxxx       node auth-admin.js  퇴직자 완전 삭제 (미리보기)
 //   ACTION=remove EMP_ID=... CONFIRM=DELETE  실제 삭제 실행
 //
@@ -887,22 +887,41 @@ async function actionReset(db) {
   }
   const name = (wSnap.docs[0].data() || {}).name || empId;
 
+  // 계정을 지우면 안 된다.
+  //
+  // 지우면 그 사람은 로그인할 때 클라이언트의 자가 이관 경로(migrateThenLogin)
+  // 로 빠지는데, 그 경로는 users 문서를 먼저 읽는다. 2026-08-06 배포한 규칙은
+  // users get 에 signedIn() 을 요구하므로 로그인 전에는 읽히지 않는다. 익명
+  // 로그인도 2026-08-24 에 껐다. 결국 초기화된 사람은 영영 못 들어온다.
+  // (이승연 사례 — 초기화 후 이틀간 로그인 불가, premigrate 로 복구)
+  //
+  // 계정을 남겨 두고 비밀번호만 바꾸면 1순위 Auth 로그인이 바로 통과해서
+  // 자가 이관 경로를 아예 타지 않는다.
   try {
     const user = await admin.auth().getUserByEmail(emailFor(empId));
-    await admin.auth().deleteUser(user.uid);
-    console.log(`  Auth 계정 삭제 완료 (${name})`);
+    await admin.auth().updateUser(user.uid, {
+      password: authPasswordFor(DEFAULT_PASSWORD),
+    });
+    console.log(`  비밀번호를 ${DEFAULT_PASSWORD} 로 재설정했습니다 (${name})`);
   } catch (e) {
     if (e.code === 'auth/user-not-found') {
-      console.log(`  Auth 계정이 없습니다 — 이미 초기 상태입니다 (${name})`);
+      // 계정이 없는 사람 = 옛 reset 으로 지워졌거나 아직 이관 전.
+      // 여기서 만들어 줘야 로그인이 된다.
+      await admin.auth().createUser({
+        email: emailFor(empId),
+        password: authPasswordFor(DEFAULT_PASSWORD),
+      });
+      console.log(`  Auth 계정이 없어 새로 만들었습니다 (${name})`);
     } else {
       throw e;
     }
   }
 
-  // Firestore 잔여 인증 필드 정리 + 요청 플래그 해제
+  // Firestore 잔여 인증 필드 정리 + 요청 플래그 해제.
+  // authMigrated 는 지우지 않는다 — 계정이 살아 있으므로 이관된 상태가 맞다.
   await db.collection('users').doc(empId).set({
-    authMigrated: admin.firestore.FieldValue.delete(),
-    authMigratedAt: admin.firestore.FieldValue.delete(),
+    authMigrated: true,
+    authMigratedAt: admin.firestore.FieldValue.serverTimestamp(),
     password: admin.firestore.FieldValue.delete(),
     securityQuestion: admin.firestore.FieldValue.delete(),
     securityAnswer: admin.firestore.FieldValue.delete(),
@@ -912,7 +931,7 @@ async function actionReset(db) {
   }, { merge: true });
 
   console.log('');
-  console.log(`>>> ${name}(${empId}) 님은 이제 사번 + 1234 로 로그인할 수 있습니다.`);
+  console.log(`>>> ${name}(${empId}) 님은 이제 사번 + ${DEFAULT_PASSWORD} 로 로그인할 수 있습니다.`);
   console.log('    로그인 직후 새 비밀번호 등록 안내가 자동으로 표시됩니다.');
 }
 
