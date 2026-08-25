@@ -26,6 +26,8 @@
 //   ACTION=purge                         node auth-admin.js  만료된 휴가증 삭제 (미리보기)
 //   ACTION=purge CONFIRM=OK                                  실제로 지운다
 //   ACTION=leavecheck EMP_ID=사번|이름       node auth-admin.js  잔여·휴가증·이력 대조
+//   ACTION=settle                        node auth-admin.js  차감 누락 정산 (미리보기)
+//   ACTION=settle CONFIRM=OK                                 실제로 정산
 //   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호를 1234 로 재설정
 //   ACTION=remove EMP_ID=12224xxxx       node auth-admin.js  퇴직자 완전 삭제 (미리보기)
 //   ACTION=remove EMP_ID=... CONFIRM=DELETE  실제 삭제 실행
@@ -1138,6 +1140,167 @@ async function actionRemove(db) {
   console.log('    각 기기는 다음 접속 시 명단에서 자동으로 사라집니다.');
 }
 
+// ---------- settle: 처리됐는데 차감 안 된 휴가증을 서버에서 정산 ----------
+//
+// 왜 서버에서 하는가.
+//   브라우저 차감은 화면 목록(leaves 배열)을 보고 계산한다. 새로고침·다른 PC·
+//   목록 비움 중 하나만 걸려도 조용히 건너뛴다. 게다가 건너뛸 때 뜨는 문구가
+//   "이미 차감됐거나…" 라 정상으로 읽힌다. 실제로 2026-05 개시 이후 balanceLogs
+//   에 deduct 기록이 단 한 건도 없다 — 넉 달 내내 차감이 안 됐고 서무가 manual
+//   로 메워 왔다.
+//
+//   서버에서 "processed=true 인데 deductedAt 이 없는 휴가증" 을 직접 찾으면
+//   화면 상태와 무관하게 항상 같은 답이 나온다.
+//
+// 계산 규칙은 script.js 와 같아야 한다 — 어긋나면 잔여가 두 벌로 갈린다.
+//   연차·반차·반반차 → 연차에서 일수만큼
+//   생휴            → 생휴에서 개수만큼
+//   하기휴가         → 하기휴가에서 개수만큼
+//   경조·결근        → 차감 없음
+const TYPE_WEIGHT = {
+  '연차': 1,
+  '반차(오전)': 0.5, '반차(오후)': 0.5,
+  '반반차(오전)': 0.25, '반반차(오후)': 0.25,
+  '생휴': 1,
+  '하기휴가': 3,
+  '경조': 1,
+  '결근': 1, '결근(오전)': 0.5, '결근(오후)': 0.5,
+};
+const TYPE_RENAME = { '무결': '결근' };
+
+function leaveItemsOf(v) {
+  const rename = (t) => TYPE_RENAME[t] || t;
+  if (Array.isArray(v.items) && v.items.length) {
+    return v.items.map((it) => ({ type: rename(it && it.type), count: it && it.count }));
+  }
+  if (v.type) return [{ type: rename(v.type), count: 1 }];
+  return [];
+}
+
+async function actionSettle(db) {
+  const confirmed = String(process.env.CONFIRM || '').trim() === 'OK';
+  console.log(`===== 차감 정산${confirmed ? '' : ' (미리보기)'} =====`);
+
+  const snap = await db.collection('leaves').get();
+  const byEmp = new Map();   // empId -> { annual, birth, summer, refs[], lines[] }
+  let skippedNoId = 0, notProcessed = 0, already = 0;
+
+  snap.forEach((d) => {
+    const v = d.data() || {};
+    if (v.processed !== true) { notProcessed++; return; }
+    if (v.deductedAt) { already++; return; }
+    const empId = String(v.employeeId || '').trim();
+    if (!empId) { skippedNoId++; return; }
+
+    if (!byEmp.has(empId)) {
+      byEmp.set(empId, { annual: 0, birth: 0, summer: 0, refs: [], lines: [] });
+    }
+    const e = byEmp.get(empId);
+    e.refs.push(d.ref);
+    leaveItemsOf(v).forEach((it) => {
+      const type = it.type;
+      const count = parseFloat(it.count) || 0;
+      if (count <= 0) return;
+      if (type === '연차' || String(type).startsWith('반차') || String(type).startsWith('반반차')) {
+        const days = (TYPE_WEIGHT[type] || 0) * count;
+        if (days > 0) { e.annual += days; e.lines.push(`${type} ${count}개(-${days})`); }
+      } else if (type === '생휴') {
+        e.birth += count; e.lines.push(`생휴 ${count}개`);
+      } else if (type === '하기휴가') {
+        e.summer += count; e.lines.push(`하기휴가 ${count}개`);
+      }
+    });
+  });
+
+  const targets = [...byEmp.entries()].filter(([, e]) => e.annual > 0 || e.birth > 0 || e.summer > 0);
+  console.log(`휴가증 ${snap.size}장 · 미처리 ${notProcessed} · 이미 차감 ${already}`
+    + ` · 사번없음 ${skippedNoId}`);
+  console.log(`정산 대상 ${targets.length}명`);
+
+  if (!targets.length) {
+    console.log('');
+    console.log('>>> 정산할 것이 없습니다.');
+    return;
+  }
+
+  // 현재 잔여를 읽어 차감 후 값을 보여준다. 마이너스가 되는 사람은 따로 표시.
+  const rows = [];
+  for (const [empId, e] of targets) {
+    const uDoc = await db.collection('users').doc(empId).get();
+    const u = uDoc.exists ? (uDoc.data() || {}) : {};
+    const nowA = typeof u.balanceAnnual === 'number' ? u.balanceAnnual : 0;
+    const nowB = typeof u.balanceBirth === 'number' ? u.balanceBirth : 0;
+    const nowS = typeof u.balanceSummer === 'number' ? u.balanceSummer : 0;
+    rows.push({
+      empId, e,
+      after: {
+        annual: Math.round((nowA - e.annual) * 100) / 100,
+        birth: nowB - e.birth,
+        summer: nowS - e.summer,
+      },
+      before: { annual: nowA, birth: nowB, summer: nowS },
+    });
+  }
+
+  console.log('');
+  console.log('[대상]  사번  휴가증  연차 → / 생휴 → / 하기 →');
+  rows.sort((a, b) => a.empId.localeCompare(b.empId));
+  const minus = [];
+  rows.forEach((r) => {
+    const parts = [];
+    if (r.e.annual > 0) parts.push(`연차 ${r.before.annual}→${r.after.annual}`);
+    if (r.e.birth > 0) parts.push(`생휴 ${r.before.birth}→${r.after.birth}`);
+    if (r.e.summer > 0) parts.push(`하기 ${r.before.summer}→${r.after.summer}`);
+    console.log(`  ${r.empId}  ${String(r.e.refs.length).padStart(2)}장  ${parts.join(' · ')}`);
+    if (r.after.annual < 0 || r.after.birth < 0 || r.after.summer < 0) minus.push(r.empId);
+  });
+
+  if (minus.length) {
+    console.log('');
+    console.log(`⚠ 차감하면 마이너스가 되는 사번 ${minus.length}명 — ${minus.join(', ')}`);
+    console.log('  서무가 manual 로 이미 메워 둔 경우일 수 있습니다. 확인 후 진행하세요.');
+  }
+
+  if (!confirmed) {
+    console.log('');
+    console.log('>>> 미리보기입니다. 반영하려면 confirm 입력란에 OK 를 넣고 다시 실행하세요.');
+    return;
+  }
+
+  console.log('');
+  console.log('[반영]');
+  let done = 0;
+  for (const r of rows) {
+    const upd = {};
+    if (r.e.annual > 0) upd.balanceAnnual = r.after.annual;
+    if (r.e.birth > 0) upd.balanceBirth = r.after.birth;
+    if (r.e.summer > 0) upd.balanceSummer = r.after.summer;
+    await db.collection('users').doc(r.empId).set(upd, { merge: true });
+
+    await db.collection('balanceLogs').add({
+      empId: r.empId,
+      type: 'deduct',
+      changes: { annual: -(r.e.annual || 0), birth: -(r.e.birth || 0), summer: -(r.e.summer || 0) },
+      meta: { via: 'github-actions', reason: 'settle', leaves: r.e.refs.length },
+      byEmpId: null,
+      byName: 'GitHub Actions',
+      byUid: null,
+      at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 같은 휴가증을 두 번 차감하지 않도록 표시한다.
+    const batch = db.batch();
+    r.e.refs.forEach((ref) => batch.update(ref, {
+      deductedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }));
+    await batch.commit();
+    done++;
+  }
+  console.log(`  ${done}명 반영 완료`);
+  console.log('');
+  console.log('>>> 정산 완료. leavecheck 로 개별 확인할 수 있습니다.');
+}
+
 // ---------- leavecheck: 한 사람의 잔여·휴가증·변경 이력 대조 ----------
 //
 // "잔여가 안 맞는다" 문의를 받았을 때 쓴다. 세 곳을 나란히 놓아야 원인이 보인다.
@@ -1650,6 +1813,7 @@ async function main() {
   if (action === 'ttl') return actionTtl(db);
   if (action === 'purge') return actionPurge(db);
   if (action === 'leavecheck') return actionLeaveCheck(db);
+  if (action === 'settle') return actionSettle(db);
   throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | deployrules `
     + `| testrules | cleanup | claims | premigrate | syncprofile | stats | anonoff `
     + `| fixleaveids | reset | remove)`);
