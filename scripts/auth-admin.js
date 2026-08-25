@@ -1171,11 +1171,30 @@ async function actionTtl(db) {
     return;
   }
 
-  await client.request({
-    url: `${url}?updateMask=ttlConfig`,
-    method: 'PATCH',
-    data: want === 'ON' ? { ttlConfig: {} } : {},
-  });
+  // 읽기는 되는데 쓰기는 IAM 에서 막힌다. Firebase Admin SDK 서비스 계정은
+  // 데이터는 다 만질 수 있어도 필드 설정(색인·TTL) 변경 권한은 없다.
+  // 권한을 더 주기보다 Console 에서 켜는 편이 낫다 — 조회는 여기서 되므로
+  // 켜졌는지 확인하는 수단은 남는다.
+  try {
+    await client.request({
+      url: `${url}?updateMask=ttlConfig`,
+      method: 'PATCH',
+      data: want === 'ON' ? { ttlConfig: {} } : {},
+    });
+  } catch (e) {
+    const msg = String((e && e.message) || e);
+    if (!/permission/i.test(msg)) throw e;
+    console.log('');
+    console.log('※ 서비스 계정에 필드 설정 변경 권한이 없습니다. Console 에서 켜세요.');
+    console.log('');
+    console.log('   Google Cloud Console → Firestore → 유지 시간(TTL) → 정책 만들기');
+    console.log('     컬렉션 그룹     leaves');
+    console.log('     타임스탬프 필드  expiresAt');
+    console.log('');
+    console.log('   켠 뒤 이 액션을 confirm 없이 다시 돌리면 켜졌는지 확인됩니다.');
+    process.exitCode = 1;
+    return;
+  }
   cfg = await read();
   console.log('');
   console.log(`>>> ${want === 'ON' ? '켰습니다' : '껐습니다'}. 현재 ${cfg ? `켜짐 (state=${cfg.state || '-'})` : '꺼짐'}.`);
