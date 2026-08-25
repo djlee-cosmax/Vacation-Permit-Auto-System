@@ -25,6 +25,7 @@
 //   ACTION=ttl CONFIRM=ON                                    켠다 (결제 계정 필요 — 못 씀)
 //   ACTION=purge                         node auth-admin.js  만료된 휴가증 삭제 (미리보기)
 //   ACTION=purge CONFIRM=OK                                  실제로 지운다
+//   ACTION=leavecheck EMP_ID=사번|이름       node auth-admin.js  잔여·휴가증·이력 대조
 //   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호를 1234 로 재설정
 //   ACTION=remove EMP_ID=12224xxxx       node auth-admin.js  퇴직자 완전 삭제 (미리보기)
 //   ACTION=remove EMP_ID=... CONFIRM=DELETE  실제 삭제 실행
@@ -1137,6 +1138,108 @@ async function actionRemove(db) {
   console.log('    각 기기는 다음 접속 시 명단에서 자동으로 사라집니다.');
 }
 
+// ---------- leavecheck: 한 사람의 잔여·휴가증·변경 이력 대조 ----------
+//
+// "잔여가 안 맞는다" 문의를 받았을 때 쓴다. 세 곳을 나란히 놓아야 원인이 보인다.
+//   users        지금 잔여
+//   leaves       무엇을 언제 썼는지 · 처리됐는지 · 차감됐는지(deductedAt)
+//   balanceLogs  잔여가 언제 왜 바뀌었는지
+//
+// EMP_ID 에 사번 또는 이름 아무거나 넣는다 — 숫자면 사번, 아니면 이름으로 찾는다.
+// 로그가 공개라 이름은 가리고 사번만 찍는다.
+async function actionLeaveCheck(db) {
+  const q = String(process.env.EMP_ID || '').trim();
+  if (!q) throw new Error('EMP_ID 가 필요합니다. (사번 또는 이름)');
+
+  const wAll = await db.collection('workers').get();
+  const byId = [];
+  wAll.forEach((d) => {
+    const v = d.data() || {};
+    const id = String(v.employeeId || '').trim();
+    const nm = String(v.name || '').trim();
+    if (id === q || nm === q) byId.push({ id, nm, team: v.team || '-' });
+  });
+
+  if (!byId.length) {
+    console.log(`※ 명단에서 찾지 못했습니다: ${/^\d+$/.test(q) ? q : '(이름)'}`);
+    process.exitCode = 1;
+    return;
+  }
+  if (byId.length > 1) {
+    console.log('※ 같은 이름이 여럿입니다. 사번으로 다시 실행하세요.');
+    byId.forEach((w) => console.log(`   ${w.id}  ${maskName(w.nm)} / ${w.team}`));
+    process.exitCode = 1;
+    return;
+  }
+
+  const { id: empId, nm, team } = byId[0];
+  console.log(`===== 잔여 대조: ${empId} =====`);
+  console.log(`대상   ${maskName(nm)} / ${team}`);
+
+  // 1) 지금 잔여
+  const uDoc = await db.collection('users').doc(empId).get();
+  const u = uDoc.exists ? (uDoc.data() || {}) : {};
+  console.log('');
+  console.log('[현재 잔여]');
+  console.log(`  연차 ${u.balanceAnnual ?? '-'}  ·  생휴 ${u.balanceBirth ?? '-'}`
+    + `  ·  하기휴가 ${u.balanceSummer ?? '-'}`);
+
+  // 2) 휴가증
+  const lv = await db.collection('leaves').where('employeeId', '==', empId).get();
+  console.log('');
+  console.log(`[휴가증 ${lv.size}장]  처리=서무 취합됨 · 차감=잔여에서 빠짐`);
+  const rows = [];
+  lv.forEach((d) => {
+    const v = d.data() || {};
+    const items = Array.isArray(v.items) ? v.items : [];
+    const kinds = items.map((it) => `${(it && it.type) || '?'} ${(it && it.count) || 1}개`).join(', ');
+    rows.push({
+      start: v.start || '?',
+      end: v.end || '?',
+      kinds: kinds || '(항목없음)',
+      processed: v.processed === true,
+      deducted: !!v.deductedAt,
+    });
+  });
+  rows.sort((a, b) => String(a.start).localeCompare(String(b.start)));
+  rows.forEach((r) => {
+    console.log(`  ${r.start} ~ ${r.end}  ${r.kinds.padEnd(22, ' ')}`
+      + `  처리 ${r.processed ? 'O' : 'X'}  차감 ${r.deducted ? 'O' : 'X'}`);
+  });
+  const notDeducted = rows.filter((r) => r.processed && !r.deducted);
+  if (notDeducted.length) {
+    console.log('');
+    console.log(`  ⚠ 처리는 됐는데 차감이 안 된 휴가증 ${notDeducted.length}장`);
+  }
+
+  // 3) 잔여 변경 이력
+  const bl = await db.collection('balanceLogs').where('empId', '==', empId).get();
+  const logs = [];
+  bl.forEach((d) => {
+    const v = d.data() || {};
+    const at = v.at && typeof v.at.toDate === 'function' ? v.at.toDate() : null;
+    logs.push({ at, type: v.type || '?', changes: v.changes || {}, by: v.byName || '' });
+  });
+  logs.sort((a, b) => (a.at && b.at ? a.at - b.at : 0));
+  console.log('');
+  console.log(`[잔여 변경 이력 ${logs.length}건]`);
+  logs.slice(-15).forEach((l) => {
+    const c = l.changes;
+    const parts = ['annual', 'birth', 'summer']
+      .filter((k) => c[k] !== undefined && c[k] !== 0)
+      .map((k) => `${k} ${c[k] > 0 ? '+' : ''}${c[k]}`);
+    const when = l.at
+      ? new Date(l.at.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 16).replace('T', ' ')
+      : '(날짜없음)';
+    console.log(`  ${when}  ${String(l.type).padEnd(7, ' ')} ${parts.join(' · ') || '-'}`
+      + (l.by ? `  (${maskName(l.by)})` : ''));
+  });
+  if (!logs.some((l) => l.type === 'deduct')) {
+    console.log('');
+    console.log('  ⚠ deduct 기록이 없습니다 — 이 사람은 자동 차감이 한 번도 안 됐습니다.');
+  }
+}
+
 // ---------- purge: 만료된 휴가증 직접 삭제 ----------
 //
 // Firestore TTL 정책은 결제 계정이 붙은 프로젝트에서만 만들 수 있다
@@ -1546,6 +1649,7 @@ async function main() {
   if (action === 'fixleaveids') return actionFixLeaveIds(db);
   if (action === 'ttl') return actionTtl(db);
   if (action === 'purge') return actionPurge(db);
+  if (action === 'leavecheck') return actionLeaveCheck(db);
   throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | deployrules `
     + `| testrules | cleanup | claims | premigrate | syncprofile | stats | anonoff `
     + `| fixleaveids | reset | remove)`);
