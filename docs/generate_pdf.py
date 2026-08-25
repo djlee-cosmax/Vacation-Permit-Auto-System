@@ -1,4 +1,10 @@
-"""HTML 매뉴얼을 PDF로 변환 (Playwright + Edge)"""
+"""HTML 매뉴얼을 PDF로 변환 (Playwright + Edge)
+
+Edge 를 쓰므로 Windows 쪽 python 으로 돌려야 한다. WSL 의 python3 에는
+playwright 가 없어 ModuleNotFoundError 가 난다.
+
+    powershell> python "\\\\wsl.localhost\\Ubuntu\\home\\djlee\\cosmax\\project5\\docs\\generate_pdf.py"
+"""
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 

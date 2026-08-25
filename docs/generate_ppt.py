@@ -92,7 +92,7 @@ def main():
     add_text(s, Inches(1.0), Inches(5.5), Inches(11.5), Inches(1.0),
              "본인 휴대폰으로 직접 휴가증을 작성하세요.", size=18, color=DARK)
     add_text(s, Inches(1.0), Inches(6.7), Inches(11.5), Inches(0.4),
-             "발행: 2026-05-22  ·  담당: 이동준", size=11, color=GRAY)
+             "발행: 2026-05-28  ·  개정: 2026-08-24  ·  담당: 이동준", size=11, color=GRAY)
 
     # ===== 2. 어떻게 바뀌나요 =====
     s = prs.slides.add_slide(blank)
@@ -146,10 +146,12 @@ def main():
         add_text(s, x, Inches(4.5), Inches(3.9), Inches(0.6),
                  desc, size=13, color=GRAY, align=PP_ALIGN.CENTER)
 
-    # 안내
-    add_rounded_rect(s, Inches(1.0), Inches(5.7), Inches(11.3), Inches(1.1), LIGHT_GRAY)
-    add_text(s, Inches(1.3), Inches(5.85), Inches(10.8), Inches(0.8),
-             "⚠️ 첫 로그인 후 [내 정보] → [비밀번호 변경] → 새 비밀번호(숫자 6~10자리) + 보안 질문 등록",
+    # 안내 — 보안 질문은 폐지됐다(2026-07 인증 서버 이관). 대신 자동 로그아웃을 알린다.
+    # 푸터가 7.0" 에 있어 상자는 6.95" 안에서 끝나야 한다.
+    add_rounded_rect(s, Inches(1.0), Inches(5.55), Inches(11.3), Inches(1.35), LIGHT_GRAY)
+    add_text(s, Inches(1.3), Inches(5.65), Inches(10.8), Inches(1.15),
+             "⚠️ 첫 로그인 후 [내 정보] → [비밀번호 변경] → 새 비밀번호(숫자 6~10자리)\n"
+             "⏱ 10분 동안 조작이 없으면 자동 로그아웃됩니다 — 다시 로그인하면 됩니다.",
              size=14, bold=True, color=DARK_RED, anchor=MSO_ANCHOR.MIDDLE)
     page_footer(s, 3, TOTAL)
 
@@ -216,9 +218,13 @@ def main():
         add_text(s, Inches(3.6), y, Inches(3.2), Inches(0.5),
                  d, size=12, color=GRAY)
     # 안내
-    add_rounded_rect(s, Inches(0.8), Inches(5.3), Inches(6.0), Inches(1.5), LIGHT_RED)
-    add_text(s, Inches(1.0), Inches(5.45), Inches(5.6), Inches(1.2),
-             "• 이름·연락처는 자동 채움 (수정 불가)\n• 여러 유형은 휴가증 따로 작성\n  (예: 연차+반차 = 2건)\n• 같은 날짜 합계 1일 초과 시 등록 차단",
+    add_rounded_rect(s, Inches(0.8), Inches(5.05), Inches(6.0), Inches(1.75), LIGHT_RED)
+    add_text(s, Inches(1.0), Inches(5.18), Inches(5.6), Inches(1.5),
+             "• 이름·연락처는 자동 채움 (수정 불가)\n"
+             "• 여러 유형은 휴가증 따로 작성 (예: 연차+반차 = 2건)\n"
+             "• 같은 날짜 합계 1일 초과 시 등록 차단\n"
+             "• 잔여보다 많이 신청하면 작성 차단\n"
+             "• 서무가 처리 완료한 휴가증은 재등록 불가",
              size=12, color=DARK)
 
     # 우측 - 휴가 유형 표
@@ -260,27 +266,31 @@ def main():
     add_rounded_rect(s, Inches(0.8), Inches(2.0), Inches(6.0), Inches(2.4), LIGHT_RED)
     add_text(s, Inches(1.0), Inches(2.15), Inches(5.6), Inches(2.2),
              "① 상단 [내 휴가증] 클릭\n\n"
-             "② 서무가 등록 완료한 본인 휴가증이\n   바로 표시됩니다.\n   (✓ 처리 완료 표시, 최근 14일)",
+             "② 서무가 등록 완료한 본인 휴가증이\n   바로 표시됩니다.\n   (✓ 처리 완료 표시, 최근 14일)\n\n"
+             "③ 위쪽에 내 잔여 휴가(개수)도 함께 표시\n   연차 · 생휴 · 하기휴가(5~10월)",
              size=13, color=DARK)
-    add_rounded_rect(s, Inches(0.8), Inches(4.6), Inches(6.0), Inches(2.0), LIGHT_GRAY)
-    add_text(s, Inches(1.0), Inches(4.75), Inches(5.6), Inches(1.8),
+    # 세 줄짜리 안내다. 상자를 2.0" 로 두면 아래가 텅 빈 회색 덩어리로 보인다.
+    add_rounded_rect(s, Inches(0.8), Inches(4.75), Inches(6.0), Inches(1.25), LIGHT_GRAY)
+    add_text(s, Inches(1.0), Inches(4.85), Inches(5.6), Inches(1.05),
              "⚠️ 잘못 작성 시\n작성 직후 우측 카드의 [삭제]로 즉시 취소.\n서무 처리 후엔 별도 요청 필요.",
              size=12, color=DARK)
 
     # FAQ (우측)
     add_text(s, Inches(7.2), Inches(1.4), Inches(5.7), Inches(0.5),
              "자주 묻는 질문", size=16, bold=True, color=RED)
+    # [비밀번호 찾기] 는 없어졌다 — 보안 질문 폐지(2026-07)로 서무 요청 → 관리자 처리 방식이다.
     qa = [
-        ("Q. 비밀번호 분실?", "로그인 화면 [비밀번호 찾기]"),
+        ("Q. 비밀번호 분실?", "서무에게 초기화 요청\n     (관리자 처리 후 1234로 로그인)"),
+        ("Q. 잔여가 부족하다고 나옴?", "[내 휴가증] 상단에서 남은 개수 확인"),
         ("Q. 사번 등록 안 됨?", "관리자(이동준)에게 요청"),
         ("Q. 화면이 옛 디자인?", "상단 ↻ 아이콘 클릭"),
         ("Q. 서버 저장 실패?", "인터넷 확인 후 재작성"),
     ]
     for i, (q, a) in enumerate(qa):
-        y = Inches(2.0 + i * 1.15)
-        add_text(s, Inches(7.2), y, Inches(5.7), Inches(0.4),
+        y = Inches(1.95 + i * 0.95)
+        add_text(s, Inches(7.2), y, Inches(5.7), Inches(0.35),
                  q, size=13, bold=True, color=DARK)
-        add_text(s, Inches(7.4), y + Inches(0.4), Inches(5.5), Inches(0.5),
+        add_text(s, Inches(7.4), y + Inches(0.35), Inches(5.5), Inches(0.55),
                  "→ " + a, size=12, color=GRAY)
     page_footer(s, 6, TOTAL)
 
