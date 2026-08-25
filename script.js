@@ -909,6 +909,17 @@ function loadDefaultWorkers() {
     .catch(function(err) {
       if (_workersReadyResolve) _workersReadyResolve();
       console.warn('workers 컬렉션 로드 실패:', err);
+
+      // 일반 작업자는 규칙상 명단 전체를 못 읽는다(list 는 서무·관리자만).
+      // 2026-08-06 이후 정상 동작이고, 이름·팀은 본인 users 문서에서 온다
+      // (profileFor). 그런데 이걸 실패로 보고 "네트워크 확인" 경고를 띄우고
+      // 있었다 — 새 기기로 로그인한 작업자마다 빨간 경고를 봤다.
+      var _s = getSession();
+      var _staff = _s && (_s.role === 'admin' || _s.role === 'leader');
+      var denied = err && (err.code === 'permission-denied'
+        || /insufficient permissions/i.test(String((err && err.message) || '')));
+      if (denied && !_staff) return;
+
       // 로컬 명단이라도 있으면 조용히 진행, 둘 다 없으면 사용자에게 안내
       if (workers.length === 0) {
         setTimeout(function() {
