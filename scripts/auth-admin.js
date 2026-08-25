@@ -424,6 +424,14 @@ async function actionTestAccount(db) {
       await d.ref.delete();
       console.log('  workers 명단 항목 삭제');
     }
+    // 확인하며 작성한 휴가증도 함께 치운다 — 남기면 서무 화면에 뜬다.
+    const lvSnap = await db.collection('leaves').where('employeeId', '==', t.empId).get();
+    if (!lvSnap.empty) {
+      const batch = db.batch();
+      lvSnap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      console.log(`  남은 휴가증 ${lvSnap.size}장 삭제`);
+    }
     console.log('');
     console.log('>>> 임시 계정을 정리했습니다.');
     return;
@@ -455,11 +463,12 @@ async function actionTestAccount(db) {
     phone: t.phone,
     authMigrated: true,
     authMigratedAt: admin.firestore.FieldValue.serverTimestamp(),
-    balanceAnnual: 0,
+    // 잔여가 0이면 작성 단계에서 막혀 작성·취소 경로를 시험할 수 없다.
+    balanceAnnual: 3,
     balanceBirth: 0,
     balanceSummer: 0,
   }, { merge: true });
-  console.log('  users 문서 생성 (이름·팀·휴대폰, 잔여휴가 0)');
+  console.log('  users 문서 생성 (이름·팀·휴대폰, 연차 잔여 3)');
 
   // reset·premigrate·remove 는 모두 workers 명단을 먼저 확인한다.
   // 명단에 없으면 "찾지 못했습니다" 로 끝나 그 경로를 시험할 수 없다.
@@ -482,9 +491,15 @@ async function actionTestAccount(db) {
   console.log(`      사번      ${t.empId}`);
   console.log(`      비밀번호   ${DEFAULT_PASSWORD}`);
   console.log('');
+  console.log('    확인할 것 (일반 작업자 경로 — 관리자·서무 계정으로는 검증되지 않는다)');
+  console.log('      1. [내 휴가증] 이 열리고 본인 것만 보이는가');
+  console.log('      2. 휴가증을 작성할 수 있는가 (연차 1개)');
+  console.log('      3. 작성한 것을 [삭제]·[취소] 로 지울 수 있는가');
+  console.log('         ← 예전에는 규칙이 isStaff() 뿐이라 여기서 권한 오류가 났다');
+  console.log('');
   console.log('    ⚠️ 명단에 넣었으므로 서무 화면 [작업자 명단] 에 보입니다.');
   console.log('       확인이 끝나면 반드시 confirm=DELETE 로 지우세요.');
-  console.log('    휴가증은 작성하지 마세요 — 실제 leaves 문서가 생깁니다.');
+  console.log('       (남긴 휴가증도 함께 지워집니다)');
 }
 
 // ---------- testrules: 실제 토큰으로 배포된 규칙 검증 ----------
