@@ -1181,9 +1181,22 @@ async function actionSettle(db) {
   const confirmed = String(process.env.CONFIRM || '').trim() === 'OK';
   console.log(`===== 차감 정산${confirmed ? '' : ' (미리보기)'} =====`);
 
+  // 서무가 잔여를 손으로 입력한 마지막 시각. manual 기록의 값이 현재 잔여와
+  // 일치하는 것으로 보아 증감이 아니라 "입력한 값" 이다. 그 시점 이전에 처리된
+  // 휴가증은 이미 반영됐을 수 있어 따로 센다.
+  const lastManual = new Map();
+  const blSnap = await db.collection('balanceLogs').where('type', '==', 'manual').get();
+  blSnap.forEach((d) => {
+    const v = d.data() || {};
+    const id = String(v.empId || '').trim();
+    const at = v.at && typeof v.at.toDate === 'function' ? v.at.toDate() : null;
+    if (!id || !at) return;
+    if (!lastManual.has(id) || at > lastManual.get(id)) lastManual.set(id, at);
+  });
+
   const snap = await db.collection('leaves').get();
   const byEmp = new Map();   // empId -> { annual, birth, summer, refs[], lines[] }
-  let skippedNoId = 0, notProcessed = 0, already = 0;
+  let skippedNoId = 0, notProcessed = 0, already = 0, beforeManual = 0;
 
   snap.forEach((d) => {
     const v = d.data() || {};
@@ -1191,6 +1204,17 @@ async function actionSettle(db) {
     if (v.deductedAt) { already++; return; }
     const empId = String(v.employeeId || '').trim();
     if (!empId) { skippedNoId++; return; }
+
+    // 서무가 손으로 값을 넣기 전에 이미 처리된 휴가증은 그 값에 반영돼 있을
+    // 수 있다. ONLY_AFTER_MANUAL=1 이면 건너뛴다.
+    const cut = lastManual.get(empId);
+    const pAt = v.processedAt && typeof v.processedAt.toDate === 'function'
+      ? v.processedAt.toDate() : null;
+    const isBefore = cut && pAt && pAt <= cut;
+    if (isBefore) {
+      beforeManual++;
+      if (String(process.env.ONLY_AFTER_MANUAL || '').trim() === '1') return;
+    }
 
     if (!byEmp.has(empId)) {
       byEmp.set(empId, { annual: 0, birth: 0, summer: 0, refs: [], lines: [] });
@@ -1213,8 +1237,12 @@ async function actionSettle(db) {
   });
 
   const targets = [...byEmp.entries()].filter(([, e]) => e.annual > 0 || e.birth > 0 || e.summer > 0);
+  const onlyAfter = String(process.env.ONLY_AFTER_MANUAL || '').trim() === '1';
   console.log(`휴가증 ${snap.size}장 · 미처리 ${notProcessed} · 이미 차감 ${already}`
     + ` · 사번없음 ${skippedNoId}`);
+  console.log(`서무가 잔여를 손으로 넣기 전에 처리된 것 ${beforeManual}장`
+    + (onlyAfter ? '  → 이번 정산에서 제외' : '  → 이번 정산에 포함'));
+  console.log(`모드  ${onlyAfter ? 'ONLY_AFTER_MANUAL=1 (수기 입력 이후만)' : '전체'}`);
   console.log(`정산 대상 ${targets.length}명`);
 
   if (!targets.length) {
