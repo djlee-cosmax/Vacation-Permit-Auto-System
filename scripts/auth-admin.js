@@ -1311,9 +1311,25 @@ async function actionSettle(db) {
 // EMP_ID 에 사번 또는 이름 아무거나 넣는다 — 숫자면 사번, 아니면 이름으로 찾는다.
 // 로그가 공개라 이름은 가리고 사번만 찍는다.
 async function actionLeaveCheck(db) {
-  const q = String(process.env.EMP_ID || '').trim();
-  if (!q) throw new Error('EMP_ID 가 필요합니다. (사번 또는 이름)');
+  const raw = String(process.env.EMP_ID || '').trim();
+  if (!raw) throw new Error('EMP_ID 가 필요합니다. (사번 또는 이름, 쉼표로 여럿)');
 
+  // 쉼표로 여럿 — 마이너스로 떨어지는 사람들을 한 번에 훑을 때 쓴다.
+  const list = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  if (list.length > 1) {
+    for (const one of list) {
+      process.env.EMP_ID = one;
+      await actionLeaveCheckOne(db, one);
+      console.log('');
+      console.log('─'.repeat(60));
+    }
+    process.env.EMP_ID = raw;
+    return;
+  }
+  return actionLeaveCheckOne(db, list[0]);
+}
+
+async function actionLeaveCheckOne(db, q) {
   const wAll = await db.collection('workers').get();
   const byId = [];
   wAll.forEach((d) => {
