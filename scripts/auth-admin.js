@@ -22,7 +22,9 @@
 //   ACTION=fixleaveids                   node auth-admin.js  사번 없는 휴가증 채우기 (미리보기)
 //   ACTION=fixleaveids CONFIRM=OK                            실제로 채운다
 //   ACTION=ttl                           node auth-admin.js  휴가증 자동 삭제 정책 조회
-//   ACTION=ttl CONFIRM=ON                                    켠다 (만료분 삭제 — 되돌릴 수 없음)
+//   ACTION=ttl CONFIRM=ON                                    켠다 (결제 계정 필요 — 못 씀)
+//   ACTION=purge                         node auth-admin.js  만료된 휴가증 삭제 (미리보기)
+//   ACTION=purge CONFIRM=OK                                  실제로 지운다
 //   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호를 1234 로 재설정
 //   ACTION=remove EMP_ID=12224xxxx       node auth-admin.js  퇴직자 완전 삭제 (미리보기)
 //   ACTION=remove EMP_ID=... CONFIRM=DELETE  실제 삭제 실행
@@ -1120,6 +1122,61 @@ async function actionRemove(db) {
   console.log('    각 기기는 다음 접속 시 명단에서 자동으로 사라집니다.');
 }
 
+// ---------- purge: 만료된 휴가증 직접 삭제 ----------
+//
+// Firestore TTL 정책은 결제 계정이 붙은 프로젝트에서만 만들 수 있다
+// (2026-08-25 확인 — "Project has billing disabled"). 이 프로젝트는 Spark
+// 무료이고, 사내 배포로 옮길 예정이라 결제 계정을 붙일 이유가 없다.
+//
+// TTL 이 하려던 일을 여기서 직접 한다. Admin SDK 는 데이터 삭제 권한이 있다
+// — 아까 막힌 것은 필드 설정 변경이었지 데이터가 아니다.
+//
+// 스케줄 워크플로에서 돌 때는 CONFIRM 없이 실행하고 PURGE_AUTO=1 을 준다.
+async function actionPurge(db) {
+  const auto = String(process.env.PURGE_AUTO || '').trim() === '1';
+  const confirmed = auto || String(process.env.CONFIRM || '').trim() === 'OK';
+
+  console.log(`===== 만료된 휴가증 삭제${confirmed ? '' : ' (미리보기)'} =====`);
+
+  const now = new Date();
+  const snap = await db.collection('leaves').get();
+  const expired = [];
+  let noField = 0;
+  snap.forEach((d) => {
+    const v = (d.data() || {}).expiresAt;
+    const t = v && typeof v.toDate === 'function' ? v.toDate() : null;
+    if (!t) { noField++; return; }
+    if (t <= now) expired.push(d.ref);
+  });
+
+  console.log(`휴가증 ${snap.size}장 · 만료 ${expired.length}장 · 남을 것 ${snap.size - expired.length}장`
+    + (noField ? ` · expiresAt 없는 문서 ${noField}장(건너뜀)` : ''));
+
+  if (!expired.length) {
+    console.log('>>> 지울 것이 없습니다.');
+    return;
+  }
+  if (!confirmed) {
+    console.log('');
+    console.log('>>> 미리보기입니다. 지우려면 confirm 입력란에 OK 를 넣고 다시 실행하세요.');
+    console.log('    되돌릴 수 없습니다.');
+    return;
+  }
+
+  // batch 는 한 번에 500건까지
+  for (let i = 0; i < expired.length; i += 400) {
+    const chunk = expired.slice(i, i + 400);
+    const batch = db.batch();
+    chunk.forEach((ref) => batch.delete(ref));
+    await batch.commit();
+    console.log(`  삭제 ${Math.min(i + chunk.length, expired.length)}/${expired.length}`);
+  }
+
+  const left = await db.collection('leaves').get();
+  console.log('');
+  console.log(`>>> ${expired.length}장 삭제 완료. 남은 휴가증 ${left.size}장.`);
+}
+
 // ---------- ttl: 휴가증 자동 삭제 정책 ----------
 //
 // script.js 가 expiresAt 에 30일 뒤를 넣지만, 필드만으로는 지워지지 않는다.
@@ -1473,6 +1530,7 @@ async function main() {
   if (action === 'anonoff') return actionAnonOff();
   if (action === 'fixleaveids') return actionFixLeaveIds(db);
   if (action === 'ttl') return actionTtl(db);
+  if (action === 'purge') return actionPurge(db);
   throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | deployrules `
     + `| testrules | cleanup | claims | premigrate | syncprofile | stats | anonoff `
     + `| fixleaveids | reset | remove)`);

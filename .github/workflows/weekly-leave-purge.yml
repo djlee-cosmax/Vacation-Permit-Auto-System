@@ -1,0 +1,50 @@
+name: 매주 만료 휴가증 정리
+
+# Firestore TTL 정책은 결제 계정이 붙은 프로젝트에서만 만들 수 있다
+# (2026-08-25 확인 — "Project has billing disabled"). 이 프로젝트는 Spark
+# 무료라 TTL 을 못 켠다. TTL 이 하려던 일을 여기서 직접 한다.
+#
+# script.js 가 휴가증에 expiresAt(작성 +30일)을 넣는다. 그 시각이 지난 것을
+# 지운다. 보관 기간을 바꾸려면 script.js 의 expiresAt 계산을 고치면 된다.
+
+on:
+  # 매주 월요일 00:00 UTC = 09:00 KST (서무 출근 전)
+  schedule:
+    - cron: '0 0 * * 1'
+  # 수동 실행 — 미리보기로 몇 장인지만 볼 수도 있다
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '미리보기만 (지우지 않음)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+concurrency:
+  group: weekly-leave-purge
+  cancel-in-progress: false
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: scripts/package.json
+
+      - name: Install deps
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+
+      - name: Purge expired leaves
+        working-directory: scripts
+        env:
+          FIREBASE_SA_KEY: ${{ secrets.FIREBASE_SA_KEY }}
+          ACTION: purge
+          PURGE_AUTO: ${{ inputs.dry_run == 'true' && '0' || '1' }}
+        run: node auth-admin.js
