@@ -1093,6 +1093,8 @@ async function actionStats(db) {
   const lv = await db.collection('leaves').get();
   const byMonth = new Map(), byType = new Map();
   let processed = 0, days = 0, items = 0, minD = null, maxD = null;
+  let noEmpId = 0, noEmpIdRecent = 0;
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const people = new Set();
   lv.forEach((doc) => {
     const d = doc.data() || {};
@@ -1106,6 +1108,13 @@ async function actionStats(db) {
     days += Number(d.days) || 0;
     // 사번으로 센다. submittedBy 는 익명 인증 시절 세션마다 달라져 인원수가 아니다.
     if (d.employeeId) people.add(String(d.employeeId).trim());
+    else {
+      // employeeId 는 명단을 "이름" 으로 찾아 채운다(script.js). 명단에 없거나
+      // 동명이인이면 빈 값이 된다. leaves 규칙을 employeeId 기준으로 조이면
+      // 이런 문서는 소유자도 못 읽는다 — 조이기 전에 몇 건인지 알아야 한다.
+      noEmpId++;
+      if (created && created >= thirtyDaysAgo) noEmpIdRecent++;
+    }
     if (created) {
       if (!minD || created < minD) minD = created;
       if (!maxD || created > maxD) maxD = created;
@@ -1113,6 +1122,8 @@ async function actionStats(db) {
   });
   console.log(`\n[leaves] 휴가증 ${lv.size}장 · 항목 ${items}줄 · 처리완료 ${processed}장`);
   console.log(`  작성 인원 ${people.size}명 (사번 기준) · 휴가 일수 합계 ${days}일`);
+  console.log(`  사번 없는 문서 ${noEmpId}장 (최근 30일 내 ${noEmpIdRecent}장)`
+    + (noEmpId ? '  ← leaves 규칙을 사번 기준으로 조이기 전에 확인' : ''));
   if (minD) console.log(`  남아 있는 기간: ${minD.toISOString().slice(0, 10)} ~ ${maxD.toISOString().slice(0, 10)}`);
   console.log('  월별 (휴가증 장 수)');
   console.log(table(byMonth));
