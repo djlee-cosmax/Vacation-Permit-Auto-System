@@ -589,7 +589,9 @@ async function actionTestRules() {
     ['일반 작업자 → 남의 users 읽기',   'deny',  'worker', `users/${REAL_OTHER}`],
     ['일반 작업자 → users 전체 조회',   'deny',  'worker', 'users?pageSize=1'],
     ['일반 작업자 → workers 전체 조회', 'deny',  'worker', 'workers?pageSize=1'],
-    ['일반 작업자 → leaves 조회',       'allow', 'worker', 'leaves?pageSize=1'],
+    // 조건 없이 전체를 훑는 것은 막혀야 한다 — 남의 휴가증이 섞이기 때문이다.
+    // 본인 사번으로 좁힌 쿼리는 아래 4)에서 따로 확인한다.
+    ['일반 작업자 → leaves 전체 조회',  'deny',  'worker', 'leaves?pageSize=1'],
     ['일반 작업자 → system 읽기',       'deny',  'worker', 'system/balanceReset'],
     ['일반 작업자 → balanceLogs 조회',  'deny',  'worker', 'balanceLogs?pageSize=1'],
     ['서무 → workers 전체 조회',        'allow', 'leader', 'workers?pageSize=1'],
@@ -609,7 +611,35 @@ async function actionTestRules() {
     console.log(`  ${ok ? 'OK  ' : '!!  '}${expect.padEnd(5)} HTTP ${status}  ${label}`);
   }
 
-  // 4) 미인증 — 토큰 없이
+  // 4) leaves — 본인 사번으로 좁힌 쿼리는 통과해야 한다.
+  //    GET 목록은 막히는 게 정상이므로, 앱이 실제로 쓰는 형태(where)로 확인한다.
+  {
+    const res = await fetch(`${docBase}:runQuery`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + tokens.worker,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'leaves' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'employeeId' },
+              op: 'EQUAL',
+              value: { stringValue: TEST_EMP },
+            },
+          },
+          limit: 1,
+        },
+      }),
+    });
+    const ok = res.status === 200;
+    if (!ok) fail++;
+    console.log(`  ${ok ? 'OK  ' : '!!  '}allow HTTP ${res.status}  일반 작업자 → 본인 사번으로 좁힌 leaves 조회`);
+  }
+
+  // 5) 미인증 — 토큰 없이
   const anonStatus = await (await fetch(`${docBase}/users/${TEST_EMP}`)).status;
   {
     const ok = anonStatus === 403 || anonStatus === 401;
@@ -617,12 +647,12 @@ async function actionTestRules() {
     console.log(`  ${ok ? 'OK  ' : '!!  '}deny  HTTP ${anonStatus}  미인증 → users 읽기`);
   }
 
-  // 5) 임시 계정 정리
+  // 6) 임시 계정 정리
   await admin.auth().deleteUser(uid);
   console.log('');
   console.log(`임시 계정 삭제 완료 (${testEmail})`);
 
-  const total = checks.length + 1;
+  const total = checks.length + 2;   // + 좁힌 leaves 조회 + 미인증
   console.log('');
   console.log(`${total}건 중 ${total - fail}건 기대와 일치` + (fail ? `, ${fail}건 불일치` : ''));
   if (fail) {
