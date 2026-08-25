@@ -1453,7 +1453,13 @@ function uploadLeaveToCloud(leave) {
   doc.submittedBy = FB_UID;
   doc.processed = false;  // 서무가 [처리 완료] 시 true로 변경
   doc.serverCreatedAt = firebase.firestore.FieldValue.serverTimestamp();
-  // 14일 후 자동 삭제용 TTL 필드
+  // 30일 후 자동 삭제용 TTL 필드.
+  //
+  // 필드만 넣는다고 지워지지 않는다 — Firebase Console 에서 leaves / expiresAt
+  // 로 TTL 정책을 켜야 동작한다. 2026-08-25 현재 꺼져 있어 5/26 치부터 그대로
+  // 쌓여 있다(333장). 2026-08-27 에 켤 예정.
+  //
+  // [내 휴가증] 이 보여주는 14일과는 다른 값이다 — 그건 화면 표시 범위다.
   doc.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   // syncStatus는 클라우드에 안 올림
   delete doc.syncStatus;
