@@ -21,6 +21,8 @@
 //   ACTION=anonoff CONFIRM=ANONOFF                           실제로 끈다 (되돌리기 ANONON)
 //   ACTION=fixleaveids                   node auth-admin.js  사번 없는 휴가증 채우기 (미리보기)
 //   ACTION=fixleaveids CONFIRM=OK                            실제로 채운다
+//   ACTION=ttl                           node auth-admin.js  휴가증 자동 삭제 정책 조회
+//   ACTION=ttl CONFIRM=ON                                    켠다 (만료분 삭제 — 되돌릴 수 없음)
 //   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호를 1234 로 재설정
 //   ACTION=remove EMP_ID=12224xxxx       node auth-admin.js  퇴직자 완전 삭제 (미리보기)
 //   ACTION=remove EMP_ID=... CONFIRM=DELETE  실제 삭제 실행
@@ -1118,6 +1120,70 @@ async function actionRemove(db) {
   console.log('    각 기기는 다음 접속 시 명단에서 자동으로 사라집니다.');
 }
 
+// ---------- ttl: 휴가증 자동 삭제 정책 ----------
+//
+// script.js 가 expiresAt 에 30일 뒤를 넣지만, 필드만으로는 지워지지 않는다.
+// Firestore 에 "이 필드를 TTL 로 쓴다" 고 등록해야 한다.
+//
+// Console 에서 켜도 되지만 손으로 하면 켜졌는지 확인할 방법이 없어 여기 둔다.
+// 기본은 조회. CONFIRM=ON 으로 켜고, OFF 로 끈다.
+//
+// ⚠️ 켜면 이미 만료된 문서가 지워진다. 되돌릴 수 없다.
+async function actionTtl(db) {
+  const { JWT } = require('google-auth-library');
+  const want = String(process.env.CONFIRM || '').trim();  // ON | OFF | (빈값=조회)
+  const sa = loadServiceAccount();
+  const client = new JWT({
+    email: sa.client_email,
+    key: sa.private_key,
+    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+  });
+  const field = `projects/${sa.project_id}/databases/(default)/collectionGroups/leaves/fields/expiresAt`;
+  const url = `https://firestore.googleapis.com/v1/${field}`;
+
+  console.log('===== 휴가증 자동 삭제(TTL) =====');
+  console.log('컬렉션 그룹  leaves  ·  필드  expiresAt');
+
+  const read = async () => {
+    const r = await client.request({ url });
+    return (r.data && r.data.ttlConfig) || null;
+  };
+
+  let cfg = await read();
+  console.log(`현재 상태    ${cfg ? `켜짐 (state=${cfg.state || '-'})` : '꺼짐'}`);
+
+  // 지금 지워질 문서가 몇 장인지 먼저 센다 — 켜기 전에 알아야 한다.
+  const now = new Date();
+  const lv = await db.collection('leaves').get();
+  let expired = 0;
+  lv.forEach((d) => {
+    const v = (d.data() || {}).expiresAt;
+    const t = v && typeof v.toDate === 'function' ? v.toDate() : null;
+    if (t && t <= now) expired++;
+  });
+  console.log(`휴가증       ${lv.size}장 · 이미 만료된 것 ${expired}장`);
+
+  if (want !== 'ON' && want !== 'OFF') {
+    console.log('');
+    console.log('>>> 조회만 했습니다.');
+    console.log(`    켜려면 confirm=ON  (만료된 ${expired}장이 지워집니다. 되돌릴 수 없습니다)`);
+    console.log('    끄려면 confirm=OFF');
+    return;
+  }
+
+  await client.request({
+    url: `${url}?updateMask=ttlConfig`,
+    method: 'PATCH',
+    data: want === 'ON' ? { ttlConfig: {} } : {},
+  });
+  cfg = await read();
+  console.log('');
+  console.log(`>>> ${want === 'ON' ? '켰습니다' : '껐습니다'}. 현재 ${cfg ? `켜짐 (state=${cfg.state || '-'})` : '꺼짐'}.`);
+  if (want === 'ON') {
+    console.log('    반영에 시간이 걸립니다(보통 24시간 안). 다음 날 stats 로 남은 장수를 확인하세요.');
+  }
+}
+
 // ---------- fixleaveids: 사번 없는 휴가증에 사번 채우기 ----------
 //
 // leaves 규칙을 employeeId 기준으로 조이기 전에 돌려야 한다. employeeId 가 빈
@@ -1387,6 +1453,7 @@ async function main() {
   if (action === 'stats') return actionStats(db);
   if (action === 'anonoff') return actionAnonOff();
   if (action === 'fixleaveids') return actionFixLeaveIds(db);
+  if (action === 'ttl') return actionTtl(db);
   throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | deployrules `
     + `| testrules | cleanup | claims | premigrate | syncprofile | stats | anonoff `
     + `| fixleaveids | reset | remove)`);
