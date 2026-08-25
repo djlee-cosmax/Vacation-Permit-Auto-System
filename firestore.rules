@@ -68,18 +68,35 @@ service cloud.firestore {
     }
 
     // ---------- leaves : 휴가증 ----------
-    // 앱이 여러 형태로 조회한다 — 중복 확인(submitterPhone4), 내 휴가증(name),
-    // 처리완료 정리(processed), 삭제 감시(전체 onSnapshot).
-    // 이 쿼리들을 규칙으로 좁히려면 클라이언트 쿼리부터 손봐야 하므로
-    // 지금은 "로그인한 실제 사용자" 까지만 제한한다.
+    // 이름·사번·휴대폰·휴가 사유가 들어 있다. 일반 작업자는 본인 것만.
     //
-    // 이것만으로도 핵심 문제(공개 API 키 + 익명 인증으로 외부에서 열람)는 닫힌다.
-    // 남은 과제: 일반 작업자가 다른 사람 휴가증까지 볼 수 있다 — 쿼리 정리 후 추가 제한.
+    // 앱 쿼리를 전부 employeeId 기준으로 바꾼 뒤 조였다(2026-08-25).
+    //   중복 확인      where('employeeId','==',내 사번)   ← submitterPhone4 였다
+    //   처리완료 정리   where('employeeId','==',내 사번)   ← processed 전체였다
+    //   내 휴가증      where('employeeId','==',내 사번)   ← name 이었다
+    //   삭제 감시      작업자는 본인 것만 구독 / 서무·관리자는 전체
+    //
+    // list 는 문서마다 규칙이 평가되므로, 본인 것만 거는 쿼리라야 통과한다.
+    // 조건 없이 전체를 훑으면 남의 문서에서 걸려 쿼리 전체가 실패한다 —
+    // 그게 노린 것이다.
     match /leaves/{leaveId} {
-      allow read: if signedIn();
-      allow create: if signedIn();
-      allow update: if signedIn();   // 차감 처리 등에서 본인·서무 모두 갱신한다
-      allow delete: if isStaff();
+      function myLeave() {
+        return signedIn() && resource.data.employeeId == myEmpId();
+      }
+      allow read: if isStaff() || myLeave();
+
+      // 남의 이름으로 써 넣지 못하게 한다.
+      allow create: if isStaff()
+        || (signedIn() && request.resource.data.employeeId == myEmpId());
+
+      // 서무는 처리완료·차감 표시, 본인은 재전송(set) 정도.
+      // 소유자를 남에게 넘기는 것은 막는다.
+      allow update: if isStaff()
+        || (myLeave() && request.resource.data.employeeId == myEmpId());
+
+      // 본인 취소를 허용한다. 예전에는 isStaff() 만이라 작업자가 [내 휴가증]
+      // 에서 취소를 눌러도 권한 오류가 났다 — 매뉴얼과 동작이 달랐다.
+      allow delete: if isStaff() || myLeave();
     }
 
     // ---------- system : 자동화 상태 (생휴 리셋 기록 등) ----------

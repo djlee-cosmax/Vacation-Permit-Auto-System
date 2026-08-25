@@ -19,6 +19,8 @@
 //   ACTION=stats                         node auth-admin.js  휴가증 이용 실적 집계 (읽기 전용)
 //   ACTION=anonoff                       node auth-admin.js  익명 로그인 제공자 끄기 (미리보기)
 //   ACTION=anonoff CONFIRM=ANONOFF                           실제로 끈다 (되돌리기 ANONON)
+//   ACTION=fixleaveids                   node auth-admin.js  사번 없는 휴가증 채우기 (미리보기)
+//   ACTION=fixleaveids CONFIRM=OK                            실제로 채운다
 //   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호를 1234 로 재설정
 //   ACTION=remove EMP_ID=12224xxxx       node auth-admin.js  퇴직자 완전 삭제 (미리보기)
 //   ACTION=remove EMP_ID=... CONFIRM=DELETE  실제 삭제 실행
@@ -1086,6 +1088,81 @@ async function actionRemove(db) {
   console.log('    각 기기는 다음 접속 시 명단에서 자동으로 사라집니다.');
 }
 
+// ---------- fixleaveids: 사번 없는 휴가증에 사번 채우기 ----------
+//
+// leaves 규칙을 employeeId 기준으로 조이기 전에 돌려야 한다. employeeId 가 빈
+// 문서는 소유자도 읽지 못하게 되기 때문이다.
+//
+// 빈 값이 생기는 이유: script.js 가 명단을 "이름" 으로 찾아 채운다. 명단에
+// 없거나 동명이인이면 못 찾는다. 코드 쪽도 로그인 사번을 쓰도록 함께 고친다.
+//
+// 기본은 미리보기. CONFIRM=OK 를 줘야 실제로 쓴다.
+async function actionFixLeaveIds(db) {
+  const confirmed = String(process.env.CONFIRM || '').trim() === 'OK';
+  console.log(`===== 휴가증 사번 채우기${confirmed ? '' : ' (미리보기)'} =====`);
+
+  const [wSnap, lvSnap] = await Promise.all([
+    db.collection('workers').get(),
+    db.collection('leaves').get(),
+  ]);
+
+  // 이름 → 사번. 동명이인은 아예 후보에서 뺀다 — 엉뚱한 사람 것이 되면
+  // 그 사람이 남의 휴가증을 읽게 된다. 못 채우는 편이 낫다.
+  const byName = new Map();
+  const dupNames = new Set();
+  wSnap.forEach((d) => {
+    const v = d.data() || {};
+    const n = String(v.name || '').trim();
+    const id = String(v.employeeId || '').trim();
+    if (!n || !id) return;
+    if (byName.has(n)) dupNames.add(n);
+    else byName.set(n, id);
+  });
+  dupNames.forEach((n) => byName.delete(n));
+
+  const targets = [];
+  lvSnap.forEach((d) => {
+    const v = d.data() || {};
+    if (String(v.employeeId || '').trim()) return;
+    targets.push({ ref: d.ref, id: d.id, name: String(v.name || '').trim(),
+                   start: v.start || '?', end: v.end || '?' });
+  });
+
+  console.log(`  휴가증 ${lvSnap.size}장 중 사번 없는 문서 ${targets.length}장`);
+  if (!targets.length) {
+    console.log('>>> 채울 것이 없습니다.');
+    return;
+  }
+
+  let fill = 0;
+  const skipped = [];
+  for (const t of targets) {
+    const id = byName.get(t.name);
+    if (!id) {
+      // 실명은 찍지 않는다 — 공개 로그다. 문서 ID 로 찾아갈 수 있다.
+      skipped.push(`${t.id} (${t.start}~${t.end}) — ${dupNames.has(t.name) ? '동명이인' : '명단에 없는 이름'}`);
+      continue;
+    }
+    console.log(`  ${t.id}  ${t.start}~${t.end}  → ${id}`);
+    if (confirmed) await t.ref.update({ employeeId: id });
+    fill++;
+  }
+
+  if (skipped.length) {
+    console.log('');
+    console.log('[건너뜀] — 손으로 확인해야 합니다');
+    skipped.forEach((s) => console.log('  ' + s));
+  }
+
+  console.log('');
+  if (confirmed) {
+    console.log(`>>> ${fill}장에 사번을 채웠습니다. 건너뛴 것 ${skipped.length}장.`);
+  } else {
+    console.log(`>>> 미리보기입니다. 채우려면 confirm 입력란에 OK 를 넣고 다시 실행하세요.`);
+    console.log(`    채울 수 있는 것 ${fill}장 · 건너뛸 것 ${skipped.length}장`);
+  }
+}
+
 // 휴가증 이용 실적 집계 — 제안 보고의 효과금액 산출에 쓴다.
 //
 // **읽기 전용이고 이름·사번은 찍지 않는다.** 개인정보 시스템이라 집계 숫자만 낸다.
@@ -1279,8 +1356,10 @@ async function main() {
   if (action === 'remove') return actionRemove(db);
   if (action === 'stats') return actionStats(db);
   if (action === 'anonoff') return actionAnonOff();
+  if (action === 'fixleaveids') return actionFixLeaveIds(db);
   throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | deployrules `
-    + `| testrules | cleanup | claims | premigrate | syncprofile | stats | anonoff | reset | remove)`);
+    + `| testrules | cleanup | claims | premigrate | syncprofile | stats | anonoff `
+    + `| fixleaveids | reset | remove)`);
 }
 
 main().catch((e) => {

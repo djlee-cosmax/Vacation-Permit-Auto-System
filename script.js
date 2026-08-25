@@ -1309,13 +1309,20 @@ async function addLeaveImpl() {
     }
   }
 
+  // 로그인한 본인 사번. 이 폼은 이름·연락처가 자동 채움이라 작성자 = 로그인한
+  // 사람이다. 아래 조회와 저장이 모두 이 값을 기준으로 한다.
+  var _sess = getSession();
+  var myEmpId = String((_sess && _sess.empId) || '').trim();
+
   // 서버에 이미 처리 완료된 동일 휴가증이 있으면 차단
   // (작업자가 [내 휴가증] 확인 안 하고 같은 내용 또 올리는 케이스 방지)
-  // submitterPhone4 기반 매칭 — 다른 기기/세션(다른 FB_UID)로 작성해도 동일 사용자 차단
-  if (FB_DB && phone4) {
+  //
+  // 사번으로 찾는다. 예전에는 submitterPhone4 로 찾았는데, 그 쿼리는 남의
+  // 문서까지 훑어야 해서 leaves 규칙을 본인 것만 읽도록 조일 수 없었다.
+  if (FB_DB && myEmpId) {
     try {
       var dup = await FB_DB.collection('leaves')
-        .where('submitterPhone4', '==', phone4)
+        .where('employeeId', '==', myEmpId)
         .get()
         .then(function(snapshot) {
           var found = null;
@@ -1347,8 +1354,13 @@ async function addLeaveImpl() {
     }
   }
 
-  // 명단 매칭 (있으면 사번/근무지 자동 채움)
-  var matched = workers.find(function(w) { return w.name === name; });
+  // 명단 매칭 (있으면 근무지 자동 채움)
+  //
+  // 이름으로 찾으면 명단에 없거나 동명이인일 때 사번이 빈 값이 된다. 그러면
+  // leaves 규칙(본인 사번만 읽기)에서 소유자도 못 읽는다. 세션 사번을 먼저 쓴다.
+  var matched = (myEmpId && workers.find(function(w) {
+    return String(w.employeeId || '').trim() === myEmpId;
+  })) || workers.find(function(w) { return w.name === name; });
   if (FULL_RANGE_TYPES.indexOf(type) !== -1) count = 1;  // 하기휴가: count 강제 1
   var days = (TYPE_WEIGHT[type] || 0) * count;
 
@@ -1396,7 +1408,7 @@ async function addLeaveImpl() {
   var leave = {
     id: uuid(),
     name: name,
-    employeeId: matched ? (matched.employeeId || '') : '',
+    employeeId: myEmpId || (matched ? (matched.employeeId || '') : ''),
     team: matched ? (matched.team || '') : '',
     items: [{ type: type, count: count }],
     days: days,
@@ -1494,14 +1506,20 @@ function deleteLeaveFromCloud(id) {
 // 페이지 로드 + 인증 완료 시 호출
 function cleanupProcessedLeavesFromCloud() {
   if (!FB_DB || !FB_UID || leaves.length === 0) return;
+  var sess = getSession();
+  var empId = String((sess && sess.empId) || '').trim();
+  if (!empId) return;
+  // 본인 것만 가져와서 processed 는 여기서 거른다.
+  // 사번+processed 두 조건을 서버에 걸면 복합 색인이 필요한데, 한 사람 문서는
+  // 몇 건 안 돼 걸러 쓰는 편이 간단하다.
   FB_DB.collection('leaves')
-    .where('processed', '==', true)
+    .where('employeeId', '==', empId)
     .get()
     .then(function(snapshot) {
       var processedIds = {};
       snapshot.forEach(function(doc) {
         var d = doc.data();
-        if (d.submittedBy === FB_UID) processedIds[doc.id] = true;
+        if (d.processed === true) processedIds[doc.id] = true;
       });
       var before = leaves.length;
       leaves = leaves.filter(function(l) { return !processedIds[l.id]; });
@@ -1708,8 +1726,16 @@ function fetchMyLeaves() {
   // 작업자 모드 — 본인 잔여 휴가 조회·표시
   showMyBalance(workerMode ? sess && sess.empId : null);
 
+  // 이름이 아니라 사번으로 찾는다 — 동명이인이 섞이지 않고, leaves 규칙을
+  // 본인 것만 읽도록 조일 수 있다.
+  var myEmpId = String((sess && sess.empId) || '').trim();
+  if (!myEmpId) {
+    document.getElementById('myLeavesList').innerHTML =
+      '<div class="my-leaves-empty">사번을 확인할 수 없습니다. 다시 로그인해 주세요.</div>';
+    return;
+  }
   FB_DB.collection('leaves')
-    .where('name', '==', name)
+    .where('employeeId', '==', myEmpId)
     .get()
     .then(function(snapshot) {
       var results = [];
@@ -1985,7 +2011,18 @@ var _leaveWatcher = null;
 function startLeaveDeletionWatcher() {
   if (_leaveWatcher) return;
   if (!FB_DB) return;
-  _leaveWatcher = FB_DB.collection('leaves').onSnapshot(function(snapshot) {
+  // 서무·관리자는 전체를 봐야 한다(남이 지운 것을 화면에서 걷어내야 하므로).
+  // 일반 작업자는 본인 것만 — 규칙이 남의 문서를 막으므로 전체 구독은 실패한다.
+  var _wSess = getSession();
+  var _wRole = (_wSess && _wSess.role) || 'worker';
+  var _wStaff = (_wRole === 'admin' || _wRole === 'leader');
+  var _wEmpId = String((_wSess && _wSess.empId) || '').trim();
+  if (!_wStaff && !_wEmpId) return;
+  var _wQuery = _wStaff
+    ? FB_DB.collection('leaves')
+    : FB_DB.collection('leaves').where('employeeId', '==', _wEmpId);
+
+  _leaveWatcher = _wQuery.onSnapshot(function(snapshot) {
     snapshot.docChanges().forEach(function(change) {
       if (change.type !== 'removed') return;
       var data = change.doc.data() || {};
