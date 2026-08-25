@@ -36,6 +36,26 @@ const STAFF_ROLES = {
 };
 
 // script.js 의 AUTH_EMAIL_DOMAIN 과 동기화할 것
+// 저장소가 PUBLIC 이라 GitHub Actions 실행 로그를 누구나 열람할 수 있다.
+// (2026-08-25 확인 — 익명 요청에 200. 그때까지 쌓인 56건은 삭제했다.)
+//
+// 그래서 로그에 실명·연락처를 찍지 않는다. 사번은 남긴다 — 관리자는 사번으로
+// 작업하고, 사번만으로는 외부에서 개인을 특정하기 어렵다.
+const maskName = (v) => {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '-';
+  return s[0] + '*'.repeat(Math.max(1, s.length - 1));
+};
+// 뒤 4자리를 남기는 흔한 방식은 여기서 쓰면 안 된다 — 이 앱은 뒤 4자리
+// (submitterPhone4)로 본인을 판별한다. 앞 3자리만 남기고 나머지를 가린다.
+const maskPhone = (v) => {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '-';
+  let seen = 0;
+  return s.replace(/\d/g, (d) => (++seen <= 3 ? d : '*'));
+};
+const MASK_KEYS = { name: maskName, phone: maskPhone, securityQuestion: () => '(숨김)' };
+
 const AUTH_EMAIL_DOMAIN = 'vacation.local';
 const emailFor = (empId) => `${String(empId).trim()}@${AUTH_EMAIL_DOMAIN}`;
 const empIdFromEmail = (email) => String(email || '').split('@')[0];
@@ -200,7 +220,7 @@ async function actionInspect(db) {
 
   console.log(`===== ${empId} 상태 =====`);
   const w = wSnap.empty ? null : (wSnap.docs[0].data() || {});
-  console.log(`workers  : ${w ? `${w.name || '-'} / ${w.team || '-'} / ${w.department || '-'}` : '없음'}`);
+  console.log(`workers  : ${w ? `${maskName(w.name)} / ${w.team || '-'} / ${w.department || '-'}` : '없음'}`);
 
   const au = authUsers.find((u) => empIdFromEmail(u.email) === empId);
   if (au) {
@@ -223,6 +243,8 @@ async function actionInspect(db) {
     let shown;
     if (k === 'password' || k === 'securityAnswer') {
       shown = `(값 숨김, 길이 ${String(v).length})`;
+    } else if (MASK_KEYS[k]) {
+      shown = JSON.stringify(MASK_KEYS[k](v));
     } else if (v && typeof v.toDate === 'function') {
       shown = kst(v.toDate().toISOString());
     } else {
@@ -256,7 +278,7 @@ async function actionStatus(db) {
     const w = info.get(id);
     if (!w) return id;
     const where = [w.dept, w.team].filter(Boolean).join(' / ');
-    return `${id}  ${(w.name || '(이름 없음)').padEnd(6, ' ')}${where ? '  ' + where : ''}`;
+    return `${id}  ${maskName(w.name).padEnd(6, ' ')}${where ? '  ' + where : ''}`;
   };
 
   // 아직 Firestore 에 비밀번호 해시가 남아 있는 = 미이관 사용자
@@ -664,7 +686,7 @@ async function actionSyncProfile(db) {
 
   toWrite.slice(0, 20).forEach((t) => {
     const f = t.from;
-    console.log(`  ${t.empId}  ${t.want.name} / ${t.want.team || '-'}` +
+    console.log(`  ${t.empId}  ${maskName(t.want.name)} / ${t.want.team || '-'}` +
       (f ? `   (이전: ${f.name || '-'} / ${f.team || '-'})` : '   ← 문서 생성'));
   });
   if (toWrite.length > 20) console.log(`  ... 외 ${toWrite.length - 20}명`);
@@ -841,7 +863,7 @@ async function actionPremigrate(db) {
   }
   const w = wSnap.docs[0].data() || {};
   const name = w.name || empId;
-  console.log(`  이름: ${name} / 팀: ${w.team || '-'} / 부서: ${w.department || '-'}`);
+  console.log(`  이름: ${maskName(name)} / 팀: ${w.team || '-'} / 부서: ${w.department || '-'}`);
 
   // 이미 Auth 계정이 있으면 손대지 않는다.
   try {
@@ -887,7 +909,7 @@ async function actionPremigrate(db) {
   console.log('  users 문서 정리 완료 (authMigrated=true, 인증 잔여 필드 제거)');
 
   console.log('');
-  console.log(`>>> ${name}(${empId}) 님 이관 완료. 사번 + ${DEFAULT_PASSWORD} 로 로그인됩니다.`);
+  console.log(`>>> ${maskName(name)}(${empId}) 님 이관 완료. 사번 + ${DEFAULT_PASSWORD} 로 로그인됩니다.`);
   if (pwChanged) {
     console.log(`    ⚠️ 기존 비밀번호는 무효가 됐습니다. 본인에게 ${DEFAULT_PASSWORD} 를 알려주세요.`);
   } else {
@@ -926,7 +948,7 @@ async function actionReset(db) {
     await admin.auth().updateUser(user.uid, {
       password: authPasswordFor(DEFAULT_PASSWORD),
     });
-    console.log(`  비밀번호를 ${DEFAULT_PASSWORD} 로 재설정했습니다 (${name})`);
+    console.log(`  비밀번호를 ${DEFAULT_PASSWORD} 로 재설정했습니다 (${maskName(name)})`);
   } catch (e) {
     if (e.code === 'auth/user-not-found') {
       // 계정이 없는 사람 = 옛 reset 으로 지워졌거나 아직 이관 전.
@@ -935,7 +957,7 @@ async function actionReset(db) {
         email: emailFor(empId),
         password: authPasswordFor(DEFAULT_PASSWORD),
       });
-      console.log(`  Auth 계정이 없어 새로 만들었습니다 (${name})`);
+      console.log(`  Auth 계정이 없어 새로 만들었습니다 (${maskName(name)})`);
     } else {
       throw e;
     }
@@ -955,7 +977,7 @@ async function actionReset(db) {
   }, { merge: true });
 
   console.log('');
-  console.log(`>>> ${name}(${empId}) 님은 이제 사번 + ${DEFAULT_PASSWORD} 로 로그인할 수 있습니다.`);
+  console.log(`>>> ${maskName(name)}(${empId}) 님은 이제 사번 + ${DEFAULT_PASSWORD} 로 로그인할 수 있습니다.`);
   console.log('    로그인 직후 새 비밀번호 등록 안내가 자동으로 표시됩니다.');
 }
 
@@ -991,7 +1013,7 @@ async function actionRemove(db) {
   }
 
   name = name || empId;
-  console.log(`  이름: ${name} / 팀: ${w.team || '-'} / 부서: ${w.department || '-'}`);
+  console.log(`  이름: ${maskName(name)} / 팀: ${w.team || '-'} / 부서: ${w.department || '-'}`);
 
   // 2) 삭제 대상 수집
   const userRef = db.collection('users').doc(empId);
@@ -1027,15 +1049,15 @@ async function actionRemove(db) {
   });
   console.log(`  Auth 계정: ${authUid ? '있음' : '없음'}`);
 
-  // 3) 백업 출력 — Actions 로그에 남겨 필요 시 복원 근거로 쓴다
+  // 3) 지워질 것 요약
+  //
+  // 예전에는 여기서 백업 JSON 전체를 찍었다. 저장소가 PUBLIC 이라 Actions 로그가
+  // 누구나 열람 가능해서 전화번호·휴가 사유가 그대로 공개됐다(2026-08-25 확인).
+  // 복원 근거를 공개된 곳에 두는 것은 애초에 맞지 않는다 — 요약만 남긴다.
   console.log('');
-  console.log('[백업 JSON] — 복원이 필요하면 이 내용을 사용하세요');
-  console.log(JSON.stringify({
-    empId, name,
-    worker: w,
-    user: u,
-    leaves: Array.from(leaveDocs.values()).map((d) => ({ id: d.id, data: d.data() })),
-  }, null, 2));
+  console.log('[지워질 것] — 되돌릴 수 없습니다. 사번을 다시 확인하세요.');
+  console.log(`  workers ${wSnap.size}건 · users ${u ? 1 : 0}건 · leaves ${leaveDocs.size}건`
+    + ` · Auth ${authUid ? 1 : 0}건`);
 
   if (!confirmed) {
     console.log('');
@@ -1060,7 +1082,7 @@ async function actionRemove(db) {
 
   const remain = await db.collection('workers').get();
   console.log('');
-  console.log(`>>> ${name}(${empId}) 삭제 완료. 남은 작업자 ${remain.size}명.`);
+  console.log(`>>> ${maskName(name)}(${empId}) 삭제 완료. 남은 작업자 ${remain.size}명.`);
   console.log('    각 기기는 다음 접속 시 명단에서 자동으로 사라집니다.');
 }
 
