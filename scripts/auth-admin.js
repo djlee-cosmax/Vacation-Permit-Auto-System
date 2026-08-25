@@ -390,6 +390,11 @@ async function actionTestAccount(db) {
       await userRef.delete();
       console.log('  users 문서 삭제');
     }
+    const wSnap = await db.collection('workers').where('employeeId', '==', t.empId).get();
+    for (const d of wSnap.docs) {
+      await d.ref.delete();
+      console.log('  workers 명단 항목 삭제');
+    }
     console.log('');
     console.log('>>> 임시 계정을 정리했습니다.');
     return;
@@ -427,14 +432,30 @@ async function actionTestAccount(db) {
   }, { merge: true });
   console.log('  users 문서 생성 (이름·팀·휴대폰, 잔여휴가 0)');
 
+  // reset·premigrate·remove 는 모두 workers 명단을 먼저 확인한다.
+  // 명단에 없으면 "찾지 못했습니다" 로 끝나 그 경로를 시험할 수 없다.
+  const wSnap = await db.collection('workers').where('employeeId', '==', t.empId).get();
+  if (wSnap.empty) {
+    await db.collection('workers').doc(t.empId).set({
+      employeeId: t.empId,
+      name: t.name,
+      team: t.team,
+      department: '생산3팀',
+      phone: t.phone,
+    });
+    console.log('  workers 명단 항목 생성 (reset·remove 경로 확인용)');
+  } else {
+    console.log('  workers 명단 항목이 이미 있습니다');
+  }
+
   console.log('');
   console.log('>>> 시크릿 창에서 아래로 로그인해 보세요.');
   console.log(`      사번      ${t.empId}`);
   console.log(`      비밀번호   ${DEFAULT_PASSWORD}`);
   console.log('');
-  console.log('    이 계정은 명단(workers)에 없으므로 서무 화면에는 보이지 않습니다.');
+  console.log('    ⚠️ 명단에 넣었으므로 서무 화면 [작업자 명단] 에 보입니다.');
+  console.log('       확인이 끝나면 반드시 confirm=DELETE 로 지우세요.');
   console.log('    휴가증은 작성하지 마세요 — 실제 leaves 문서가 생깁니다.');
-  console.log('    확인이 끝나면 confirm=DELETE 로 지우세요.');
 }
 
 // ---------- testrules: 실제 토큰으로 배포된 규칙 검증 ----------
