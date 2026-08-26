@@ -45,7 +45,7 @@ def header(prs, slide, title):
 
 def footer(slide, n):
     add_text(slide, Inches(0.4), Inches(7.0), Inches(12.6), Inches(0.3),
-             f"COSMAX · 생산3팀 파우더 성형실    |    {n} / {TOTAL}",
+             f"COSMAX    |    {n} / {TOTAL}",
              size=9, color=GRAY, align=PP_ALIGN.RIGHT)
 
 
@@ -59,7 +59,7 @@ def main():
     s = prs.slides.add_slide(blank)
     add_rect(s, 0, 0, Inches(0.4), prs.slide_height, RED)
     add_text(s, Inches(1.0), Inches(1.5), Inches(11.5), Inches(0.5),
-             "COSMAX · 생산3팀 파우더 성형실", size=16, bold=True, color=RED)
+             "COSMAX", size=16, bold=True, color=RED)
     add_text(s, Inches(1.0), Inches(2.4), Inches(11.5), Inches(1.5),
              "휴가증 자동 반영 프로그램", size=48, bold=True, color=DARK)
     add_text(s, Inches(1.0), Inches(4.0), Inches(11.5), Inches(0.6),
@@ -68,7 +68,7 @@ def main():
     add_text(s, Inches(1.0), Inches(5.5), Inches(11.5), Inches(1.0),
              "매일 하는 일은 세 번의 클릭입니다.", size=18, color=DARK)
     add_text(s, Inches(1.0), Inches(6.7), Inches(11.5), Inches(0.4),
-             "발행: 2026-08-26  ·  담당: 이동준", size=11, color=GRAY)
+             "발행: 2026-08-26", size=11, color=GRAY)
 
     # ===== 2. 매일 하는 일 =====
     s = prs.slides.add_slide(blank)

@@ -83,7 +83,7 @@ def add_text(slide, x, y, w, h, text, size=18, bold=False, color=DARK, align=PP_
 
 def page_footer(slide, n, total):
     add_text(slide, Inches(0.4), Inches(7.0), Inches(12.6), Inches(0.3),
-             f"COSMAX · 생산3팀 파우더 성형실    |    {n} / {total}",
+             f"COSMAX    |    {n} / {total}",
              size=9, color=GRAY, align=PP_ALIGN.RIGHT)
 
 
@@ -98,7 +98,7 @@ def main():
     s = prs.slides.add_slide(blank)
     add_rect(s, 0, 0, Inches(0.4), prs.slide_height, RED)
     add_text(s, Inches(1.0), Inches(1.5), Inches(11.5), Inches(0.5),
-             "COSMAX · 생산3팀 파우더 성형실", size=16, bold=True, color=RED)
+             "COSMAX", size=16, bold=True, color=RED)
     add_text(s, Inches(1.0), Inches(2.4), Inches(11.5), Inches(1.5),
              "휴가증 자동 반영 프로그램", size=48, bold=True, color=DARK)
     add_text(s, Inches(1.0), Inches(4.0), Inches(11.5), Inches(0.6),
@@ -107,7 +107,7 @@ def main():
     add_text(s, Inches(1.0), Inches(5.5), Inches(11.5), Inches(1.0),
              "본인 휴대폰으로 직접 휴가증을 작성하세요.", size=18, color=DARK)
     add_text(s, Inches(1.0), Inches(6.7), Inches(11.5), Inches(0.4),
-             "발행: 2026-05-28  ·  개정: 2026-08-26  ·  담당: 이동준", size=11, color=GRAY)
+             "발행: 2026-05-28  ·  개정: 2026-08-26", size=11, color=GRAY)
 
     # ===== 2. 어떻게 바뀌나요 =====
     s = prs.slides.add_slide(blank)
@@ -301,7 +301,7 @@ def main():
     qa = [
         ("Q. 비밀번호 분실?", "서무에게 초기화 요청\n     (관리자 처리 후 1234로 로그인)"),
         ("Q. 잔여가 부족하다고 나옴?", "[내 휴가증] 상단에서 남은 개수 확인"),
-        ("Q. 사번 등록 안 됨?", "관리자(이동준)에게 요청"),
+        ("Q. 사번 등록 안 됨?", "관리자에게 요청"),
         ("Q. 화면이 옛 디자인?", "상단 ↻ 아이콘 클릭"),
         ("Q. 서버 저장 실패?", "인터넷 확인 후 재작성"),
     ]
