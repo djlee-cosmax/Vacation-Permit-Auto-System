@@ -9,6 +9,21 @@ from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 SCRIPT_DIR = Path(__file__).resolve().parent
 OUT = SCRIPT_DIR / "휴가증 자동 반영 프로그램 안내 (작업자용).pptx"
 
+# 본문 폭과 왼쪽 끝. 슬라이드 가운데(6.6665")를 기준으로 잡는다.
+#
+# 예전에는 왼쪽 0.8 에서 시작해 간격만 곱했는데, 마지막 카드가 13.10 에서 끝나
+# 오른쪽 여백이 0.23 밖에 안 남았다 — 눈에 띄게 오른쪽으로 밀려 보인다.
+# 폭을 먼저 정하고 남는 만큼을 좌우로 나누면 카드 개수와 무관하게 가운데다.
+SLIDE_W = 13.333
+CONTENT_W = 11.9
+CONTENT_X = (SLIDE_W - CONTENT_W) / 2      # 0.7165
+
+
+def cards(n, gap=0.3):
+    """카드 n개를 본문 폭 안에 고르게 편다. (왼쪽 x 목록, 카드 폭) 반환."""
+    w = (CONTENT_W - gap * (n - 1)) / n
+    return [CONTENT_X + i * (w + gap) for i in range(n)], w
+
 # COSMAX 색상
 RED = RGBColor(0xC8, 0x10, 0x2E)
 DARK_RED = RGBColor(0xA3, 0x0D, 0x24)
@@ -99,21 +114,22 @@ def main():
     add_rect(s, 0, 0, prs.slide_width, Inches(1.0), RED)
     add_text(s, Inches(0.5), Inches(0.2), Inches(12.3), Inches(0.6),
              "어떻게 바뀌나요?", size=28, bold=True, color=WHITE)
+    xs2, cw2 = cards(2)
     # 이전
-    add_rounded_rect(s, Inches(0.8), Inches(1.7), Inches(5.7), Inches(4.3), LIGHT_GRAY)
-    add_text(s, Inches(1.0), Inches(2.0), Inches(5.3), Inches(0.6),
+    add_rounded_rect(s, Inches(xs2[0]), Inches(1.7), Inches(cw2), Inches(4.3), LIGHT_GRAY)
+    add_text(s, Inches(xs2[0] + 0.2), Inches(2.0), Inches(cw2 - 0.4), Inches(0.6),
              "❌  이전 방식", size=18, bold=True, color=GRAY)
-    add_text(s, Inches(1.0), Inches(2.9), Inches(5.3), Inches(3.0),
+    add_text(s, Inches(xs2[0] + 0.2), Inches(2.9), Inches(cw2 - 0.4), Inches(3.0),
              "• 종이 휴가증 작성\n\n• 휴가증함에 제출\n\n• 담당자가 매일 수거\n\n• 서무가 일일이 입력",
              size=15, color=DARK)
     # 새 방식
-    add_rounded_rect(s, Inches(6.8), Inches(1.7), Inches(5.7), Inches(4.3), LIGHT_RED)
-    add_text(s, Inches(7.0), Inches(2.0), Inches(5.3), Inches(0.6),
+    add_rounded_rect(s, Inches(xs2[1]), Inches(1.7), Inches(cw2), Inches(4.3), LIGHT_RED)
+    add_text(s, Inches(xs2[1] + 0.2), Inches(2.0), Inches(cw2 - 0.4), Inches(0.6),
              "✓  새 방식", size=18, bold=True, color=RED)
-    add_text(s, Inches(7.0), Inches(2.9), Inches(5.3), Inches(3.0),
+    add_text(s, Inches(xs2[1] + 0.2), Inches(2.9), Inches(cw2 - 0.4), Inches(3.0),
              "• 본인 휴대폰으로 사이트 접속\n\n• 본인 휴가증 직접 작성\n\n• 클라우드에 자동 저장\n\n• 서무가 한 번에 자동 등록",
              size=15, color=DARK)
-    add_text(s, Inches(0.8), Inches(6.3), Inches(11.7), Inches(0.5),
+    add_text(s, Inches(CONTENT_X), Inches(6.3), Inches(CONTENT_W), Inches(0.5),
              "→ 작성자는 그대로 본인. 종이 대신 휴대폰으로!",
              size=18, bold=True, color=RED, align=PP_ALIGN.CENTER)
     page_footer(s, 2, TOTAL)
@@ -125,8 +141,8 @@ def main():
              "1. 접속 & 로그인", size=28, bold=True, color=WHITE)
 
     # 사이트 주소
-    add_rounded_rect(s, Inches(1.0), Inches(1.5), Inches(11.3), Inches(0.9), LIGHT_RED)
-    add_text(s, Inches(1.0), Inches(1.5), Inches(11.3), Inches(0.9),
+    add_rounded_rect(s, Inches(CONTENT_X), Inches(1.5), Inches(CONTENT_W), Inches(0.9), LIGHT_RED)
+    add_text(s, Inches(CONTENT_X), Inches(1.5), Inches(CONTENT_W), Inches(0.9),
              "https://djlee-cosmax.github.io/Vacation-Permit-Auto-System/",
              size=17, bold=True, color=RED, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
 
@@ -136,20 +152,21 @@ def main():
         ("②", "사번 + 1234", "초기 비밀번호"),
         ("③", "로그인", "→ 메인 화면 진입"),
     ]
-    for i, (num, title, desc) in enumerate(steps):
-        x = Inches(0.8 + i * 4.2)
-        add_rounded_rect(s, x, Inches(2.8), Inches(3.9), Inches(2.6), LIGHT_RED)
-        add_text(s, x, Inches(3.0), Inches(3.9), Inches(0.7),
+    xs, cw = cards(3)
+    for (num, title, desc), cx in zip(steps, xs):
+        x = Inches(cx)
+        add_rounded_rect(s, x, Inches(2.8), Inches(cw), Inches(2.6), LIGHT_RED)
+        add_text(s, x, Inches(3.0), Inches(cw), Inches(0.7),
                  num, size=36, bold=True, color=RED, align=PP_ALIGN.CENTER)
-        add_text(s, x, Inches(3.9), Inches(3.9), Inches(0.5),
+        add_text(s, x, Inches(3.9), Inches(cw), Inches(0.5),
                  title, size=18, bold=True, color=DARK, align=PP_ALIGN.CENTER)
-        add_text(s, x, Inches(4.5), Inches(3.9), Inches(0.6),
+        add_text(s, x, Inches(4.5), Inches(cw), Inches(0.6),
                  desc, size=13, color=GRAY, align=PP_ALIGN.CENTER)
 
     # 안내 — 보안 질문은 폐지됐다(2026-07 인증 서버 이관). 대신 자동 로그아웃을 알린다.
     # 푸터가 7.0" 에 있어 상자는 6.95" 안에서 끝나야 한다.
-    add_rounded_rect(s, Inches(1.0), Inches(5.55), Inches(11.3), Inches(1.35), LIGHT_GRAY)
-    add_text(s, Inches(1.3), Inches(5.65), Inches(10.8), Inches(1.15),
+    add_rounded_rect(s, Inches(CONTENT_X), Inches(5.55), Inches(CONTENT_W), Inches(1.35), LIGHT_GRAY)
+    add_text(s, Inches(CONTENT_X + 0.3), Inches(5.65), Inches(CONTENT_W - 0.6), Inches(1.15),
              "⚠️ 첫 로그인 후 [내 정보] → [비밀번호 변경] → 새 비밀번호(숫자 6~10자리)\n"
              "⏱ 10분 동안 조작이 없으면 자동 로그아웃됩니다 — 다시 로그인하면 됩니다.",
              size=14, bold=True, color=DARK_RED, anchor=MSO_ANCHOR.MIDDLE)
@@ -161,15 +178,16 @@ def main():
     add_text(s, Inches(0.5), Inches(0.2), Inches(12.3), Inches(0.6),
              "2. 홈 화면에 추가하기 (권장)", size=28, bold=True, color=WHITE)
 
-    add_text(s, Inches(0.8), Inches(1.4), Inches(11.7), Inches(0.6),
+    add_text(s, Inches(CONTENT_X), Inches(1.4), Inches(CONTENT_W), Inches(0.6),
              "휴대폰 홈 화면에 추가하면 일반 앱처럼 아이콘 한 번에 실행됩니다.",
              size=15, color=DARK, align=PP_ALIGN.CENTER)
 
     # iOS 카드
-    add_rounded_rect(s, Inches(0.8), Inches(2.3), Inches(5.9), Inches(3.8), LIGHT_RED)
-    add_text(s, Inches(1.0), Inches(2.5), Inches(5.5), Inches(0.6),
+    xs4, cw4 = cards(2)
+    add_rounded_rect(s, Inches(xs4[0]), Inches(2.3), Inches(cw4), Inches(3.8), LIGHT_RED)
+    add_text(s, Inches(xs4[0] + 0.2), Inches(2.5), Inches(cw4 - 0.4), Inches(0.6),
              "📱 iOS (Safari)", size=20, bold=True, color=RED)
-    add_text(s, Inches(1.0), Inches(3.3), Inches(5.5), Inches(2.7),
+    add_text(s, Inches(xs4[0] + 0.2), Inches(3.3), Inches(cw4 - 0.4), Inches(2.7),
              "① 사이트 접속\n\n"
              "② 하단 가운데 공유 버튼 ⬆️ 탭\n\n"
              "③ \"홈 화면에 추가\" 선택\n\n"
@@ -177,10 +195,10 @@ def main():
              size=14, color=DARK)
 
     # Android 카드
-    add_rounded_rect(s, Inches(6.8), Inches(2.3), Inches(5.9), Inches(3.8), LIGHT_RED)
-    add_text(s, Inches(7.0), Inches(2.5), Inches(5.5), Inches(0.6),
+    add_rounded_rect(s, Inches(xs4[1]), Inches(2.3), Inches(cw4), Inches(3.8), LIGHT_RED)
+    add_text(s, Inches(xs4[1] + 0.2), Inches(2.5), Inches(cw4 - 0.4), Inches(0.6),
              "🤖 Android (Chrome)", size=20, bold=True, color=RED)
-    add_text(s, Inches(7.0), Inches(3.3), Inches(5.5), Inches(2.7),
+    add_text(s, Inches(xs4[1] + 0.2), Inches(3.3), Inches(cw4 - 0.4), Inches(2.7),
              "① 사이트 접속\n\n"
              "② 우상단 ⋮ (점 세 개) 탭\n\n"
              "③ \"홈 화면에 추가\" 선택\n\n"
@@ -188,8 +206,8 @@ def main():
              size=14, color=DARK)
 
     # 안내 박스
-    add_rounded_rect(s, Inches(0.8), Inches(6.3), Inches(11.9), Inches(0.7), LIGHT_GRAY)
-    add_text(s, Inches(1.0), Inches(6.3), Inches(11.5), Inches(0.7),
+    add_rounded_rect(s, Inches(CONTENT_X), Inches(6.3), Inches(CONTENT_W), Inches(0.7), LIGHT_GRAY)
+    add_text(s, Inches(CONTENT_X + 0.2), Inches(6.3), Inches(CONTENT_W - 0.4), Inches(0.7),
              "💡 추가 후 아이콘 탭 → 풀스크린 앱으로 실행 / 새로고침은 상단 ↻ 아이콘",
              size=12, bold=True, color=DARK_RED, anchor=MSO_ANCHOR.MIDDLE)
     page_footer(s, 4, TOTAL)
@@ -201,7 +219,7 @@ def main():
              "3. 휴가증 작성", size=28, bold=True, color=WHITE)
 
     # 좌측 - 작성 절차
-    add_text(s, Inches(0.8), Inches(1.5), Inches(6.0), Inches(0.5),
+    add_text(s, Inches(CONTENT_X), Inches(1.5), Inches(6.0), Inches(0.5),
              "왼쪽 [휴가증 작성] 카드에서:", size=14, bold=True, color=DARK)
     steps = [
         ("1.", "구분 선택", "연차, 반차, 생휴 등"),
@@ -211,15 +229,15 @@ def main():
     ]
     for i, (n, t, d) in enumerate(steps):
         y = Inches(2.1 + i * 0.7)
-        add_text(s, Inches(0.8), y, Inches(0.4), Inches(0.5),
+        add_text(s, Inches(CONTENT_X), y, Inches(0.4), Inches(0.5),
                  n, size=15, bold=True, color=RED)
-        add_text(s, Inches(1.3), y, Inches(2.2), Inches(0.5),
+        add_text(s, Inches(CONTENT_X + 0.5), y, Inches(2.2), Inches(0.5),
                  t, size=14, bold=True, color=DARK)
-        add_text(s, Inches(3.6), y, Inches(3.2), Inches(0.5),
+        add_text(s, Inches(CONTENT_X + 2.8), y, Inches(3.2), Inches(0.5),
                  d, size=12, color=GRAY)
     # 안내
-    add_rounded_rect(s, Inches(0.8), Inches(5.05), Inches(6.0), Inches(1.75), LIGHT_RED)
-    add_text(s, Inches(1.0), Inches(5.18), Inches(5.6), Inches(1.5),
+    add_rounded_rect(s, Inches(CONTENT_X), Inches(5.05), Inches(6.0), Inches(1.75), LIGHT_RED)
+    add_text(s, Inches(CONTENT_X + 0.2), Inches(5.18), Inches(5.6), Inches(1.5),
              "• 이름·연락처는 자동 채움 (수정 불가)\n"
              "• 여러 유형은 휴가증 따로 작성 (예: 연차+반차 = 2건)\n"
              "• 같은 날짜 합계 1일 초과 시 등록 차단\n"
@@ -229,7 +247,7 @@ def main():
              size=12, color=DARK)
 
     # 우측 - 휴가 유형 표
-    add_text(s, Inches(7.2), Inches(1.5), Inches(5.5), Inches(0.5),
+    add_text(s, Inches(CONTENT_X + 6.4), Inches(1.5), Inches(5.5), Inches(0.5),
              "휴가 유형:", size=14, bold=True, color=DARK)
     rows = [
         ("구분", "1개당"),
@@ -240,7 +258,7 @@ def main():
         ("하기휴가", "3.0일"),
         ("결근(전/오전/오후)", "1.0/0.5일"),
     ]
-    tbl_x = Inches(7.2); tbl_y = Inches(2.1); rh = Inches(0.55)
+    tbl_x = Inches(CONTENT_X + 6.4); tbl_y = Inches(2.1); rh = Inches(0.55)
     cols = [Inches(3.5), Inches(2.0)]
     for ri, row in enumerate(rows):
         y = tbl_y + rh * ri
@@ -262,22 +280,22 @@ def main():
              "4. 내 휴가증 확인 & FAQ", size=28, bold=True, color=WHITE)
 
     # 내 휴가증 (좌측)
-    add_text(s, Inches(0.8), Inches(1.4), Inches(6.0), Inches(0.5),
+    add_text(s, Inches(CONTENT_X), Inches(1.4), Inches(6.0), Inches(0.5),
              "내 휴가증 확인", size=16, bold=True, color=RED)
-    add_rounded_rect(s, Inches(0.8), Inches(2.0), Inches(6.0), Inches(2.4), LIGHT_RED)
-    add_text(s, Inches(1.0), Inches(2.15), Inches(5.6), Inches(2.2),
+    add_rounded_rect(s, Inches(CONTENT_X), Inches(2.0), Inches(6.0), Inches(2.4), LIGHT_RED)
+    add_text(s, Inches(CONTENT_X + 0.2), Inches(2.15), Inches(5.6), Inches(2.2),
              "① 상단 [내 휴가증] 클릭\n\n"
              "② 서무가 등록 완료한 본인 휴가증이\n   바로 표시됩니다.\n   (✓ 처리 완료 표시, 최근 14일)\n\n"
              "③ 위쪽에 내 잔여 휴가(개수)도 함께 표시\n   연차 · 생휴 · 하기휴가(5~10월)",
              size=13, color=DARK)
     # 세 줄짜리 안내다. 상자를 2.0" 로 두면 아래가 텅 빈 회색 덩어리로 보인다.
-    add_rounded_rect(s, Inches(0.8), Inches(4.75), Inches(6.0), Inches(1.25), LIGHT_GRAY)
-    add_text(s, Inches(1.0), Inches(4.85), Inches(5.6), Inches(1.05),
+    add_rounded_rect(s, Inches(CONTENT_X), Inches(4.75), Inches(6.0), Inches(1.25), LIGHT_GRAY)
+    add_text(s, Inches(CONTENT_X + 0.2), Inches(4.85), Inches(5.6), Inches(1.05),
              "⚠️ 잘못 작성 시\n작성 직후 우측 카드의 [삭제]로 즉시 취소.\n서무 처리 후엔 별도 요청 필요.",
              size=12, color=DARK)
 
     # FAQ (우측)
-    add_text(s, Inches(7.2), Inches(1.4), Inches(5.7), Inches(0.5),
+    add_text(s, Inches(CONTENT_X + 6.4), Inches(1.4), Inches(5.5), Inches(0.5),
              "자주 묻는 질문", size=16, bold=True, color=RED)
     # [비밀번호 찾기] 는 없어졌다 — 보안 질문 폐지(2026-07)로 서무 요청 → 관리자 처리 방식이다.
     qa = [
@@ -289,9 +307,9 @@ def main():
     ]
     for i, (q, a) in enumerate(qa):
         y = Inches(1.95 + i * 0.95)
-        add_text(s, Inches(7.2), y, Inches(5.7), Inches(0.35),
+        add_text(s, Inches(CONTENT_X + 6.4), y, Inches(5.5), Inches(0.35),
                  q, size=13, bold=True, color=DARK)
-        add_text(s, Inches(7.4), y + Inches(0.35), Inches(5.5), Inches(0.55),
+        add_text(s, Inches(CONTENT_X + 6.6), y + Inches(0.35), Inches(5.3), Inches(0.55),
                  "→ " + a, size=12, color=GRAY)
     page_footer(s, 6, TOTAL)
 
