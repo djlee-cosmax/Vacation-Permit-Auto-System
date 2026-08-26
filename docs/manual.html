@@ -238,14 +238,14 @@
 
 <!-- ===== 표지 ===== -->
 <div class="cover">
-  <div class="brand">COSMAX · 생산3팀</div>
+  <div class="brand">COSMAX</div>
   <h1>휴가증 자동 반영 프로그램</h1>
   <div class="subtitle">종합 매뉴얼</div>
   <div class="divider"></div>
   <div class="meta">
     <strong>대상:</strong> 작업자 / 서무 담당자<br>
     <strong>발행:</strong> 2026-05-22 &nbsp;·&nbsp; <strong>개정:</strong> 2026-08-26<br>
-    <strong>담당:</strong> 이동준 (생산3팀)
+    <strong>대상 부서:</strong> 도입 부서에서 채워 주세요
   </div>
 </div>
 
@@ -307,8 +307,8 @@
 <table>
   <thead><tr><th>역할</th><th>담당</th><th>가능한 기능</th></tr></thead>
   <tbody>
-    <tr><td>관리자</td><td>이동준</td><td>모든 기능</td></tr>
-    <tr><td>서무</td><td>김가영</td><td>서버 불러오기 / 파일 내보내기 / 처리 완료</td></tr>
+    <tr><td>관리자</td><td>부서 담당자 1명</td><td>모든 기능</td></tr>
+    <tr><td>서무</td><td>부서 서무</td><td>서버 불러오기 / 파일 내보내기 / 프로그램 실행</td></tr>
     <tr><td>작업자</td><td>각자 본인</td><td>휴가증 작성 / 내 휴가증 조회·취소</td></tr>
   </tbody>
 </table>
@@ -340,7 +340,7 @@
 
 <div class="info-box">
   <strong>비밀번호를 잊었을 때:</strong> 서무에게 초기화를 요청하세요.
-  서무가 접수하면 이름 옆에 <strong>[초기화 대기]</strong> 표시가 붙고, 관리자(이동준)가 처리하면 초기화됩니다.
+  서무가 접수하면 이름 옆에 <strong>[초기화 대기]</strong> 표시가 붙고, 관리자가 처리하면 초기화됩니다.
   <strong>요청 즉시 바뀌지는 않으니</strong> 표시가 사라진 뒤 사번 + <strong>1234</strong>로 로그인해 새 비밀번호를 등록해 주세요.
 </div>
 
@@ -402,7 +402,7 @@
 <table>
   <thead><tr><th style="width:40%">증상</th><th>해결</th></tr></thead>
   <tbody>
-    <tr><td>"등록되지 않은 사번"</td><td>관리자(이동준)에게 명단 추가 요청</td></tr>
+    <tr><td>"등록되지 않은 사번"</td><td>관리자에게 명단 추가 요청</td></tr>
     <tr><td>비밀번호 분실</td><td><strong>서무에게 초기화 요청</strong> → 이름 옆 <strong>[초기화 대기]</strong> 표시가 사라지면 사번 + <strong>1234</strong>로 로그인 → 새 비밀번호 등록<br><span style="color:#666">요청 즉시 바뀌지 않습니다 — 관리자가 처리해야 초기화됩니다.</span></td></tr>
     <tr><td>초기화를 요청했는데 아직 1234로 안 됨</td><td>관리자 처리 전입니다. 명단에 <strong>[초기화 대기]</strong> 표시가 남아 있는지 서무에게 확인 요청</td></tr>
     <tr><td>비밀번호가 갑자기 안 됨</td><td>대소문자·숫자 확인 후에도 안 되면 서무에게 초기화 요청 (연속 실패 시 잠시 차단될 수 있음 — 몇 분 뒤 재시도)</td></tr>
@@ -475,7 +475,7 @@
 <ol class="steps">
   <li>PC에서 <strong>[작업자 명단]</strong> → 해당 작업자 행의 <strong>[초기화 요청]</strong> 버튼 클릭 → 요청 접수<br>
       <span class="mono">이 단계에서는 아직 초기화되지 않습니다.</span> 이름 옆에 <strong>[초기화 대기]</strong> 표시가 붙습니다.</li>
-  <li>관리자(이동준)가 GitHub Actions의 <strong>[계정 관리]</strong> 워크플로를 실행<br>
+  <li>관리자가 GitHub Actions의 <strong>[계정 관리]</strong> 워크플로를 실행<br>
       <span class="mono">action = reset</span> / <span class="mono">사번 = 해당 작업자 사번</span><br>
       처리되면 <strong>[초기화 대기]</strong> 표시가 사라집니다.</li>
   <li>작업자에게 <strong>사번 + 1234</strong>로 로그인하도록 안내</li>
@@ -489,7 +489,7 @@
 <h3>3.6 퇴직자 명단 삭제</h3>
 <p>퇴직·전출로 명단에서 완전히 빼야 할 때의 절차입니다. <strong>명단 화면에서 지우는 것만으로는 삭제되지 않습니다</strong> — 새로고침하면 서버 명단에서 다시 채워집니다.</p>
 <ol class="steps">
-  <li>관리자(이동준)가 GitHub Actions의 <strong>[계정 관리]</strong> 워크플로 실행<br>
+  <li>관리자가 GitHub Actions의 <strong>[계정 관리]</strong> 워크플로 실행<br>
       <span class="mono">action = remove</span> / <span class="mono">사번 = 퇴직자 사번</span> / <span class="mono">confirm = 비워둠</span></li>
   <li>실행 로그에서 <strong>삭제 대상과 백업 JSON</strong> 확인 (이 단계에서는 아무것도 지우지 않음)</li>
   <li>맞으면 같은 워크플로를 <span class="mono">confirm = DELETE</span> 로 다시 실행 → 실제 삭제</li>
@@ -506,13 +506,13 @@
     <tr><td>[서버에서 불러오기] 버튼이 안 보임</td><td>서무 사번으로 다시 로그인</td></tr>
     <tr><td>작업자가 비밀번호를 잊음</td><td><strong>3.5 절차</strong>대로 초기화 요청 → 관리자가 처리 → 1234로 로그인</td></tr>
     <tr><td>자동화 에러 (setup/run.bat)</td><td>Python PATH 확인 / setup.bat 재실행</td></tr>
-    <tr><td>실수로 [처리 완료] 일찍 클릭</td><td>관리자(이동준)에게 요청</td></tr>
+    <tr><td>실수로 [처리 완료] 일찍 클릭</td><td>관리자에게 요청</td></tr>
     <tr><td>자동화가 중간에 멈춤</td><td><span class="mono">error_*.png</span>, <span class="mono">last_error.log</span>를 관리자에게 전달</td></tr>
   </tbody>
 </table>
 
 <div class="footer-note">
-  COSMAX 생산3팀 · 휴가증 자동 반영 프로그램 종합 매뉴얼 · 2026-08-26 · 담당 이동준
+  COSMAX · 휴가증 자동 반영 프로그램 종합 매뉴얼 · 2026-08-26
 </div>
 
 </section>
