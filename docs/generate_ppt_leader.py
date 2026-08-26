@@ -21,6 +21,21 @@ from generate_ppt import (
 OUT = Path(__file__).resolve().parent / "휴가증 자동 반영 프로그램 안내 (서무용).pptx"
 TOTAL = 6
 
+# 본문 폭과 왼쪽 끝. 슬라이드 가운데(6.6665")를 기준으로 잡는다.
+#
+# 처음에는 왼쪽 0.8 에서 시작해 카드 간격만 정했는데, 마지막 카드가 13.10 에서
+# 끝나 오른쪽 여백이 0.23 밖에 안 남았다 — 눈에 띄게 오른쪽으로 밀려 보인다.
+# 폭을 먼저 정하고 남는 만큼을 좌우로 나누면 그럴 일이 없다.
+SLIDE_W = 13.333
+CONTENT_W = 11.9
+CONTENT_X = (SLIDE_W - CONTENT_W) / 2      # 0.7165
+
+
+def cards(n, gap=0.3):
+    """카드 n개를 본문 폭 안에 고르게 편다. (왼쪽 x 목록, 카드 폭) 반환."""
+    w = (CONTENT_W - gap * (n - 1)) / n
+    return [CONTENT_X + i * (w + gap) for i in range(n)], w
+
 
 def header(prs, slide, title):
     add_rect(slide, 0, 0, prs.slide_width, Inches(1.0), RED)
@@ -68,23 +83,24 @@ def main():
         ("②", "파일로 내보내기", "JSON · XLSX 가\n다운로드 폴더에 저장"),
         ("③", "프로그램 실행", "자동화가 그룹웨어에\n임시저장합니다"),
     ]
-    for i, (num, title, desc) in enumerate(steps):
-        x = Inches(0.8 + i * 4.2)
-        add_rounded_rect(s, x, Inches(1.95), Inches(3.9), Inches(2.9), LIGHT_RED)
-        add_text(s, x, Inches(2.15), Inches(3.9), Inches(0.7),
+    xs, cw = cards(3)
+    for (num, title, desc), cx in zip(steps, xs):
+        x = Inches(cx)
+        add_rounded_rect(s, x, Inches(1.95), Inches(cw), Inches(2.9), LIGHT_RED)
+        add_text(s, x, Inches(2.15), Inches(cw), Inches(0.7),
                  num, size=36, bold=True, color=RED, align=PP_ALIGN.CENTER)
-        add_text(s, x, Inches(3.0), Inches(3.9), Inches(0.5),
+        add_text(s, x, Inches(3.0), Inches(cw), Inches(0.5),
                  title, size=17, bold=True, color=DARK, align=PP_ALIGN.CENTER)
-        add_text(s, x, Inches(3.6), Inches(3.9), Inches(1.1),
+        add_text(s, x, Inches(3.6), Inches(cw), Inches(1.1),
                  desc, size=12.5, color=GRAY, align=PP_ALIGN.CENTER)
 
-    add_rounded_rect(s, Inches(0.8), Inches(5.15), Inches(11.9), Inches(0.85), LIGHT_GRAY)
-    add_text(s, Inches(1.1), Inches(5.15), Inches(11.3), Inches(0.85),
+    add_rounded_rect(s, Inches(CONTENT_X), Inches(5.15), Inches(CONTENT_W), Inches(0.85), LIGHT_GRAY)
+    add_text(s, Inches(CONTENT_X + 0.3), Inches(5.15), Inches(CONTENT_W - 0.6), Inches(0.85),
              "④ 그룹웨어에서 내용을 검토하고 직접 신청합니다 — 마지막 확인은 사람이 합니다.",
              size=13.5, bold=True, color=DARK, anchor=MSO_ANCHOR.MIDDLE)
 
-    add_rounded_rect(s, Inches(0.8), Inches(6.15), Inches(11.9), Inches(0.75), LIGHT_RED)
-    add_text(s, Inches(1.1), Inches(6.15), Inches(11.3), Inches(0.75),
+    add_rounded_rect(s, Inches(CONTENT_X), Inches(6.15), Inches(CONTENT_W), Inches(0.75), LIGHT_RED)
+    add_text(s, Inches(CONTENT_X + 0.3), Inches(6.15), Inches(CONTENT_W - 0.6), Inches(0.75),
              "⚠️ run.bat 을 직접 열지 마세요. ③ [프로그램 실행] 을 눌러야 같은 자동화가 돕니다.",
              size=13.5, bold=True, color=DARK_RED, anchor=MSO_ANCHOR.MIDDLE)
     footer(s, 2)
@@ -98,29 +114,31 @@ def main():
              size=17, bold=True, color=RED, align=PP_ALIGN.CENTER)
 
     # 이전 / 지금
-    add_rounded_rect(s, Inches(0.8), Inches(2.1), Inches(5.7), Inches(2.5), LIGHT_GRAY)
-    add_text(s, Inches(1.0), Inches(2.3), Inches(5.3), Inches(0.5),
+    xs2, cw2 = cards(2)
+    add_rounded_rect(s, Inches(xs2[0]), Inches(2.1), Inches(cw2), Inches(2.5), LIGHT_GRAY)
+    add_text(s, Inches(xs2[0] + 0.25), Inches(2.3), Inches(cw2 - 0.5), Inches(0.5),
              "지금까지", size=17, bold=True, color=GRAY)
-    add_text(s, Inches(1.0), Inches(2.95), Inches(5.3), Inches(1.5),
-             "• 잔여가 안 맞으면\n   명단에서 손으로 고침\n• 매번 확인이 필요했음",
+    # 줄바꿈을 넣었더니 오히려 어색해서 뺐다 — 상자 폭에 한 줄로 들어간다.
+    add_text(s, Inches(xs2[0] + 0.25), Inches(2.95), Inches(cw2 - 0.5), Inches(1.5),
+             "• 잔여가 안 맞으면 명단에서 손으로 고침\n• 매번 확인이 필요했음",
              size=14, color=DARK)
 
-    add_rounded_rect(s, Inches(6.8), Inches(2.1), Inches(5.7), Inches(2.5), LIGHT_RED)
-    add_text(s, Inches(7.0), Inches(2.3), Inches(5.3), Inches(0.5),
+    add_rounded_rect(s, Inches(xs2[1]), Inches(2.1), Inches(cw2), Inches(2.5), LIGHT_RED)
+    add_text(s, Inches(xs2[1] + 0.25), Inches(2.3), Inches(cw2 - 0.5), Inches(0.5),
              "앞으로", size=17, bold=True, color=RED)
-    add_text(s, Inches(7.0), Inches(2.95), Inches(5.3), Inches(1.5),
+    add_text(s, Inches(xs2[1] + 0.25), Inches(2.95), Inches(cw2 - 0.5), Inches(1.5),
              "• 서버가 매일 저녁 자동 차감\n• 서무는 아무것도 안 해도 됨\n• 시간이 지나면 저절로 맞음",
              size=14, color=DARK)
 
     # 예외
-    add_rounded_rect(s, Inches(0.8), Inches(4.85), Inches(11.9), Inches(1.0), LIGHT_GRAY)
-    add_text(s, Inches(1.1), Inches(4.85), Inches(11.3), Inches(1.0),
+    add_rounded_rect(s, Inches(CONTENT_X), Inches(4.85), Inches(CONTENT_W), Inches(1.0), LIGHT_GRAY)
+    add_text(s, Inches(CONTENT_X + 0.3), Inches(4.85), Inches(CONTENT_W - 0.6), Inches(1.0),
              "다만 연차는 그룹웨어 실제 잔여와 다르면 고쳐도 됩니다.\n"
              "고친 시점이 새 기준이 되어 그 이전 휴가증은 다시 빠지지 않습니다.",
              size=13.5, color=DARK, anchor=MSO_ANCHOR.MIDDLE)
 
-    add_rounded_rect(s, Inches(0.8), Inches(6.0), Inches(11.9), Inches(0.9), LIGHT_RED)
-    add_text(s, Inches(1.1), Inches(6.0), Inches(11.3), Inches(0.9),
+    add_rounded_rect(s, Inches(CONTENT_X), Inches(6.0), Inches(CONTENT_W), Inches(0.9), LIGHT_RED)
+    add_text(s, Inches(CONTENT_X + 0.3), Inches(6.0), Inches(CONTENT_W - 0.6), Inches(0.9),
              "⚠️ 생휴 · 하기휴가 칸은 절대 손대지 마세요.\n"
              "     손으로 줄이면 자동 차감이 또 빼서 마이너스가 됩니다.",
              size=13.5, bold=True, color=DARK_RED, anchor=MSO_ANCHOR.MIDDLE)
@@ -144,16 +162,17 @@ def main():
          "• 퇴직자 명단 삭제\n"
          "• 비밀번호 실제 초기화 처리"),
     ]
-    for i, (title, col, bg, body) in enumerate(can):
-        x = Inches(0.8 + i * 6.0)
-        add_rounded_rect(s, x, Inches(2.0), Inches(5.7), Inches(2.9), bg)
-        add_text(s, x + Inches(0.25), Inches(2.2), Inches(5.2), Inches(0.5),
+    xs4, cw4 = cards(2)
+    for (title, col, bg, body), cx in zip(can, xs4):
+        x = Inches(cx)
+        add_rounded_rect(s, x, Inches(2.0), Inches(cw4), Inches(2.9), bg)
+        add_text(s, Inches(cx + 0.25), Inches(2.2), Inches(cw4 - 0.5), Inches(0.5),
                  title, size=17, bold=True, color=col)
-        add_text(s, x + Inches(0.25), Inches(2.9), Inches(5.2), Inches(1.8),
+        add_text(s, Inches(cx + 0.25), Inches(2.9), Inches(cw4 - 0.5), Inches(1.8),
                  body, size=14, color=DARK)
 
-    add_rounded_rect(s, Inches(0.8), Inches(5.2), Inches(11.9), Inches(1.35), LIGHT_GRAY)
-    add_text(s, Inches(1.1), Inches(5.2), Inches(11.3), Inches(1.35),
+    add_rounded_rect(s, Inches(CONTENT_X), Inches(5.2), Inches(CONTENT_W), Inches(1.35), LIGHT_GRAY)
+    add_text(s, Inches(CONTENT_X + 0.3), Inches(5.2), Inches(CONTENT_W - 0.6), Inches(1.35),
              "명단을 고친 뒤에는 관리자에게 알려 주세요.\n"
              "이름 · 근무지는 로그인 화면에도 쓰이는 값이라 서버 쪽도 함께 맞춰야 합니다.",
              size=13.5, color=DARK, anchor=MSO_ANCHOR.MIDDLE)
@@ -173,18 +192,19 @@ def main():
         ("③", "관리자 처리", "표시가 사라지면\n초기화된 것입니다"),
         ("④", "사번 + 1234", "작업자에게 알려 주세요\n로그인 후 새 비밀번호 등록"),
     ]
-    for i, (num, title, desc) in enumerate(flow):
-        x = Inches(0.7 + i * 3.15)
-        add_rounded_rect(s, x, Inches(2.0), Inches(2.95), Inches(2.9), LIGHT_RED)
-        add_text(s, x, Inches(2.2), Inches(2.95), Inches(0.6),
+    xs5, cw5 = cards(4)
+    for (num, title, desc), cx in zip(flow, xs5):
+        x = Inches(cx)
+        add_rounded_rect(s, x, Inches(2.0), Inches(cw5), Inches(2.9), LIGHT_RED)
+        add_text(s, x, Inches(2.2), Inches(cw5), Inches(0.6),
                  num, size=30, bold=True, color=RED, align=PP_ALIGN.CENTER)
-        add_text(s, x, Inches(2.95), Inches(2.95), Inches(0.5),
+        add_text(s, x, Inches(2.95), Inches(cw5), Inches(0.5),
                  title, size=15, bold=True, color=DARK, align=PP_ALIGN.CENTER)
-        add_text(s, x, Inches(3.55), Inches(2.95), Inches(1.2),
+        add_text(s, x, Inches(3.55), Inches(cw5), Inches(1.2),
                  desc, size=12, color=GRAY, align=PP_ALIGN.CENTER)
 
-    add_rounded_rect(s, Inches(0.8), Inches(5.25), Inches(11.9), Inches(1.3), LIGHT_GRAY)
-    add_text(s, Inches(1.1), Inches(5.25), Inches(11.3), Inches(1.3),
+    add_rounded_rect(s, Inches(CONTENT_X), Inches(5.25), Inches(CONTENT_W), Inches(1.3), LIGHT_GRAY)
+    add_text(s, Inches(CONTENT_X + 0.3), Inches(5.25), Inches(CONTENT_W - 0.6), Inches(1.3),
              "요청만으로는 초기화되지 않습니다. 관리자가 처리해야 [초기화 대기] 표시가 사라집니다.\n"
              "비밀번호는 서버가 복원할 수 없는 형태로 보관하므로 초기화만 가능합니다.",
              size=13.5, color=DARK, anchor=MSO_ANCHOR.MIDDLE)
@@ -205,10 +225,10 @@ def main():
     y0 = 1.35
     for i, (q, a) in enumerate(qa):
         y = Inches(y0 + i * 0.92)
-        add_rounded_rect(s, Inches(0.8), y, Inches(11.9), Inches(0.78), LIGHT_GRAY)
-        add_text(s, Inches(1.1), y, Inches(5.3), Inches(0.78),
+        add_rounded_rect(s, Inches(CONTENT_X), y, Inches(CONTENT_W), Inches(0.78), LIGHT_GRAY)
+        add_text(s, Inches(CONTENT_X + 0.3), y, Inches(5.2), Inches(0.78),
                  q, size=13, bold=True, color=DARK, anchor=MSO_ANCHOR.MIDDLE)
-        add_text(s, Inches(6.6), y, Inches(5.9), Inches(0.78),
+        add_text(s, Inches(CONTENT_X + 5.8), y, Inches(CONTENT_W - 6.1), Inches(0.78),
                  "→ " + a, size=13, color=GRAY, anchor=MSO_ANCHOR.MIDDLE)
     footer(s, 6)
 
