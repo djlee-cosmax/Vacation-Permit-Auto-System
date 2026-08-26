@@ -1140,6 +1140,86 @@ async function actionRemove(db) {
   console.log('    각 기기는 다음 접속 시 명단에서 자동으로 사라집니다.');
 }
 
+// ---------- dropleave: 휴가증 한 장을 지운다 ----------
+//
+// 작성했다가 실제로는 쓰지 않은 건을 정리한다(신청 후 취소 등). 화면에는
+// 처리 완료된 남의 휴가증을 지우는 경로가 없다 — [서버에서 불러오기] 가
+// processed=true 인 것을 다시 가져오지 않기 때문이다.
+//
+// 이미 차감된 건이면 잔여를 되돌린 뒤 지운다. 안 그러면 쓰지도 않은 휴가가
+// 차감된 채로 남는다.
+//
+// EMP_ID 에 휴가증 문서 ID 를 넣는다 (leavecheck 출력 맨 오른쪽).
+async function actionDropLeave(db) {
+  const id = String(process.env.EMP_ID || '').trim();
+  if (!id) throw new Error('EMP_ID 에 휴가증 문서 ID 가 필요합니다. (leavecheck 참고)');
+  const confirmed = String(process.env.CONFIRM || '').trim() === 'DELETE';
+
+  console.log(`===== 휴가증 삭제${confirmed ? '' : ' (미리보기)'} =====`);
+  const ref = db.collection('leaves').doc(id);
+  const doc = await ref.get();
+  if (!doc.exists) {
+    console.log(`※ 그런 휴가증이 없습니다: ${id}`);
+    process.exitCode = 1;
+    return;
+  }
+  const v = doc.data() || {};
+  const empId = String(v.employeeId || '').trim();
+  const items = leaveItemsOf(v);
+  const kinds = items.map((it) => `${it.type} ${it.count || 1}개`).join(', ');
+
+  console.log(`문서   ${id}`);
+  console.log(`대상   ${empId}  ${maskName(v.name)}`);
+  console.log(`내용   ${v.start || '?'} ~ ${v.end || '?'}  ${kinds}`);
+  console.log(`상태   처리 ${v.processed === true ? 'O' : 'X'} · 차감 ${v.deductedAt ? 'O' : 'X'}`);
+
+  // 차감돼 있으면 되돌릴 양을 계산한다
+  const back = { annual: 0, birth: 0, summer: 0 };
+  if (v.deductedAt) {
+    items.forEach((it) => {
+      const count = parseFloat(it.count) || 0;
+      if (count <= 0) return;
+      const t = it.type;
+      if (t === '연차' || String(t).startsWith('반차') || String(t).startsWith('반반차')) {
+        back.annual += (TYPE_WEIGHT[t] || 0) * count;
+      } else if (t === '생휴') back.birth += count;
+      else if (t === '하기휴가') back.summer += count;
+    });
+    const parts = Object.entries(back).filter(([, n]) => n > 0).map(([k, n]) => `${k} +${n}`);
+    console.log(`환원   ${parts.join(' · ') || '없음'}`);
+  }
+
+  if (!confirmed) {
+    console.log('');
+    console.log('>>> 미리보기입니다. 지우려면 confirm 입력란에 DELETE 를 넣고 다시 실행하세요.');
+    console.log('    되돌릴 수 없습니다.');
+    return;
+  }
+
+  if (v.deductedAt && empId && (back.annual || back.birth || back.summer)) {
+    const uDoc = await db.collection('users').doc(empId).get();
+    const u = uDoc.exists ? (uDoc.data() || {}) : {};
+    const upd = {};
+    if (back.annual) upd.balanceAnnual = Math.round(((u.balanceAnnual || 0) + back.annual) * 100) / 100;
+    if (back.birth) upd.balanceBirth = (u.balanceBirth || 0) + back.birth;
+    if (back.summer) upd.balanceSummer = (u.balanceSummer || 0) + back.summer;
+    await db.collection('users').doc(empId).set(upd, { merge: true });
+    await db.collection('balanceLogs').add({
+      empId, type: 'revert',
+      changes: { annual: back.annual, birth: back.birth, summer: back.summer },
+      meta: { via: 'github-actions', reason: 'dropleave', leaveId: id },
+      byEmpId: null, byName: 'GitHub Actions', byUid: null,
+      at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    console.log('  차감분 환원 완료');
+  }
+
+  await ref.delete();
+  console.log('  휴가증 삭제 완료');
+  console.log('');
+  console.log('>>> 삭제했습니다.');
+}
+
 // ---------- fixsummer: 쪼개 쓴 하기휴가를 한 장으로 합친다 ----------
 //
 // 하기휴가는 1개 = 연속 3일이다. 그런데 작성 화면이 개수를 1로 고정할 뿐,
@@ -1532,6 +1612,7 @@ async function actionLeaveCheckOne(db, q) {
     const items = Array.isArray(v.items) ? v.items : [];
     const kinds = items.map((it) => `${(it && it.type) || '?'} ${(it && it.count) || 1}개`).join(', ');
     rows.push({
+      id: d.id,
       start: v.start || '?',
       end: v.end || '?',
       kinds: kinds || '(항목없음)',
@@ -1542,7 +1623,8 @@ async function actionLeaveCheckOne(db, q) {
   rows.sort((a, b) => String(a.start).localeCompare(String(b.start)));
   rows.forEach((r) => {
     console.log(`  ${r.start} ~ ${r.end}  ${r.kinds.padEnd(22, ' ')}`
-      + `  처리 ${r.processed ? 'O' : 'X'}  차감 ${r.deducted ? 'O' : 'X'}`);
+      + `  처리 ${r.processed ? 'O' : 'X'}  차감 ${r.deducted ? 'O' : 'X'}`
+      + `  ${r.id}`);
   });
   const notDeducted = rows.filter((r) => r.processed && !r.deducted);
   if (notDeducted.length) {
@@ -1990,6 +2072,7 @@ async function main() {
   if (action === 'leavecheck') return actionLeaveCheck(db);
   if (action === 'settle') return actionSettle(db);
   if (action === 'fixsummer') return actionFixSummer(db);
+  if (action === 'dropleave') return actionDropLeave(db);
   throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | deployrules `
     + `| testrules | cleanup | claims | premigrate | syncprofile | stats | anonoff `
     + `| fixleaveids | reset | remove)`);
