@@ -1179,7 +1179,13 @@ function leaveItemsOf(v) {
 
 async function actionSettle(db) {
   const confirmed = String(process.env.CONFIRM || '').trim() === 'OK';
+  // 초과 사용이라 손으로 정리해야 하는 사람은 EMP_ID 에 쉼표로 적어 뺀다.
+  // (예: 하기휴가를 하루씩 세 장으로 쓴 경우, 생휴를 한 달에 두 번 쓴 경우)
+  const skip = new Set(
+    String(process.env.EMP_ID || '').split(',').map((s) => s.trim()).filter(Boolean)
+  );
   console.log(`===== 차감 정산${confirmed ? '' : ' (미리보기)'} =====`);
+  if (skip.size) console.log(`제외 사번  ${[...skip].join(', ')}`);
 
   // 항목마다 "언제부터 안 빠졌는가" 가 다르다. 하나로 자르면 틀린다.
   //
@@ -1217,6 +1223,7 @@ async function actionSettle(db) {
     if (v.deductedAt) { already++; return; }
     const empId = String(v.employeeId || '').trim();
     if (!empId) { skippedNoId++; return; }
+    if (skip.has(empId)) return;
 
     // 아직 오지 않은 휴가는 차감하지 않는다.
     // 생휴는 매달 1일 1개로 리셋된다(reset-birth). 9월 생휴를 8월에 빼 두면
