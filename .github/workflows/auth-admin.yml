@@ -33,6 +33,7 @@ on:
           - purge
           - leavecheck
           - settle
+          - fixsummer
           - remove
       emp_id:
         description: '사번 (leavecheck 은 이름도 됩니다)'

@@ -1140,6 +1140,93 @@ async function actionRemove(db) {
   console.log('    각 기기는 다음 접속 시 명단에서 자동으로 사라집니다.');
 }
 
+// ---------- fixsummer: 쪼개 쓴 하기휴가를 한 장으로 합친다 ----------
+//
+// 하기휴가는 1개 = 연속 3일이다. 그런데 작성 화면이 개수를 1로 고정할 뿐,
+// 하루씩 세 번 쓰는 것을 막지 않는다. 그러면 각각 1개로 잡혀 3개가 된다.
+// 사흘을 쓴 사람이 잔여에서 3개 빠지는 셈이다.
+//
+// 붙어 있는 날짜의 하기휴가 여러 장을 첫 장 하나로 합친다(기간을 늘리고
+// 나머지는 삭제). 날짜가 안 붙어 있으면 손대지 않고 보고만 한다 — 정말로
+// 여러 번 쓴 것일 수 있다.
+async function actionFixSummer(db) {
+  const confirmed = String(process.env.CONFIRM || '').trim() === 'OK';
+  console.log(`===== 쪼개 쓴 하기휴가 정리${confirmed ? '' : ' (미리보기)'} =====`);
+
+  const snap = await db.collection('leaves').get();
+  const byEmp = new Map();
+  snap.forEach((d) => {
+    const v = d.data() || {};
+    const has = leaveItemsOf(v).some((it) => it.type === '하기휴가');
+    if (!has) return;
+    const empId = String(v.employeeId || '').trim();
+    if (!empId) return;
+    if (!byEmp.has(empId)) byEmp.set(empId, []);
+    byEmp.get(empId).push({
+      ref: d.ref, id: d.id,
+      start: String(v.start || ''), end: String(v.end || ''),
+      deducted: !!v.deductedAt,
+    });
+  });
+
+  const addDays = (ymd, n) => {
+    const t = new Date(ymd + 'T00:00:00Z');
+    t.setUTCDate(t.getUTCDate() + n);
+    return t.toISOString().slice(0, 10);
+  };
+
+  const merges = [];
+  const manual = [];
+  for (const [empId, list] of byEmp) {
+    if (list.length < 2) continue;
+    list.sort((a, b) => a.start.localeCompare(b.start));
+    // 하루짜리들이 연속으로 이어지는지 본다
+    const consecutive = list.every((l, i) =>
+      l.start === l.end && (i === 0 || l.start === addDays(list[i - 1].start, 1)));
+    if (!consecutive || list.some((l) => l.deducted)) {
+      manual.push({ empId, list });
+      continue;
+    }
+    merges.push({ empId, list, start: list[0].start, end: list[list.length - 1].end });
+  }
+
+  if (!merges.length && !manual.length) {
+    console.log('여러 장으로 쪼개진 하기휴가가 없습니다.');
+    return;
+  }
+
+  merges.forEach((m) => {
+    console.log('');
+    console.log(`  ${m.empId}  ${m.list.length}장 → 1장`);
+    m.list.forEach((l, i) => console.log(`     ${i === 0 ? '유지' : '삭제'}  ${l.start} ~ ${l.end}  (${l.id})`));
+    console.log(`     결과  ${m.start} ~ ${m.end}  하기휴가 1개`);
+  });
+
+  manual.forEach((m) => {
+    console.log('');
+    console.log(`  ${m.empId}  ${m.list.length}장 — 손으로 확인 (날짜가 안 붙었거나 이미 차감됨)`);
+    m.list.forEach((l) => console.log(`     ${l.start} ~ ${l.end}  차감 ${l.deducted ? 'O' : 'X'}`));
+  });
+
+  console.log('');
+  if (!confirmed) {
+    console.log(`>>> 미리보기입니다. 합칠 수 있는 것 ${merges.length}명 · 손으로 볼 것 ${manual.length}명`);
+    console.log('    합치려면 confirm 입력란에 OK 를 넣고 다시 실행하세요.');
+    return;
+  }
+
+  for (const m of merges) {
+    const [keep, ...drop] = m.list;
+    await keep.ref.update({ end: m.end });
+    const batch = db.batch();
+    drop.forEach((l) => batch.delete(l.ref));
+    await batch.commit();
+    console.log(`  ${m.empId}  합침 (${m.start} ~ ${m.end}) · ${drop.length}장 삭제`);
+  }
+  console.log('');
+  console.log(`>>> ${merges.length}명 정리 완료. 다음 정산에서 하기휴가 1개만 차감됩니다.`);
+}
+
 // ---------- settle: 처리됐는데 차감 안 된 휴가증을 서버에서 정산 ----------
 //
 // 왜 서버에서 하는가.
@@ -1902,6 +1989,7 @@ async function main() {
   if (action === 'purge') return actionPurge(db);
   if (action === 'leavecheck') return actionLeaveCheck(db);
   if (action === 'settle') return actionSettle(db);
+  if (action === 'fixsummer') return actionFixSummer(db);
   throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | deployrules `
     + `| testrules | cleanup | claims | premigrate | syncprofile | stats | anonoff `
     + `| fixleaveids | reset | remove)`);
