@@ -1,0 +1,56 @@
+name: 매일 잔여 차감 정산
+
+# 잔여 차감이 브라우저에서만 일어나던 것을 서버로 옮긴다.
+#
+# 브라우저 차감은 화면 목록(leaves 배열)을 보고 계산해서, 새로고침·다른 PC·
+# 목록 비움 중 하나만 걸려도 조용히 건너뛴다. 실제로 2026-05 개시부터 08-26
+# 까지 balanceLogs 에 deduct 가 한 건도 없었다 — 넉 달 내내 차감이 안 됐고
+# 서무가 손으로 메워 왔다.
+#
+# 여기서는 "처리됐는데 아직 차감 안 된 휴가증" 을 서버에서 직접 찾아 반영한다.
+# 화면 상태와 무관하므로 서무가 무엇을 누르든 잔여가 맞는다.
+#
+# 차감하면 마이너스가 되는 사람은 건드리지 않고 로그에 남긴다 — 초과 사용이나
+# 휴가증 작성 오류라 사람이 봐야 한다.
+
+on:
+  # 매일 11:00 UTC = 20:00 KST — 서무가 그날 처리한 것을 저녁에 반영한다.
+  schedule:
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '미리보기만 (반영하지 않음)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+concurrency:
+  group: daily-settle
+  cancel-in-progress: false
+
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: scripts/package.json
+
+      - name: Install deps
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+
+      - name: Settle deductions
+        working-directory: scripts
+        env:
+          FIREBASE_SA_KEY: ${{ secrets.FIREBASE_SA_KEY }}
+          ACTION: settle
+          SKIP_NEGATIVE: '1'
+          CONFIRM: ${{ inputs.dry_run == 'true' && '' || 'OK' }}
+        run: node auth-admin.js

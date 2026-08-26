@@ -1325,8 +1325,17 @@ async function actionSettle(db) {
 
   console.log('');
   console.log('[반영]');
+  // 자동 실행에서는 마이너스가 될 사람을 건드리지 않는다. 초과 사용이거나
+  // 데이터가 잘못된 경우인데(하기휴가를 하루씩 세 장 등), 마이너스 잔여는
+  // 작업자 화면에 그대로 보여 혼란을 부른다. 사람이 보고 정리해야 한다.
+  const skipNegative = String(process.env.SKIP_NEGATIVE || '').trim() === '1';
+  const held = [];
   let done = 0;
   for (const r of rows) {
+    if (skipNegative && (r.after.annual < 0 || r.after.birth < 0 || r.after.summer < 0)) {
+      held.push(r.empId);
+      continue;
+    }
     const upd = {};
     if (r.e.annual > 0) upd.balanceAnnual = r.after.annual;
     if (r.e.birth > 0) upd.balanceBirth = r.after.birth;
@@ -1353,6 +1362,13 @@ async function actionSettle(db) {
     done++;
   }
   console.log(`  ${done}명 반영 완료`);
+  if (held.length) {
+    console.log('');
+    console.log(`⚠ 사람 확인 필요 ${held.length}명 — ${held.join(', ')}`);
+    console.log('  차감하면 마이너스가 됩니다. 초과 사용이거나 휴가증이 잘못 작성된');
+    console.log('  경우입니다(하기휴가 1개=연속 3일을 하루씩 나눠 쓴 경우 등).');
+    console.log('  leavecheck 로 확인한 뒤 휴가증을 고치거나 잔여를 조정하세요.');
+  }
   console.log('');
   console.log('>>> 정산 완료. leavecheck 로 개별 확인할 수 있습니다.');
 }
