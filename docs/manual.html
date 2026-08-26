@@ -244,7 +244,7 @@
   <div class="divider"></div>
   <div class="meta">
     <strong>대상:</strong> 작업자 / 서무 담당자<br>
-    <strong>발행:</strong> 2026-05-22 &nbsp;·&nbsp; <strong>개정:</strong> 2026-08-24<br>
+    <strong>발행:</strong> 2026-05-22 &nbsp;·&nbsp; <strong>개정:</strong> 2026-08-26<br>
     <strong>담당:</strong> 이동준 (생산3팀)
   </div>
 </div>
@@ -298,8 +298,9 @@
   <li><strong>작업자</strong> 휴대폰으로 사이트 접속 → 휴가증 작성</li>
   <li>작성 즉시 <strong>클라우드 자동 저장</strong></li>
   <li><strong>서무</strong> 매일 PC에서 사이트 접속 → [서버에서 불러오기] → [파일로 내보내기]</li>
-  <li>자동화 프로그램(<span class="mono">run.bat</span>)으로 그룹웨어 임시저장</li>
-  <li>그룹웨어 검토·신청 후 [처리 완료]</li>
+  <li><strong>[프로그램 실행]</strong> → 자동화가 그룹웨어에 임시저장</li>
+  <li>서무가 그룹웨어에서 검토·신청</li>
+  <li>잔여 휴가는 <strong>매일 저녁 서버가 자동 차감</strong></li>
 </ol>
 
 <h3>1.2 역할별 권한 (사번 로그인 기반)</h3>
@@ -367,6 +368,11 @@
   하기휴가는 <strong>개수</strong>로 비교합니다(1개 = 3일). 잔여가 맞지 않으면 서무에게 확인을 요청하세요.
 </div>
 <div class="info-box">
+  <strong>하기휴가는 한 장으로 씁니다.</strong> 1개가 연속 3일이라, 구분에서 하기휴가를 고르면
+  <strong>종료일이 자동으로 3일 뒤로 채워지고 고칠 수 없습니다.</strong>
+  하루씩 나눠 세 번 쓰면 3개를 쓴 것으로 잡히므로 그렇게 하지 마세요.
+</div>
+<div class="info-box">
   <strong>처리 완료된 휴가증 중복 등록 차단:</strong> 본인이 작성하고 서무가 처리 완료한 휴가증과 동일한 내용(같은 시작일·종료일·종류·개수)은 다시 등록할 수 없습니다. 작성 전 <strong>[내 휴가증]</strong>에서 처리 상태를 확인하세요.
 </div>
 <p style="font-size:10pt;color:#666">※ [+ 추가]는 한 번만 눌러 주세요 — 연속으로 눌러도 1건만 등록되도록 막아 두었습니다.</p>
@@ -379,7 +385,7 @@
     <tr><td>반차(오전/오후)</td><td>0.5일</td><td>오전: 12:50 출근 / 오후: 12:00 퇴근</td></tr>
     <tr><td>반반차(오전/오후)</td><td>0.25일</td><td>오전: 10:00 출근 / 오후: 15:00 퇴근</td></tr>
     <tr><td>생휴</td><td>1.0일</td><td>생리 휴가</td></tr>
-    <tr><td>하기휴가</td><td>3.0일</td><td>1개 = 연속 3일</td></tr>
+    <tr><td>하기휴가</td><td>3.0일</td><td>1개 = 연속 3일 — 시작일만 고르면 종료일 자동</td></tr>
     <tr><td>결근(전/오전/오후)</td><td>1.0 / 0.5일</td><td>연차 잔여 없을 때</td></tr>
   </tbody>
 </table>
@@ -429,11 +435,20 @@
   <li>우측 카드의 <strong>[서버에서 불러오기]</strong> 클릭 → 미처리 휴가증 가져오기 + 자동 처리 완료 마크</li>
   <li>화면에서 휴가증 목록 검토</li>
   <li>상단 <strong>[파일로 내보내기]</strong> → JSON + XLSX 다운로드</li>
-  <li>자동화 폴더의 <strong>run.bat</strong> 더블클릭 → JSON 선택 → 진행</li>
+  <li><strong>[프로그램 실행]</strong> 클릭 → 자동화가 그룹웨어에 임시저장</li>
   <li>완료 알림 확인 → 그룹웨어 검토 후 신청 처리</li>
 </ol>
+<p style="font-size:10pt;color:#666">※ 화면의 버튼에 ① ② ③ 번호가 붙어 있습니다. 그 순서대로 누르면 됩니다.</p>
 <div class="info-box">
   <strong>[서버에서 불러오기] = 자동 처리 완료:</strong> 불러오는 즉시 서버에 처리 완료로 마크됩니다. 작업자가 이후 수정할 수 없으며, 다음 불러오기에 중복으로 나오지 않습니다.
+</div>
+<div class="info-box">
+  <strong>잔여 휴가 차감은 서무가 따로 하지 않습니다.</strong> 매일 저녁 서버가 처리된 휴가증을 확인해 자동으로 차감합니다.
+  화면에서 차감이 됐든 안 됐든 결과는 같으니, 잔여를 손으로 맞추지 않으셔도 됩니다.
+</div>
+<div class="warn-box">
+  <strong>run.bat을 직접 여는 방식은 쓰지 마세요.</strong> 예전 안내였습니다.
+  <strong>[프로그램 실행]</strong>을 눌러야 같은 자동화가 돌면서 화면 기록도 함께 맞춰집니다.
 </div>
 
 <h3>3.3 자동화 최초 설치 (한 번만)</h3>
@@ -441,7 +456,8 @@
   <li><strong>Python 3.10~3.12</strong> 설치 — <span class="mono">python.org/downloads</span> ("Add Python to PATH" 체크)</li>
   <li>자동화 폴더(또는 ZIP) 적당한 위치에 배치 (예: <span class="mono">D:\휴가증자동화\</span>) — ZIP은 풀기 전 우클릭 → 속성 → "차단 해제"</li>
   <li><strong>setup.bat</strong> 더블클릭 → 자동 설치 완료 대기</li>
-  <li>첫 <strong>run.bat</strong> 실행 → 그룹웨어 로그인 → 이후 자동 유지</li>
+  <li>첫 <strong>run.bat</strong> 실행 → 그룹웨어 로그인 → 이후 자동 유지<br>
+    <span style="font-size:9.5pt;color:#666">최초 로그인 때만 직접 실행합니다. 평소에는 화면의 <strong>[프로그램 실행]</strong>을 쓰세요.</span></li>
 </ol>
 
 <h3>3.4 결과 알림</h3>
@@ -496,7 +512,7 @@
 </table>
 
 <div class="footer-note">
-  COSMAX 생산3팀 · 휴가증 자동 반영 프로그램 종합 매뉴얼 · 2026-08-24 · 담당 이동준
+  COSMAX 생산3팀 · 휴가증 자동 반영 프로그램 종합 매뉴얼 · 2026-08-26 · 담당 이동준
 </div>
 
 </section>
