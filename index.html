@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="휴가증">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="style.css?v=20260825">
+  <link rel="stylesheet" href="style.css?v=20260826">
   <!-- 즉시 인증 상태 검사 (메인 콘텐츠 깜빡임 방지) -->
   <script>
     (function() {
@@ -130,6 +130,7 @@
             <span class="period-sep" id="periodSep">~</span>
             <input type="date" id="leaveEnd">
           </div>
+          <div class="form-hint-text" id="fullRangeHint" style="display:none"></div>
         </div>
 
         <div class="form-group form-row-full">
@@ -357,7 +358,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=20260825"></script>
+  <script src="script.js?v=20260826"></script>
   <!-- PWA Service Worker 등록 -->
   <script>
     if ('serviceWorker' in navigator) {

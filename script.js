@@ -1177,14 +1177,36 @@ function extendSession() {
 function refreshFormTotals() {
   var type = document.getElementById('leaveType').value;
   var count = parseInt(document.getElementById('leaveCount').value, 10) || 1;
+  var endEl = document.getElementById('leaveEnd');
+  var hintEl = document.getElementById('fullRangeHint');
   if (FULL_RANGE_TYPES.indexOf(type) !== -1) {
     // 하기휴가 등: count 1 고정
     var countEl = document.getElementById('leaveCount');
     countEl.value = '1';
     countEl.disabled = true;
     count = 1;
+
+    // 1개 = 연속 3일이다. 개수만 고정하고 기간을 열어 두면 하루씩 세 번 쓸 수
+    // 있고, 그러면 각각 1개로 잡혀 사흘 쓴 사람이 3개를 잃는다.
+    // (2026-08 에 실제로 발생했다 — 8/05·8/06·8/07 세 장)
+    // 시작일을 고르면 종료일을 3일치로 채우고 잠근다.
+    var startVal = document.getElementById('leaveStart').value;
+    if (startVal) {
+      var d = new Date(startVal + 'T00:00:00');
+      d.setDate(d.getDate() + ((TYPE_WEIGHT[type] || 1) - 1));
+      endEl.value = dateToStr(d);
+    }
+    endEl.readOnly = true;
+    endEl.title = '하기휴가는 1개 = 연속 3일이라 시작일에 맞춰 자동으로 정해집니다.';
+    if (hintEl) {
+      hintEl.textContent = '※ 하기휴가는 1개 = 연속 3일입니다. 시작일만 고르면 종료일은 자동입니다.';
+      hintEl.style.display = '';
+    }
   } else {
     document.getElementById('leaveCount').disabled = false;
+    endEl.readOnly = false;
+    endEl.title = '';
+    if (hintEl) hintEl.style.display = 'none';
   }
   var days = (TYPE_WEIGHT[type] || 0) * count;
   document.getElementById('leaveItemsTotal').textContent = fmtDays(days);
