@@ -186,6 +186,10 @@
         </div>
       </div>
 
+      <!-- 초기화 대기 띠 — 요청이 있을 때만 나타난다. 63명을 훑어야 배지가
+           보이던 것을 여기 모아 준다. 누르면 그 사람들만 걸러 본다. -->
+      <div class="worker-pending-bar" id="workerPendingBar" style="display:none"></div>
+
       <div class="worker-toolbar admin-only">
         <button class="btn-secondary btn-small" onclick="document.getElementById('workerFile').click()">명단 업로드</button>
         <input type="file" id="workerFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="onWorkerFileSelected(event)">

@@ -1228,6 +1228,47 @@ html.leader-mode .not-leader-only { display: none !important; }
   border: 1px solid #ffe08a;
   cursor: help;
 }
+/* 「초기화 대기 N건」 띠 — 명단 창 위. 배지와 같은 노란 계열로 묶어
+   "같은 일" 임을 보이되, 띠는 눌러야 하므로 테두리를 진하게 준다. */
+.worker-pending-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding: 9px 12px;
+  background: #fff8e6;
+  border: 1px solid #ffe08a;
+  border-left: 4px solid #e0a800;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.worker-pending-count {
+  font-weight: 700;
+  color: #8a6100;
+}
+/* 이름은 곁들이는 값이다 — 많아지면 줄여 두고 띠 높이를 지킨다 */
+.worker-pending-names {
+  flex: 1;
+  min-width: 120px;
+  color: #7a6a45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.worker-pending-btn {
+  flex: 0 0 auto;
+  padding: 5px 12px;
+  background: #fff;
+  color: #8a6100;
+  border: 1px solid #e0a800;
+  border-radius: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.worker-pending-btn:hover { background: #fff3cd; }
+
 .worker-row-admin > td { background: #fff5f5; }
 .worker-row-admin > td:first-child { border-left: 3px solid #c8102e; padding-left: 9px !important; }
 .worker-row-leader > td { background: #fff7f0; }

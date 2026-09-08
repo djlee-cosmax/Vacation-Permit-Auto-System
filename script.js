@@ -2503,7 +2503,7 @@ function openWorkerModal() {
   document.getElementById('workerModal').style.display = 'flex';
   // 서무·관리자만 잔여 정보를 Firestore에서 페치 (모달 열 때마다 최신화)
   if ((LEADER_MODE || ADMIN_MODE) && FB_DB) {
-    fetchAllBalances().then(function() { renderWorkerTable(); });
+    fetchAllBalances().then(function() { renderPwPendingBar(); renderWorkerTable(); });
   }
 }
 
@@ -2512,6 +2512,10 @@ function openWorkerModal() {
 // 관리자가 GitHub Actions 로 해야 끝난다. 그 사이를 눈에 남겨두지 않으면
 // "눌렀으니 됐다" 고 여기고 넘어간다 — 실제로 그렇게 한 건이 하루 묵었다.
 var pwResetPending = {};
+
+// 「초기화 대기」 띠를 눌러 그 사람들만 보고 있는 중인지.
+// 검색어와 함께 걸린다 — 대기 안에서 또 이름으로 좁힐 수 있다.
+var pwPendingOnly = false;
 
 // Firestore users 컬렉션에서 모든 사번의 잔여 정보 페치 → balanceCache + workerModalState 갱신
 function fetchAllBalances() {
@@ -2558,6 +2562,45 @@ function pwPendingBadge(w) {
   return '<span class="worker-pwreset-badge" title="비밀번호 초기화 요청이 접수됐습니다.'
     + ' 관리자가 GitHub Actions 의 [계정 관리] → reset 을 실행해야 완료됩니다.">'
     + '초기화 대기' + escapeHtml(when) + '</span>';
+}
+
+// 「초기화 대기 N건」 띠.
+//
+// 배지는 그 사람 행까지 가야 보인다. 63명이라 요청 한 건이 묻히고, 실제로
+// 한 건이 하루 묵었다. 창을 열면 바로 눈에 걸리게 위에 띄운다.
+//
+// 대기가 없으면 아무것도 안 띄운다 — 늘 있는 띠는 곧 안 보이게 된다.
+function renderPwPendingBar() {
+  var bar = document.getElementById('workerPendingBar');
+  if (!bar) return;
+  // 대기 정보는 서무·관리자만 받아 온다(fetchAllBalances). 그래도 분명히 해 둔다.
+  var ids = (ADMIN_MODE || LEADER_MODE) ? Object.keys(pwResetPending) : [];
+  if (!ids.length) {
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+    // 대기가 사라졌는데 걸러 보기가 켜져 있으면 빈 목록만 남는다
+    pwPendingOnly = false;
+    return;
+  }
+  bar.style.display = '';
+  var names = ids.map(function(id) {
+    var found = null;
+    workerModalState.forEach(function(x) {
+      if (String(x.employeeId || '').trim() === id) found = x;
+    });
+    return (found && found.name) ? found.name : id;
+  });
+  bar.innerHTML =
+    '<span class="worker-pending-count">비밀번호 초기화 대기 ' + ids.length + '건</span>'
+    + '<span class="worker-pending-names">' + escapeHtml(names.join(' \u00b7 ')) + '</span>'
+    + '<button type="button" class="worker-pending-btn" onclick="togglePwPendingOnly()">'
+    + (pwPendingOnly ? '전체 보기' : '이 사람들만 보기') + '</button>';
+}
+
+function togglePwPendingOnly() {
+  pwPendingOnly = !pwPendingOnly;
+  renderPwPendingBar();
+  renderWorkerTable();
 }
 
 // 잔여 입력 시 Firestore 저장 (debounce)
@@ -2637,6 +2680,11 @@ function renderWorkerTable() {
     if (!aLeader && bLeader) return 1;
     return (a.w.name || '').localeCompare(b.w.name || '', 'ko');
   });
+  if (pwPendingOnly) {
+    view = view.filter(function(item) {
+      return String(item.w.employeeId || '').trim() in pwResetPending;
+    });
+  }
   if (workerSearchQuery) {
     view = view.filter(function(item) {
       var hay = ((item.w.name || '') + ' ' + (item.w.employeeId || '') + ' ' + (item.w.team || '') + ' ' + (item.w.phone || '')).toLowerCase();
@@ -2645,7 +2693,13 @@ function renderWorkerTable() {
   }
 
   if (view.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#ccc;padding:24px">검색 결과가 없습니다.</td></tr>';
+    // 대기만 보는 중에 비면 검색 탓이 아닐 수 있다 — 요청한 사람이 명단에서
+    // 빠진 경우다. 「검색 결과가 없습니다」로 두면 왜 빈지 알 길이 없다.
+    var 빈말 = (pwPendingOnly && !workerSearchQuery)
+      ? '초기화 대기 중인 사람이 명단에 없습니다.'
+      : '검색 결과가 없습니다.';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#ccc;padding:24px">'
+      + 빈말 + '</td></tr>';
     return;
   }
 
@@ -3092,7 +3146,7 @@ function onLeaveBalanceFileSelected(e) {
           });
           showToast(validCount + '명의 잔여 휴가가 저장됐습니다.', 'success');
           // 캐시·테이블 갱신
-          fetchAllBalances().then(function() { renderWorkerTable(); });
+          fetchAllBalances().then(function() { renderPwPendingBar(); renderWorkerTable(); });
         })
         .catch(function(err) {
           console.error('잔여 업로드 실패:', err);
