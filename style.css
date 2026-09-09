@@ -1039,6 +1039,15 @@ input, select, textarea { font-family: inherit; }
     width: auto;
     white-space: normal;
   }
+  /* 단추 칸만은 줄을 바꾸지 않는다.
+     바로 위 td 규칙의 white-space: normal 이 선택자가 더 세서
+     `.worker-row-actions { white-space: nowrap }` 을 덮고 있었다. 그래서
+     「초기화 요청」 아래로 × 가 떨어져 있었다 (2026-09-09 사용자 지적).
+     칸 폭은 원래 넉넉했다 — 폭이 아니라 이 한 줄이 원인이었다. */
+  html.role-leader #workerModal .worker-table td.worker-row-actions,
+  html.role-admin #workerModal .worker-table td.worker-row-actions {
+    white-space: nowrap;
+  }
   /* 컬럼 폭 비율 (8컬럼): 이름 / 사번 / 근무지 / 연락처 / 잔여연차 / 잔여생휴 / 잔여하기 / 액션 */
   html.role-leader #workerModal .worker-table th:nth-child(1),
   html.role-leader #workerModal .worker-table td:nth-child(1),
