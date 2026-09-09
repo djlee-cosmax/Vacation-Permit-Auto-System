@@ -1048,11 +1048,13 @@ input, select, textarea { font-family: inherit; }
   html.role-admin #workerModal .worker-table td.worker-row-actions {
     white-space: nowrap;
   }
-  /* 컬럼 폭 비율 (8컬럼): 이름 / 사번 / 근무지 / 연락처 / 잔여연차 / 잔여생휴 / 잔여하기 / 액션 */
+  /* 컬럼 폭 비율 (8컬럼): 이름 / 사번 / 근무지 / 연락처 / 잔여연차 / 잔여생휴 / 잔여하기 / 액션
+     근무지가 「파우더성형실」에서 4px 모자라 잘렸다. 이름은 두세 글자라 남으므로
+     거기서 3% 를 덜어 근무지에 줬다 — 22/11 → 19/14 (2026-09-09). */
   html.role-leader #workerModal .worker-table th:nth-child(1),
   html.role-leader #workerModal .worker-table td:nth-child(1),
   html.role-admin #workerModal .worker-table th:nth-child(1),
-  html.role-admin #workerModal .worker-table td:nth-child(1) { width: 22%; }
+  html.role-admin #workerModal .worker-table td:nth-child(1) { width: 19%; }
   html.role-leader #workerModal .worker-table th:nth-child(2),
   html.role-leader #workerModal .worker-table td:nth-child(2),
   html.role-admin #workerModal .worker-table th:nth-child(2),
@@ -1060,7 +1062,7 @@ input, select, textarea { font-family: inherit; }
   html.role-leader #workerModal .worker-table th:nth-child(3),
   html.role-leader #workerModal .worker-table td:nth-child(3),
   html.role-admin #workerModal .worker-table th:nth-child(3),
-  html.role-admin #workerModal .worker-table td:nth-child(3) { width: 11%; }
+  html.role-admin #workerModal .worker-table td:nth-child(3) { width: 14%; }
   html.role-leader #workerModal .worker-table th:nth-child(4),
   html.role-leader #workerModal .worker-table td:nth-child(4),
   html.role-admin #workerModal .worker-table th:nth-child(4),
