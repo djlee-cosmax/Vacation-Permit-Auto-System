@@ -52,5 +52,10 @@ jobs:
           FIREBASE_SA_KEY: ${{ secrets.FIREBASE_SA_KEY }}
           ACTION: settle
           SKIP_NEGATIVE: '1'
-          CONFIRM: ${{ inputs.dry_run == 'true' && '' || 'OK' }}
+          # ★ 참일 때 값을 빈 문자열로 두면 안 된다. Actions 식도 (A && B) || C
+          #   로 세는데 빈 문자열은 거짓이라, || 가 넘어가 **늘 OK** 가 된다.
+          #   그래서 미리보기(dry_run=true)가 실제 반영으로 돌았다
+          #   (2026-09-28 실측 — 19명이 그대로 차감됐다).
+          #   참일 때 값이 비지 않도록 조건을 뒤집는다.
+          CONFIRM: ${{ inputs.dry_run != 'true' && 'OK' || '' }}
         run: node auth-admin.js
