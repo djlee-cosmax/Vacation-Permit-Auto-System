@@ -1307,6 +1307,37 @@ async function actionFixSummer(db) {
   console.log(`>>> ${merges.length}명 정리 완료. 다음 정산에서 하기휴가 1개만 차감됩니다.`);
 }
 
+// 생휴를 이번 정산에서 건너뛸 것인가.
+//
+// 생휴는 매달 1일 1개로 리셋된다. 그래서 **지난달에 쓴 생휴를 이번 달에 빼면
+// 안 된다** — 리셋으로 들어온 이번 달 1개를 잡아먹는다.
+//
+//   reset      그 사람의 마지막 리셋 시각 (없으면 건너뛰지 않는다)
+//   processed  서무가 그 휴가증을 처리한 시각
+//   start      휴가 쓴 날 'YYYY-MM-DD' (KST)
+//
+// 두 가지를 다 본다.
+//   ① 리셋보다 먼저 처리된 것 → 리셋이 이미 되돌렸다
+//   ② 리셋된 달보다 **앞선 달에 쓴 것** → 지난달 몫이다
+//
+// 예전엔 ①만 봤다. 그러면 서무가 달을 넘겨 자리를 비울 때 사고가 난다 —
+// 2026-09-21~25 연차로 5일치가 밀렸는데, 10월에 처리했으면 9월 생휴가
+// 10월 잔여에서 빠질 뻔했다 (2026-09-28 확인).
+//
+// 달로 견준다. 시각으로 견주면 리셋 당일(10/1 09:00)보다 이른 10/1 00:00 의
+// 생휴가 지난달 것으로 잘못 걸린다.
+function birthSkip(reset, processed, start) {
+  if (!reset) return false;
+  if (processed && processed <= reset) return true;          // ①
+  if (!start) return false;
+  const k = new Date(reset.getTime() + 9 * 3600 * 1000);     // 리셋 시각을 KST 로
+  const resetMonth = k.getUTCFullYear() * 12 + k.getUTCMonth();
+  const y = Number(String(start).slice(0, 4));
+  const m = Number(String(start).slice(5, 7));
+  if (!y || !m) return false;
+  return (y * 12 + (m - 1)) < resetMonth;                    // ②
+}
+
 // ---------- settle: 처리됐는데 차감 안 된 휴가증을 서버에서 정산 ----------
 //
 // 왜 서버에서 하는가.
@@ -1364,6 +1395,7 @@ async function actionSettle(db) {
   //
   // manual 로그의 changes 에 birth·summer 가 같이 찍혀 있지만, 그건
   // saveWorkerBalances 가 행 전체를 기록하기 때문이지 건드렸다는 뜻이 아니다.
+  // 생휴 판단은 birthSkip() 으로 뺐다 (아래 주석 참고)
   const lastManual = new Map();   // 연차 기준
   const lastReset = new Map();    // 생휴 기준
   const blSnap = await db.collection('balanceLogs').get();
@@ -1404,7 +1436,7 @@ async function actionSettle(db) {
     const cutAnnual = lastManual.get(empId);
     const cutBirth = lastReset.get(empId);
     const skipAnnual = cutAnnual && pAt && pAt <= cutAnnual;
-    const skipBirth = cutBirth && pAt && pAt <= cutBirth;
+    const skipBirth = birthSkip(cutBirth, pAt, v.start);
 
     if (!byEmp.has(empId)) {
       byEmp.set(empId, { annual: 0, birth: 0, summer: 0, refs: [], lines: [] });
@@ -1435,7 +1467,7 @@ async function actionSettle(db) {
   console.log('[제외한 것]');
   console.log(`  아직 오지 않은 휴가            ${future}장`);
   console.log(`  연차 — 서무 수기 조정 이전     ${beforeManual}건  (그룹웨어 대조로 이미 반영)`);
-  console.log(`  생휴 — 지난달 리셋 이전        ${beforeReset}건  (리셋으로 이미 되돌아감)`);
+  console.log(`  생휴 — 지난달 것               ${beforeReset}건  (리셋으로 이미 되돌아감)`);
   console.log(`  하기휴가                       제외 없음 (수기 조정·리셋 대상 아님)`);
   console.log('');
   console.log(`정산 대상 ${targets.length}명`);

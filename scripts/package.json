@@ -5,7 +5,8 @@
   "description": "GitHub Actions에서 실행되는 관리 스크립트 (생휴 자동 리셋 등)",
   "type": "commonjs",
   "scripts": {
-    "reset-birth": "node reset-birth.js"
+    "reset-birth": "node reset-birth.js",
+    "test": "node birthskip.test.js"
   },
   "dependencies": {
     "firebase-admin": "^12.7.0"
