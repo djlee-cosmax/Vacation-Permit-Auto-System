@@ -7,6 +7,15 @@ var DEFAULT_PASSWORD = '1234';
 // name 은 표시용 최후 폴백이다 — users 문서에도 명단 캐시에도 이름이 없을 때만
 // 쓰인다(profileFor). 저장소가 공개라 실명을 적으면 사번과 이름이 함께 노출되므로
 // 역할명을 넣는다. 실제 이름은 Firestore users/workers 에서 온다.
+// 생휴 잔여 상한.
+//
+// 생휴는 매달 1일 1개로 리셋된다 — 쌓이지 않으므로 1 을 넘을 수 없다.
+// 그런데 **지난달에 차감된 휴가증을 이달 들어 지우면** 되돌리기가 리셋된 1 위에
+// 또 1 을 얹어 2 가 됐다. 2026-09-14 에 세 사람이 그렇게 됐다
+// (김·전·지 — 8월 차감분을 9/1 리셋 뒤에 지웠다).
+// 되돌리는 쪽·저장하는 쪽 어디서든 이 값을 넘지 않게 한다.
+var BIRTH_MAX = 1;
+
 var STAFF_ROLES = {
   '122210202': { role: 'admin', name: '관리자', department: '생산3팀' },
   '122240096': { role: 'leader', name: '서무', department: '생산3팀' }
@@ -1958,7 +1967,7 @@ function revertDeductionForLeave(leave) {
         }
         if (ded.birth > 0) {
           var curB = (typeof d.balanceBirth === 'number') ? d.balanceBirth : 0;
-          update.balanceBirth = curB + ded.birth;
+          update.balanceBirth = Math.min(BIRTH_MAX, curB + ded.birth);
         }
         if (ded.summer > 0) {
           var curS = (typeof d.balanceSummer === 'number') ? d.balanceSummer : 0;
@@ -2718,7 +2727,7 @@ function renderWorkerTable() {
     var isMale = w.gender === 'M';
     var birthCellHtml = isMale
       ? '<span class="worker-balance-na">해당 없음</span>'
-      : '<input type="number" step="1" min="0" value="' + escapeHtml(String(balBirth)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceBirth\',this.value)">';
+      : '<input type="number" step="1" min="0" max="' + BIRTH_MAX + '" value="' + escapeHtml(String(balBirth)) + '" oninput="updateWorkerBalance(' + i + ',\'balanceBirth\',this.value)">';
     if (ADMIN_MODE) {
       var empIdSafe = String(w.employeeId || '').trim();
       var pwBtn = empIdSafe
@@ -3122,7 +3131,9 @@ function onLeaveBalanceFileSelected(e) {
         // 남자는 생휴 무시
         var worker = workers.find(function(w) { return String(w.employeeId || '').trim() === en.empId; });
         var isMale = worker && worker.gender === 'M';
-        if (!isMale && en.birth != null && !isNaN(en.birth)) update.balanceBirth = en.birth;
+        if (!isMale && en.birth != null && !isNaN(en.birth)) {
+          update.balanceBirth = Math.min(BIRTH_MAX, en.birth);
+        }
         if (en.summer != null && !isNaN(en.summer)) update.balanceSummer = en.summer;
         if (Object.keys(update).length === 0) return;
         batch.set(FB_DB.collection('users').doc(en.empId), update, { merge: true });

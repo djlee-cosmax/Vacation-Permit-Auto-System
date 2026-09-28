@@ -26,6 +26,8 @@
 //   ACTION=purge                         node auth-admin.js  만료된 휴가증 삭제 (미리보기)
 //   ACTION=purge CONFIRM=OK                                  실제로 지운다
 //   ACTION=leavecheck EMP_ID=사번|이름       node auth-admin.js  잔여·휴가증·이력 대조
+//   ACTION=setbirth EMP_ID="사번=값,..."                        생휴 잔여 맞추기 (미리보기)
+//   ACTION=setbirth EMP_ID="..." CONFIRM=OK                    실제로 맞춤
 //   ACTION=settle                        node auth-admin.js  차감 누락 정산 (미리보기)
 //   ACTION=settle CONFIRM=OK                                 실제로 정산
 //   ACTION=reset  EMP_ID=12224xxxx       node auth-admin.js  비밀번호를 1234 로 재설정
@@ -36,6 +38,16 @@
 //   FIREBASE_SA_KEY  — Firebase Service Account JSON (문자열)
 
 const admin = require('firebase-admin');
+
+// 생휴 잔여 상한.
+//
+// 생휴는 매달 1일 1개로 리셋된다 — 쌓이지 않으므로 1 을 넘을 수 없다.
+// 그런데 **지난달에 차감된 휴가증을 이달 들어 지우면** 되돌리기가 리셋된 1 위에
+// 또 1 을 얹어 2 가 됐다. 2026-09-14 에 세 사람이 그렇게 됐다
+// (김·전·지 — 8월 차감분을 9/1 리셋 뒤에 지웠다).
+// 되돌리는 쪽·저장하는 쪽 어디서든 이 값을 넘지 않게 한다.
+// script.js 의 BIRTH_MAX 와 같은 값이어야 한다.
+const BIRTH_MAX = 1;
 
 // script.js 의 STAFF_ROLES 와 동기화할 것
 // 저장소가 공개라 사번 옆에 실명을 적지 않는다 — 이름은 Firestore 에서 온다.
@@ -1201,7 +1213,7 @@ async function actionDropLeave(db) {
     const u = uDoc.exists ? (uDoc.data() || {}) : {};
     const upd = {};
     if (back.annual) upd.balanceAnnual = Math.round(((u.balanceAnnual || 0) + back.annual) * 100) / 100;
-    if (back.birth) upd.balanceBirth = (u.balanceBirth || 0) + back.birth;
+    if (back.birth) upd.balanceBirth = Math.min(BIRTH_MAX, (u.balanceBirth || 0) + back.birth);
     if (back.summer) upd.balanceSummer = (u.balanceSummer || 0) + back.summer;
     await db.collection('users').doc(empId).set(upd, { merge: true });
     await db.collection('balanceLogs').add({
@@ -1336,6 +1348,73 @@ function birthSkip(reset, processed, start) {
   const m = Number(String(start).slice(5, 7));
   if (!y || !m) return false;
   return (y * 12 + (m - 1)) < resetMonth;                    // ②
+}
+
+// ---------- setbirth: 생휴 잔여를 정해진 값으로 맞춘다 ----------
+//
+// 되돌리기가 달 경계를 안 봐서 잔여가 틀어진 것을 바로잡을 때 쓴다.
+// 자동 정산은 "휴가증"을 보고 빼는 도구라 이미 틀어진 값을 고치지는 못한다.
+//
+//   ACTION=setbirth EMP_ID="122230105=1,122230254=0"            미리보기
+//   ACTION=setbirth EMP_ID="..." CONFIRM=OK                     실제로 맞춤
+//
+// 이름 대신 사번만 받는다 — 동명이인이 있으면 엉뚱한 사람을 건드린다.
+async function actionSetBirth(db) {
+  const raw = String(process.env.EMP_ID || '').trim();
+  if (!raw) {
+    console.log('EMP_ID 에 "사번=값" 을 쉼표로 넣으세요. 예: 122230105=1,122230254=0');
+    process.exitCode = 1;
+    return;
+  }
+
+  const wants = [];
+  for (const part of raw.split(',')) {
+    const [id, v] = part.split('=').map((x) => String(x || '').trim());
+    if (!/^\d+$/.test(id)) { console.log(`※ 사번이 아닙니다: ${part}`); process.exitCode = 1; return; }
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0 || n > BIRTH_MAX) {
+      console.log(`※ 생휴는 0 ~ ${BIRTH_MAX} 사이여야 합니다: ${part}`);
+      process.exitCode = 1;
+      return;
+    }
+    wants.push({ id, want: n });
+  }
+
+  console.log('===== 생휴 잔여 맞추기 =====');
+  const rows = [];
+  for (const w of wants) {
+    const uDoc = await db.collection('users').doc(w.id).get();
+    const u = uDoc.exists ? (uDoc.data() || {}) : {};
+    const now = typeof u.balanceBirth === 'number' ? u.balanceBirth : null;
+    rows.push({ ...w, now, exists: uDoc.exists });
+    console.log(`  ${w.id}  생휴 ${now === null ? '-' : now} → ${w.want}`
+      + (uDoc.exists ? '' : '   ※ users 문서가 없습니다'));
+  }
+
+  if (String(process.env.CONFIRM || '').trim() !== 'OK') {
+    console.log('');
+    console.log('>>> 미리보기입니다. 맞추려면 confirm 입력란에 OK 를 넣고 다시 실행하세요.');
+    return;
+  }
+
+  let done = 0;
+  for (const r of rows) {
+    if (!r.exists || r.now === r.want) continue;
+    await db.collection('users').doc(r.id).set({ balanceBirth: r.want }, { merge: true });
+    await db.collection('balanceLogs').add({
+      empId: r.id,
+      type: 'manual',
+      changes: { birth: r.want },
+      meta: { via: 'github-actions', reason: 'setbirth', before: r.now },
+      byEmpId: null,
+      byName: 'GitHub Actions',
+      byUid: null,
+      at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    done += 1;
+  }
+  console.log('');
+  console.log(`>>> ${done}명 맞췄습니다.`);
 }
 
 // ---------- settle: 처리됐는데 차감 안 된 휴가증을 서버에서 정산 ----------
@@ -2105,6 +2184,7 @@ async function main() {
   if (action === 'settle') return actionSettle(db);
   if (action === 'fixsummer') return actionFixSummer(db);
   if (action === 'dropleave') return actionDropLeave(db);
+  if (action === 'setbirth') return actionSetBirth(db);
   throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | deployrules `
     + `| testrules | cleanup | claims | premigrate | syncprofile | stats | anonoff `
     + `| fixleaveids | reset | remove)`);
