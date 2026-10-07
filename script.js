@@ -2893,19 +2893,106 @@ function resetToDefaultWorkers() {
   showToast('기본 명단으로 재설정되었습니다. 저장 버튼을 눌러 확정해 주세요.', 'success');
 }
 
+// 관리자 「저장」 — 이 기기 명단 캐시에 더해 **서버에도** 반영한다 (2026-10-07).
+//
+// 예전에는 localStorage 에만 저장했다. 서무 PC·작업자 휴대폰에는 안 가는데
+// 「N명 저장되었습니다」 가 떠서 반영된 줄 알았다 (근무지를 바꿔도 그대로).
+// 지금은 기존 작업자의 이름·근무지·연락처가 서버와 다르면 workers 와 users
+// (작업자 본인 화면이 읽는 사본 — auth-admin.js syncprofile 과 같은 세 칸) 양쪽에 쓴다.
+//
+// 추가·삭제는 서버에 하지 않는다 — 새 사람은 성별(생휴)·로그인 계정이 필요하고,
+// 퇴직은 로그인 계정까지 지우는 ACTION=remove 로 한다. 그런 행이 있으면 확인 창에 알린다.
+// (명단에서 지운 행은 서버에 남아 있어 다음 접속 때 다시 채워진다 — loadDefaultWorkers)
+var _workerSaving = false;
 function saveWorkerList() {
-  // 빈 이름 행 제거
-  workers = workerModalState.filter(function(w) { return w.name && w.name.trim(); }).map(function(w) {
-    return {
+  if (_workerSaving) return;
+  // 빈 이름 행 제거 · 창에서만 쓰는 칸(잔여 입력값)은 명단 캐시에 넣지 않는다
+  var edited = workerModalState.filter(function(w) { return w.name && w.name.trim(); }).map(function(w) {
+    var c = Object.assign({}, w, {
       name: (w.name || '').trim(),
       employeeId: (w.employeeId || '').trim(),
       team: (w.team || '').trim(),
       phone: (w.phone || '').trim()
-    };
+    });
+    delete c.balanceAnnual; delete c.balanceBirth; delete c.balanceSummer; delete c._balanceDirty;
+    return c;
   });
-  localStorage.setItem('p5_workers', JSON.stringify(workers));
-  closeWorkerModal();
-  showToast(workers.length + '명 저장되었습니다.', 'success');
+  function 로컬저장() {
+    workers = edited;
+    localStorage.setItem('p5_workers', JSON.stringify(workers));
+  }
+  if (!FB_DB) {
+    로컬저장();
+    showToast('서버 연결 안 됨 — 이 기기에만 저장했습니다. 서버에는 반영되지 않았습니다.', 'error');
+    return;
+  }
+  var 칸이름 = { name: '이름', team: '근무지', phone: '연락처' };
+  _workerSaving = true;
+  FB_DB.collection('workers').get()
+    .then(function(snapshot) {
+      var server = {};                                   // 사번 → { ref, w }
+      snapshot.forEach(function(doc) {
+        var sw = doc.data() || {};
+        var id = String(sw.employeeId || '').trim();
+        if (id) server[id] = { ref: doc.ref, w: sw };
+      });
+      var changes = [], newRows = [], seen = {};
+      edited.forEach(function(w) {
+        var id = w.employeeId;
+        if (!id || !server[id]) { newRows.push(w); return; }
+        seen[id] = true;
+        var sw = server[id].w, diff = [];
+        ['name', 'team', 'phone'].forEach(function(k) {
+          var before = String(sw[k] || '').trim();
+          if (before !== w[k]) diff.push(칸이름[k] + ' ' + (before || '(빈칸)') + ' → ' + (w[k] || '(빈칸)'));
+        });
+        if (diff.length) changes.push({ id: id, ref: server[id].ref, w: w, diff: diff });
+      });
+      var dropped = Object.keys(server).filter(function(id) { return !seen[id]; });
+
+      var 알림 = [];
+      if (newRows.length) 알림.push('※ 새로 넣은 ' + newRows.length + '명(' + newRows.map(function(w) { return w.name; }).join(', ')
+        + ')은 서버에 넣지 않습니다 — 신규 등록은 따로 처리합니다.');
+      if (dropped.length) 알림.push('※ 명단에서 뺀 ' + dropped.length + '명(' + dropped.map(function(id) { return server[id].w.name || id; }).join(', ')
+        + ')은 서버에서 지우지 않습니다 — 퇴직은 계정 삭제 도구로 처리합니다.');
+
+      if (!changes.length) {
+        로컬저장();
+        closeWorkerModal();
+        showToast('서버에 바뀐 내용이 없습니다.' + (알림.length ? ' (추가·삭제는 서버에 반영 안 됨)' : ''), '');
+        if (알림.length) alert(알림.join('\n'));
+        return null;
+      }
+      var 목록 = changes.slice(0, 15).map(function(c) { return '· ' + c.w.name + '  ' + c.diff.join(' · '); });
+      if (changes.length > 15) 목록.push('· … 외 ' + (changes.length - 15) + '명');
+      if (!confirm('서버에 반영합니다 (' + changes.length + '명)\n\n' + 목록.join('\n')
+          + (알림.length ? '\n\n' + 알림.join('\n') : '') + '\n\n계속할까요?')) return null;
+
+      var batch = FB_DB.batch();
+      changes.forEach(function(c) {
+        var 값 = { name: c.w.name, team: c.w.team, phone: c.w.phone };
+        batch.update(c.ref, 값);
+        batch.set(FB_DB.collection('users').doc(c.id), 값, { merge: true });
+      });
+      return batch.commit().then(function() {
+        // 서버 명단 사본도 맞춘다 — 창을 다시 열거나 기본 명단으로 재설정할 때 옛 값이 안 나오게
+        changes.forEach(function(c) {
+          DEFAULT_WORKERS.forEach(function(d) {
+            if (String(d.employeeId || '').trim() === c.id) {
+              d.name = c.w.name; d.team = c.w.team; d.phone = c.w.phone;
+            }
+          });
+        });
+        로컬저장();
+        closeWorkerModal();
+        showToast(changes.length + '명 서버에 반영했습니다.', 'success');
+      });
+    })
+    .catch(function(err) {
+      console.error('명단 서버 저장 실패:', err);
+      showToast('서버 저장 실패: ' + (err.message || err) + ' — 다시 시도해 주세요.', 'error');
+    })
+    .then(function() { _workerSaving = false; });
 }
 
 // 서무: 편집된 잔여 휴가를 일괄 Firestore 저장
