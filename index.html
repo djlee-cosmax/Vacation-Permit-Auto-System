@@ -177,7 +177,7 @@
   <div class="modal-overlay" id="workerModal" style="display:none" onclick="closeWorkerModal()">
     <div class="modal" onclick="event.stopPropagation()">
       <button class="modal-close" onclick="closeWorkerModal()">x</button>
-      <h3>작업자 명단 관리 <span class="modal-hint" id="workerHint"></span></h3>
+      <h3>작업자 명단 관리</h3>
 
       <div class="worker-search-row">
         <div class="worker-search-input-wrap">
@@ -191,10 +191,6 @@
       <div class="worker-pending-bar" id="workerPendingBar" style="display:none"></div>
 
       <div class="worker-toolbar admin-only">
-        <button class="btn-secondary btn-small" onclick="document.getElementById('workerFile').click()">명단 업로드</button>
-        <input type="file" id="workerFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="onWorkerFileSelected(event)">
-        <button class="btn-secondary btn-small" onclick="document.getElementById('leaveBalanceFile').click()" title="엑셀 양식: 사번 | 이름 | 연차 잔여 | 생휴 잔여 | 하기 잔여">잔여 휴가 업로드</button>
-        <input type="file" id="leaveBalanceFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="onLeaveBalanceFileSelected(event)">
         <button class="btn-secondary btn-small" onclick="addWorkerRow()">+ 직접 추가</button>
       </div>
       <div class="worker-readonly-notice not-admin-only not-leader-only">
@@ -362,7 +358,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=2026100702"></script>
+  <script src="script.js?v=2026100703"></script>
   <!-- PWA Service Worker 등록 -->
   <script>
     if ('serviceWorker' in navigator) {
