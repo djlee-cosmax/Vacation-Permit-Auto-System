@@ -2673,7 +2673,7 @@ function isLeaderWorker(w) {
 function renderWorkerTable() {
   var tbody = document.getElementById('workerTableBody');
   if (workerModalState.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#ccc;padding:24px">명단이 비어있습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#ccc;padding:24px">명단이 비어있습니다.</td></tr>';
     return;
   }
   // 관리자 → 서무 → 가나다순 정렬 + 검색 필터 (원본 인덱스 보존)
@@ -2688,6 +2688,12 @@ function renderWorkerTable() {
     if (aLeader && !bLeader) return -1;
     if (!aLeader && bLeader) return 1;
     return (a.w.name || '').localeCompare(b.w.name || '', 'ko');
+  });
+  // 「구분」 칸 — 관리자·서무는 역할, 나머지는 순번. 순번은 검색·대기 거르기 **전**
+  // 전체 명단 순서로 매긴다 — 걸러 봐도 그 사람 번호가 그대로라 마지막 번호가 곧 인원수다.
+  var 순번 = 0;
+  view.forEach(function(item) {
+    if (!isAdminWorker(item.w) && !isLeaderWorker(item.w)) item.seq = ++순번;
   });
   if (pwPendingOnly) {
     view = view.filter(function(item) {
@@ -2707,7 +2713,7 @@ function renderWorkerTable() {
     var 빈말 = (pwPendingOnly && !workerSearchQuery)
       ? '초기화 대기 중인 사람이 명단에 없습니다.'
       : '검색 결과가 없습니다.';
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#ccc;padding:24px">'
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#ccc;padding:24px">'
       + 빈말 + '</td></tr>';
     return;
   }
@@ -2715,9 +2721,11 @@ function renderWorkerTable() {
   tbody.innerHTML = view.map(function(item) {
     var w = item.w;
     var i = item.idx;  // 원본 workerModalState 인덱스 (편집·삭제 시 사용)
-    var adminBadge = isAdminWorker(w) ? '<span class="worker-admin-badge">관리자</span>' : '';
-    var leaderBadge = (!isAdminWorker(w) && isLeaderWorker(w)) ? '<span class="worker-leader-badge">서무</span>' : '';
-    var roleBadge = adminBadge + leaderBadge + pwPendingBadge(w);
+    // 관리자·서무 배지는 이름 옆이 아니라 맨 앞 「구분」 칸에 — 이름 옆에는 「초기화 대기」만 남는다
+    var 구분 = isAdminWorker(w) ? '<span class="worker-admin-badge">관리자</span>'
+      : (isLeaderWorker(w) ? '<span class="worker-leader-badge">서무</span>' : String(item.seq));
+    var seqCell = '<td class="worker-seq-cell">' + 구분 + '</td>';
+    var roleBadge = pwPendingBadge(w);
     var trCls = isAdminWorker(w) ? ' class="worker-row-admin"' : (isLeaderWorker(w) ? ' class="worker-row-leader"' : '');
     // 잔여 셀 — 서무·관리자에게만 보이는 input (leader-only 클래스)
     var balAnnual = (w.balanceAnnual != null && w.balanceAnnual !== '') ? w.balanceAnnual : '';
@@ -2733,7 +2741,7 @@ function renderWorkerTable() {
       var pwBtn = empIdSafe
         ? '<button class="worker-row-pw" onclick="resetWorkerPassword(\'' + empIdSafe + '\')" title="비밀번호 초기화를 요청합니다. 관리자가 처리해야 완료됩니다.">초기화 요청</button>'
         : '';
-      return '<tr' + trCls + '>' +
+      return '<tr' + trCls + '>' + seqCell +
         '<td><input type="text" value="' + escapeHtml(w.name || '') + '" oninput="updateWorker(' + i + ',\'name\',this.value)">' + roleBadge + '</td>' +
         '<td><input type="text" value="' + escapeHtml(w.employeeId || '') + '" oninput="updateWorker(' + i + ',\'employeeId\',this.value)"></td>' +
         '<td><input type="text" value="' + escapeHtml(w.team || '') + '" oninput="updateWorker(' + i + ',\'team\',this.value)"></td>' +
@@ -2749,7 +2757,7 @@ function renderWorkerTable() {
       var leaderPwBtn = leaderEmpIdSafe
         ? '<button class="worker-row-pw" onclick="resetWorkerPassword(\'' + leaderEmpIdSafe + '\')" title="비밀번호 초기화를 요청합니다. 관리자가 처리해야 완료됩니다.">초기화 요청</button>'
         : '';
-      return '<tr' + trCls + '>' +
+      return '<tr' + trCls + '>' + seqCell +
         '<td class="worker-readonly-cell">' + escapeHtml(w.name || '') + roleBadge + '</td>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.employeeId || '') + '</td>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.team || '') + '</td>' +
@@ -2761,7 +2769,7 @@ function renderWorkerTable() {
       '</tr>';
     } else {
       // 일반 작업자: 잔여 컬럼은 .leader-only로 숨김
-      return '<tr' + trCls + '>' +
+      return '<tr' + trCls + '>' + seqCell +
         '<td class="worker-readonly-cell">' + escapeHtml(w.name || '') + roleBadge + '</td>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.employeeId || '') + '</td>' +
         '<td class="worker-readonly-cell">' + escapeHtml(w.team || '') + '</td>' +

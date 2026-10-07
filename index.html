@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="휴가증">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="style.css?v=20260826">
+  <link rel="stylesheet" href="style.css?v=20261007">
   <!-- 즉시 인증 상태 검사 (메인 콘텐츠 깜빡임 방지) -->
   <script>
     (function() {
@@ -196,7 +196,6 @@
         <button class="btn-secondary btn-small" onclick="document.getElementById('leaveBalanceFile').click()" title="엑셀 양식: 사번 | 이름 | 연차 잔여 | 생휴 잔여 | 하기 잔여">잔여 휴가 업로드</button>
         <input type="file" id="leaveBalanceFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="onLeaveBalanceFileSelected(event)">
         <button class="btn-secondary btn-small" onclick="addWorkerRow()">+ 직접 추가</button>
-        <span class="worker-toolbar-hint">잔여 휴가 양식: 사번 | 이름 | 연차 잔여 | 생휴 잔여 | 하기 잔여</span>
       </div>
       <div class="worker-readonly-notice not-admin-only not-leader-only">
         <div>※ 작업자 명단은 조회만 가능합니다.</div>
@@ -207,6 +206,7 @@
         <table class="worker-table" id="workerTable">
           <thead>
             <tr>
+              <th class="worker-col-seq">구분</th>
               <th>이름</th>
               <th>사번</th>
               <th>근무지</th>
@@ -362,7 +362,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-  <script src="script.js?v=20260826"></script>
+  <script src="script.js?v=20261007"></script>
   <!-- PWA Service Worker 등록 -->
   <script>
     if ('serviceWorker' in navigator) {

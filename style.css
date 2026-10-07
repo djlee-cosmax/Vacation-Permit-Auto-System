@@ -1048,13 +1048,15 @@ input, select, textarea { font-family: inherit; }
   html.role-admin #workerModal .worker-table td.worker-row-actions {
     white-space: nowrap;
   }
-  /* 컬럼 폭 비율 (8컬럼): 이름 / 사번 / 근무지 / 연락처 / 잔여연차 / 잔여생휴 / 잔여하기 / 액션
+  /* 컬럼 폭 비율 (9컬럼): 구분 / 이름 / 사번 / 근무지 / 연락처 / 잔여연차 / 잔여생휴 / 잔여하기 / 액션
      근무지가 「파우더성형실」에서 4px 모자라 잘렸다. 이름은 두세 글자라 남으므로
-     거기서 3% 를 덜어 근무지에 줬다 — 22/11 → 19/14 (2026-09-09). */
+     거기서 3% 를 덜어 근무지에 줬다 — 22/11 → 19/14 (2026-09-09).
+     맨 앞 「구분」(관리자·서무·순번)을 넣으며 이름 옆 역할 배지를 그리로 옮겼다 — 이름 19 → 14,
+     연락처 17 → 16, 사번 14 → 13 을 덜어 구분 7. 합(106)과 근무지 14 는 그대로 (2026-10-07). */
   html.role-leader #workerModal .worker-table th:nth-child(1),
   html.role-leader #workerModal .worker-table td:nth-child(1),
   html.role-admin #workerModal .worker-table th:nth-child(1),
-  html.role-admin #workerModal .worker-table td:nth-child(1) { width: 19%; }
+  html.role-admin #workerModal .worker-table td:nth-child(1) { width: 7%; }
   html.role-leader #workerModal .worker-table th:nth-child(2),
   html.role-leader #workerModal .worker-table td:nth-child(2),
   html.role-admin #workerModal .worker-table th:nth-child(2),
@@ -1062,19 +1064,19 @@ input, select, textarea { font-family: inherit; }
   html.role-leader #workerModal .worker-table th:nth-child(3),
   html.role-leader #workerModal .worker-table td:nth-child(3),
   html.role-admin #workerModal .worker-table th:nth-child(3),
-  html.role-admin #workerModal .worker-table td:nth-child(3) { width: 14%; }
+  html.role-admin #workerModal .worker-table td:nth-child(3) { width: 13%; }
   html.role-leader #workerModal .worker-table th:nth-child(4),
   html.role-leader #workerModal .worker-table td:nth-child(4),
   html.role-admin #workerModal .worker-table th:nth-child(4),
-  html.role-admin #workerModal .worker-table td:nth-child(4) { width: 17%; }
+  html.role-admin #workerModal .worker-table td:nth-child(4) { width: 14%; }
   html.role-leader #workerModal .worker-table th:nth-child(5),
   html.role-leader #workerModal .worker-table td:nth-child(5),
   html.role-admin #workerModal .worker-table th:nth-child(5),
-  html.role-admin #workerModal .worker-table td:nth-child(5) { width: 11%; }
+  html.role-admin #workerModal .worker-table td:nth-child(5) { width: 16%; }
   html.role-leader #workerModal .worker-table th:nth-child(6),
   html.role-leader #workerModal .worker-table td:nth-child(6),
   html.role-admin #workerModal .worker-table th:nth-child(6),
-  html.role-admin #workerModal .worker-table td:nth-child(6) { width: 10%; }
+  html.role-admin #workerModal .worker-table td:nth-child(6) { width: 11%; }
   html.role-leader #workerModal .worker-table th:nth-child(7),
   html.role-leader #workerModal .worker-table td:nth-child(7),
   html.role-admin #workerModal .worker-table th:nth-child(7),
@@ -1082,7 +1084,11 @@ input, select, textarea { font-family: inherit; }
   html.role-leader #workerModal .worker-table th:nth-child(8),
   html.role-leader #workerModal .worker-table td:nth-child(8),
   html.role-admin #workerModal .worker-table th:nth-child(8),
-  html.role-admin #workerModal .worker-table td:nth-child(8) { width: 11%; }
+  html.role-admin #workerModal .worker-table td:nth-child(8) { width: 10%; }
+  html.role-leader #workerModal .worker-table th:nth-child(9),
+  html.role-leader #workerModal .worker-table td:nth-child(9),
+  html.role-admin #workerModal .worker-table th:nth-child(9),
+  html.role-admin #workerModal .worker-table td:nth-child(9) { width: 11%; }
   html.role-leader #workerModal .worker-readonly-cell,
   html.role-admin #workerModal .worker-readonly-cell { font-size: 15px !important; padding: 12px 16px !important; }
   html.role-leader #workerModal .worker-table input,
@@ -1183,9 +1189,9 @@ html.role-admin [data-step]::before {
   flex-shrink: 0;
 }
 
-/* ===== 일반 작업자 — 사번 컬럼 숨김 ===== */
-html.role-worker .worker-table th:nth-child(2),
-html.role-worker .worker-table td:nth-child(2) { display: none !important; }
+/* ===== 일반 작업자 — 사번 컬럼 숨김 (맨 앞 「구분」 칸이 생겨 셋째 칸, 2026-10-07) ===== */
+html.role-worker .worker-table th:nth-child(3),
+html.role-worker .worker-table td:nth-child(3) { display: none !important; }
 
 /* ===== 일반 작업자 — 관리자/서무 전용 요소 숨김 ===== */
 html.role-worker .staff-only { display: none !important; }
@@ -1233,6 +1239,19 @@ html.leader-mode .not-leader-only { display: none !important; }
 }
 .worker-admin-badge { background: #c8102e; }
 .worker-leader-badge { background: #ff7043; }
+
+/* 「구분」 칸 — 관리자·서무 배지 또는 순번. 배지가 이름 뒤가 아니라 칸 맨 앞이라 왼쪽 여백을 뺀다 */
+.worker-table .worker-col-seq,
+.worker-table .worker-seq-cell {
+  text-align: center;
+  white-space: nowrap;
+}
+.worker-table .worker-seq-cell {
+  color: #888;
+  font-variant-numeric: tabular-nums;
+}
+.worker-seq-cell .worker-admin-badge,
+.worker-seq-cell .worker-leader-badge { margin-left: 0; }
 
 /* 초기화 대기 — 요청만 접수되고 관리자 처리가 남은 상태.
    역할 배지와 색이 겹치면 안 된다. 이건 신분이 아니라 "할 일" 이다. */
