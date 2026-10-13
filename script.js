@@ -1079,6 +1079,21 @@ function countWorkdays(startStr, endStr) {
   return n;
 }
 
+// 시작일부터 세어 n 번째 평일(주말·공휴일 제외). 시작일이 쉬는 날이면 다음 평일부터 센다.
+function nthWorkday(startStr, n) {
+  var d = new Date(startStr + 'T00:00:00');
+  var seen = 0;
+  for (var guard = 0; guard < 60; guard++) {
+    var dow = d.getDay();
+    if (dow !== 0 && dow !== 6 && !KR_HOLIDAYS_SHORT[dateToStr(d)]) {
+      seen++;
+      if (seen >= n) break;
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return dateToStr(d);
+}
+
 // ----- 초기화 -----
 (function init() {
   // 기존 leave 데이터에 옛 type명(예: '무결')이 있으면 신 명칭으로 마이그레이션
@@ -1199,16 +1214,20 @@ function refreshFormTotals() {
     // 있고, 그러면 각각 1개로 잡혀 사흘 쓴 사람이 3개를 잃는다.
     // (2026-08 에 실제로 발생했다 — 8/05·8/06·8/07 세 장)
     // 시작일을 고르면 종료일을 3일치로 채우고 잠근다.
+    // 3일은 평일로 센다. 달력으로 +2 하면 목요일 시작이 토요일에 끝나
+    // 그룹웨어에는 이틀만 올라가는데 1개(3일)가 빠진다. (2026-10 작업자 문의)
     var startVal = document.getElementById('leaveStart').value;
+    var startOff = false;
     if (startVal) {
-      var d = new Date(startVal + 'T00:00:00');
-      d.setDate(d.getDate() + ((TYPE_WEIGHT[type] || 1) - 1));
-      endEl.value = dateToStr(d);
+      endEl.value = nthWorkday(startVal, TYPE_WEIGHT[type] || 1);
+      startOff = getWorkdaysList(startVal, startVal).length === 0;
     }
     endEl.readOnly = true;
-    endEl.title = '하기휴가는 1개 = 연속 3일이라 시작일에 맞춰 자동으로 정해집니다.';
+    endEl.title = '하기휴가는 1개 = 평일 3일이라 시작일에 맞춰 자동으로 정해집니다.';
     if (hintEl) {
-      hintEl.textContent = '※ 하기휴가는 1개 = 연속 3일입니다. 시작일만 고르면 종료일은 자동입니다.';
+      hintEl.textContent = startOff
+        ? '※ 시작일이 주말·공휴일입니다. 평일로 골라 주세요.'
+        : '※ 하기휴가는 1개 = 평일 3일입니다. 시작일만 고르면 종료일은 주말·공휴일을 빼고 자동으로 정해집니다.';
       hintEl.style.display = '';
     }
   } else {
@@ -1299,6 +1318,16 @@ async function addLeaveImpl() {
     var eMonth = parseInt((end || '').split('-')[1], 10);
     if (!sMonth || !eMonth || sMonth < 5 || sMonth > 10 || eMonth < 5 || eMonth > 10) {
       showToast('하기휴가는 5~10월에만 사용 가능합니다.\n기간을 다시 확인해 주세요.', 'error');
+      return;
+    }
+    // 1개 = 평일 3일. 시작일이 쉬는 날이거나 평일이 3일이 아니면 막는다.
+    var summerDays = getWorkdaysList(start, end);
+    if (!summerDays.length || summerDays[0] !== start) {
+      showToast('하기휴가 시작일이 주말·공휴일입니다.\n평일로 다시 골라 주세요.', 'error');
+      return;
+    }
+    if (summerDays.length !== (TYPE_WEIGHT[type] || 3)) {
+      showToast('하기휴가는 평일 3일입니다.\n시작일을 다시 골라 주세요.', 'error');
       return;
     }
   }

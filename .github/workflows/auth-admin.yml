@@ -36,6 +36,7 @@ on:
           - fixsummer
           - dropleave
           - setbirth
+          - summercheck
           - remove
       emp_id:
         description: '사번 (leavecheck 은 이름도 · setbirth 는 "사번=값,사번=값")'

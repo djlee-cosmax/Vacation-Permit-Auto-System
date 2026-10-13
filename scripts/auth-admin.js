@@ -1319,6 +1319,58 @@ async function actionFixSummer(db) {
   console.log(`>>> ${merges.length}명 정리 완료. 다음 정산에서 하기휴가 1개만 차감됩니다.`);
 }
 
+// script.js KR_HOLIDAYS_SHORT 의 2026 · 2027 분. 하기휴가 평일 수를 셀 때만 쓴다.
+const KR_HOLIDAYS = new Set([
+  '2026-01-01', '2026-02-16', '2026-02-17', '2026-02-18', '2026-03-01', '2026-03-02',
+  '2026-05-05', '2026-05-24', '2026-05-25', '2026-06-03', '2026-06-06', '2026-08-15', '2026-08-17',
+  '2026-09-24', '2026-09-25', '2026-09-26', '2026-09-28', '2026-10-03', '2026-10-05', '2026-10-09', '2026-12-25',
+  '2027-01-01', '2027-02-06', '2027-02-07', '2027-02-08', '2027-02-09', '2027-03-01',
+  '2027-05-05', '2027-05-13', '2027-06-06', '2027-08-15', '2027-08-16',
+  '2027-09-14', '2027-09-15', '2027-09-16', '2027-10-03', '2027-10-04', '2027-10-09', '2027-10-11',
+  '2027-12-25', '2027-12-27',
+]);
+
+// 하기휴가 1개 = 평일 3일. 8/26 부터 작성 화면이 종료일을 달력으로 +2 해서
+// 목·금 시작이면 주말이 끼어 평일이 3일이 안 됐다(2026-10 작업자 문의).
+// 그런 휴가증을 찾는다 — 읽기만 한다.
+async function actionSummerCheck(db) {
+  console.log('===== 하기휴가 평일 수 점검 (읽기만) =====');
+  const DOW = '일월화수목금토';
+  const snap = await db.collection('leaves').get();
+  const rows = [];
+  snap.forEach((d) => {
+    const v = d.data() || {};
+    if (!leaveItemsOf(v).some((it) => it.type === '하기휴가')) return;
+    const start = String(v.start || ''), end = String(v.end || '');
+    const days = [];
+    const t = new Date(start + 'T00:00:00Z');
+    const e = new Date(end + 'T00:00:00Z');
+    for (let g = 0; t <= e && g < 60; g++) {
+      const ymd = t.toISOString().slice(0, 10);
+      const w = t.getUTCDay();
+      if (w !== 0 && w !== 6 && !KR_HOLIDAYS.has(ymd)) days.push(ymd);
+      t.setUTCDate(t.getUTCDate() + 1);
+    }
+    const dw = (s) => (s ? DOW[new Date(s + 'T00:00:00Z').getUTCDay()] : '?');
+    rows.push({
+      id: d.id, empId: String(v.employeeId || '').trim() || '(사번없음)',
+      name: maskName(v.name), team: v.team || '-',
+      start, end, sw: dw(start), ew: dw(end), n: days.length,
+      startOff: days[0] !== start,
+      processed: v.processed === true, deducted: !!v.deductedAt,
+    });
+  });
+  rows.sort((a, b) => a.start.localeCompare(b.start));
+  const bad = rows.filter((r) => r.n !== 3 || r.startOff);
+  console.log(`하기휴가 휴가증 ${rows.length}장 · 평일 3일이 아닌 것 ${bad.length}장`);
+  console.log('');
+  bad.forEach((r) => {
+    console.log(`  ${r.empId}  ${r.name} / ${r.team}  ${r.start}(${r.sw}) ~ ${r.end}(${r.ew})`
+      + `  평일 ${r.n}일${r.startOff ? ' · 시작일이 쉬는 날' : ''}`
+      + `  처리 ${r.processed ? 'O' : 'X'}  차감 ${r.deducted ? 'O' : 'X'}  ${r.id}`);
+  });
+}
+
 // 생휴를 이번 정산에서 건너뛸 것인가.
 //
 // 생휴는 매달 1일 1개로 리셋된다. 그래서 **지난달에 쓴 생휴를 이번 달에 빼면
@@ -2185,6 +2237,7 @@ async function main() {
   if (action === 'fixsummer') return actionFixSummer(db);
   if (action === 'dropleave') return actionDropLeave(db);
   if (action === 'setbirth') return actionSetBirth(db);
+  if (action === 'summercheck') return actionSummerCheck(db);
   throw new Error(`알 수 없는 ACTION: ${action} (status | inspect | rules | deployrules `
     + `| testrules | cleanup | claims | premigrate | syncprofile | stats | anonoff `
     + `| fixleaveids | reset | remove)`);
