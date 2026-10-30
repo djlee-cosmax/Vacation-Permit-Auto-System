@@ -1573,13 +1573,24 @@ function deleteLeaveFromCloud(id) {
     .catch(function(err) { console.warn('Firestore 삭제 실패:', err); });
 }
 
-// 본인이 작성한 휴가증 중 서버에서 처리 완료(processed=true)된 건 우측 카드에서 자동 제거
-// 페이지 로드 + 인증 완료 시 호출
+// 본인이 작성한 휴가증 정리 — 우측 카드(이 휴대폰에 저장된 목록)에서 자동 제거
+//   ① 서버에서 처리 완료(processed=true)된 건
+//   ② 서버에 올라간 적이 있는데 서버 문서가 없어진 건 — 매주 만료 정리(30일) · 서무 삭제.
+//      앱이 켜져 있을 때 지워지면 startLeaveDeletionWatcher 가 걷어 내지만, 꺼져 있던 사이
+//      지워진 것은 계속 남았다(2026-10-30 작업자 문의). 아직 안 올라간 것(재전송 · 전송 중)은
+//      작업자가 다시 보내야 하므로 남기고, 막 올린 것이 조회에 늦게 잡히는 경우를 피해 2일 지난 것만.
+//      서무 · 관리자 화면 목록에는 남의 휴가증이 섞여 있어 ② 는 작업자 화면에서만, 본인 사번 것만.
+// 페이지 로드(인증 완료) · 앱으로 돌아올 때(화면이 다시 보일 때 — 1분에 한 번까지) 호출.
+// 예전에는 페이지 로드 때만 돌아, 앱을 닫지 않고 다시 띄우면 처리 완료된 것도 남아 있었다.
+var _lastLeaveCleanupAt = 0;
 function cleanupProcessedLeavesFromCloud() {
   if (!FB_DB || !FB_UID || leaves.length === 0) return;
   var sess = getSession();
   var empId = String((sess && sess.empId) || '').trim();
   if (!empId) return;
+  var role = (sess && sess.role) || 'worker';
+  var isStaffView = (role === 'admin' || role === 'leader');
+  _lastLeaveCleanupAt = Date.now();
   // 본인 것만 가져와서 processed 는 여기서 거른다.
   // 사번+processed 두 조건을 서버에 걸면 복합 색인이 필요한데, 한 사람 문서는
   // 몇 건 안 돼 걸러 쓰는 편이 간단하다.
@@ -1588,12 +1599,22 @@ function cleanupProcessedLeavesFromCloud() {
     .get()
     .then(function(snapshot) {
       var processedIds = {};
+      var serverIds = {};
       snapshot.forEach(function(doc) {
         var d = doc.data();
+        serverIds[doc.id] = true;
         if (d.processed === true) processedIds[doc.id] = true;
       });
+      var cutoff = Date.now() - 2 * 24 * 60 * 60 * 1000;
       var before = leaves.length;
-      leaves = leaves.filter(function(l) { return !processedIds[l.id]; });
+      leaves = leaves.filter(function(l) {
+        if (processedIds[l.id]) return false;                                   // ①
+        if (serverIds[l.id] || isStaffView) return true;
+        if (l.syncStatus === 'failed' || l.syncStatus === 'pending') return true; // 아직 안 올라감
+        if (String(l.employeeId || '').trim() !== empId) return true;           // 이 조회로는 모름
+        var t = Date.parse(l.createdAt || '');
+        return !(t && t < cutoff);                                              // ② 2일 지난 것만
+      });
       if (leaves.length !== before) {
         saveLeaves();
         renderLeaveList();
@@ -1601,6 +1622,16 @@ function cleanupProcessedLeavesFromCloud() {
     })
     .catch(function(err) { console.warn('processed cleanup 실패:', err); });
 }
+
+// 앱(탭)으로 돌아올 때도 정리 — 휴대폰은 앱을 닫지 않고 뒤에 두었다가 그대로 다시 띄운다.
+// pageshow 는 뒤로 가기 캐시에서 되살아난 경우(iOS 사파리)까지. 1분에 한 번까지만.
+function _cleanupLeavesOnReturn() {
+  if (document.visibilityState && document.visibilityState !== 'visible') return;
+  if (Date.now() - _lastLeaveCleanupAt < 60 * 1000) return;
+  cleanupProcessedLeavesFromCloud();
+}
+document.addEventListener('visibilitychange', _cleanupLeavesOnReturn);
+window.addEventListener('pageshow', _cleanupLeavesOnReturn);
 
 function saveLeaves() {
   localStorage.setItem('p5_leaves', JSON.stringify(leaves));
